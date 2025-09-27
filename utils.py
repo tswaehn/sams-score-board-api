@@ -456,6 +456,8 @@ def _filter_matches_for_today(document: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 
 
+
+
 def render_live_games_html(payload: str) -> str:
     document = json.loads(payload)
     series_mapping = extract_series_mapping(payload)
@@ -469,28 +471,68 @@ def render_live_games_html(payload: str) -> str:
         scheduled = escape(game.get("scheduledIso") or "Unknown time")
         status = _render_status(game)
         sets = game.get("sets") or []
-        set_items = []
+
+        set_rows: List[str] = []
+        team1_wins = 0
+        team2_wins = 0
         for match_set in sets:
             number = match_set.get("number")
             team1_points = match_set.get("team1")
             team2_points = match_set.get("team2")
-            set_items.append(
-                f"<li>Set {number}: {team1_points}-{team2_points}</li>"
+            if not (
+                isinstance(number, int)
+                and isinstance(team1_points, int)
+                and isinstance(team2_points, int)
+            ):
+                continue
+
+            if team1_points > team2_points:
+                team1_wins += 1
+            elif team2_points > team1_points:
+                team2_wins += 1
+
+            team1_class = "set-score-value winner" if team1_points > team2_points else "set-score-value"
+            team2_class = "set-score-value winner" if team2_points > team1_points else "set-score-value"
+
+            set_rows.append(
+                "<li class='set-row'>"
+                f"<span class='set-label'>Set {number}</span>"
+                f"<span class='set-score'><span class='{team1_class}'>{team1_points}</span>"
+                " - "
+                f"<span class='{team2_class}'>{team2_points}</span></span>"
+                "</li>"
             )
-        if set_items:
+
+        set_list_html = "".join(set_rows)
+        if set_list_html:
             sets_markup = (
-                f"<div class='match-sets'>Sets played: {len(sets)}</div>"
-                f"<ul class='set-list'>{''.join(set_items)}</ul>"
+                "<div class='match-sets-container'>"
+                f"<div class='match-sets'>Sets played: {len(set_rows)}</div>"
+                "<ul class='set-list'>"
+                f"{set_list_html}"
+                "</ul>"
+                f"<div class='set-summary'>Sets won: {team1_wins}-{team2_wins}</div>"
+                "</div>"
             )
         else:
-            sets_markup = "<div class='match-sets'>Sets played: 0</div>"
+            sets_markup = (
+                "<div class='match-sets-container'>"
+                "<div class='match-sets'>Sets played: 0</div>"
+                "<div class='set-summary'>Sets won: 0-0</div>"
+                "</div>"
+            )
+
         items.append(
-            "<li>"
+            "<li class='live-match'>"
+            "<div class='match-content'>"
+            "<div class='match-details'>"
             f"<div class='match-series'>{escape(series_name)}</div>"
             f"<div class='match-teams'>{team1} vs {team2}</div>"
             f"<div class='match-time'>{scheduled}</div>"
             f"<div class='match-status'>{status}</div>"
+            "</div>"
             f"{sets_markup}"
+            "</div>"
             "</li>"
         )
 
@@ -508,15 +550,22 @@ def render_live_games_html(payload: str) -> str:
         "body{font-family:Arial,sans-serif;margin:2rem;background:#f5f5f5;}"
         "h1{margin-bottom:1rem;}"
         "ul{list-style:none;padding:0;}"
-        "li{background:#fff;padding:1rem;margin-bottom:1rem;border-radius:8px;"
-        "box-shadow:0 1px 3px rgba(0,0,0,0.1);}"
-        ".match-series{font-weight:bold;color:#005a9c;margin-bottom:0.25rem;}"
-        ".match-teams{font-size:1.1rem;margin-bottom:0.25rem;}"
+        "li.live-match{background:#fff;padding:1rem;margin-bottom:1rem;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);}"
+        ".match-content{display:flex;justify-content:space-between;align-items:flex-start;gap:1.5rem;flex-wrap:wrap;}"
+        ".match-details{flex:1 1 240px;}"
+        ".match-series{font-weight:bold;color:#005a9c;margin-bottom:0.5rem;}"
+        ".match-teams{font-size:1.2rem;margin-bottom:0.5rem;}"
         ".match-time{color:#555;margin-bottom:0.25rem;}"
-        ".match-status{font-size:0.9rem;color:#777;}"
-        ".match-sets{margin-top:0.5rem;color:#333;}"
-        ".set-list{list-style:none;padding:0;margin:0.5rem 0 0;display:flex;flex-wrap:wrap;gap:0.5rem;}"
-        ".set-list li{background:#e7effa;padding:0.25rem 0.5rem;border-radius:4px;}"
+        ".match-status{font-size:0.95rem;color:#777;}"
+        ".match-sets-container{flex:0 0 220px;text-align:right;}"
+        ".match-sets{font-size:1.3rem;color:#333;margin-bottom:0.75rem;}"
+        ".set-list{list-style:none;padding:0;margin:0;}"
+        ".set-row{display:flex;justify-content:space-between;align-items:center;font-size:1.25rem;margin-bottom:0.4rem;}"
+        ".set-label{color:#555;margin-right:1rem;font-size:1rem;}"
+        ".set-score{display:flex;gap:0.45rem;align-items:center;font-size:1.65rem;}"
+        ".set-score-value{display:inline-block;min-width:1.8rem;text-align:center;}"
+        ".set-score-value.winner{font-weight:bold;font-size:1.85rem;}"
+        ".set-summary{margin-top:0.9rem;font-size:1.2rem;color:#222;}"
         "nav a{margin-right:1rem;}"
         "</style>"
         "</head>"
