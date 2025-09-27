@@ -472,6 +472,7 @@ def _logo_img_tag(logo_url: str, team_name: str) -> str:
     return f"<img src='{safe_url}' alt='{safe_name} logo' class='team-logo' />"
 
 
+
 def render_live_games_html(payload: str) -> str:
     document = json.loads(payload)
     series_mapping = extract_series_mapping(payload)
@@ -494,10 +495,8 @@ def render_live_games_html(payload: str) -> str:
         scheduled = escape(game.get("scheduledIso") or "Unknown time")
         status = _render_status(game)
 
-        team1_info = team_entries.get(game.get("team1Id"), {})
-        team2_info = team_entries.get(game.get("team2Id"), {})
-        team1_logo_raw = team1_info.get("logoImage200") or ""
-        team2_logo_raw = team2_info.get("logoImage200") or ""
+        team1_logo_raw = (team_entries.get(game.get("team1Id"), {}) or {}).get("logoImage200") or ""
+        team2_logo_raw = (team_entries.get(game.get("team2Id"), {}) or {}).get("logoImage200") or ""
 
         set_rows: List[str] = []
         team1_wins = 0
@@ -576,9 +575,9 @@ def render_live_games_html(payload: str) -> str:
         )
 
     if not items:
-        items.append("<li>No games scheduled for today.</li>")
+        items.append("<li class='live-match empty'><div class='match-content'>No games scheduled for today.</div></li>")
 
-    list_markup = "\n".join(items)
+    list_markup = "".join(items)
     return (
         "<!DOCTYPE html>"
         "<html lang='en'>"
@@ -588,33 +587,36 @@ def render_live_games_html(payload: str) -> str:
         "<style>"
         "body{font-family:Arial,sans-serif;margin:2rem;background:#f5f5f5;}"
         "h1{margin-bottom:1rem;}"
-        "ul{list-style:none;padding:0;}"
-        "li.live-match{background:#fff;padding:1rem;margin-bottom:1rem;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);"
-        ".match-content{display:flex;justify-content:space-between;align-items:flex-start;gap:1.5rem;flex-wrap:wrap;}"
-        ".match-details{flex:1 1 260px;}"
-        ".match-series{font-weight:bold;color:#005a9c;margin-bottom:0.5rem;}"
-        ".match-teams{font-size:1.2rem;margin-bottom:0.5rem;}"
+        "ul.live-list{display:flex;flex-wrap:wrap;gap:1.5rem;list-style:none;padding:0;margin:0;}"
+        "li.live-match{background:#fff;padding:1rem;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);flex:1 1 calc(33.333% - 1.5rem);max-width:calc(33.333% - 1.5rem);box-sizing:border-box;display:flex;}"
+        "li.live-match.empty{justify-content:center;align-items:center;text-align:center;}"
+        "@media (max-width:1024px){li.live-match{flex:1 1 calc(50% - 1.5rem);max-width:calc(50% - 1.5rem);}}"
+        "@media (max-width:640px){li.live-match{flex:1 1 100%;max-width:100%;}}"
+        ".match-content{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;width:100%;}"
+        ".match-details{flex:1 1 160px;}"
+        ".match-series{font-weight:bold;color:#005a9c;margin-bottom:0.4rem;}"
+        ".match-teams{font-size:1.15rem;margin-bottom:0.4rem;}"
         ".match-time{color:#555;margin-bottom:0.25rem;}"
         ".match-status{font-size:0.95rem;color:#777;}"
-        ".match-logos{display:flex;gap:1rem;margin-top:0.75rem;}"
-        ".team-logo-container{width:64px;height:64px;border-radius:8px;background:#efefef;display:flex;align-items:center;justify-content:center;overflow:hidden;}"
+        ".match-logos{display:flex;gap:0.75rem;margin-top:0.75rem;}"
+        ".team-logo-container{width:56px;height:56px;border-radius:8px;background:#efefef;display:flex;align-items:center;justify-content:center;overflow:hidden;}"
         ".team-logo{max-width:100%;max-height:100%;object-fit:contain;}"
-        ".match-sets-container{flex:0 0 240px;text-align:right;}"
-        ".match-sets{font-size:1.3rem;color:#333;margin-bottom:0.75rem;}"
+        ".match-sets-container{flex:0 0 200px;text-align:right;}"
+        ".match-sets{font-size:1.2rem;color:#333;margin-bottom:0.6rem;}"
         ".set-list{list-style:none;padding:0;margin:0;}"
-        ".set-row{display:flex;justify-content:space-between;align-items:center;font-size:1.25rem;margin-bottom:0.4rem;}"
-        ".set-label{color:#555;margin-right:1rem;font-size:1rem;}"
-        ".set-score{display:flex;gap:0.45rem;align-items:center;font-size:1.65rem;}"
-        ".set-score-value{display:inline-block;min-width:1.8rem;text-align:center;}"
-        ".set-score-value.winner{font-weight:bold;font-size:1.85rem;}"
-        ".set-summary{margin-top:0.9rem;font-size:1.2rem;color:#222;}"
+        ".set-row{display:flex;justify-content:space-between;align-items:center;font-size:1.2rem;margin-bottom:0.35rem;}"
+        ".set-label{color:#555;margin-right:0.75rem;font-size:1rem;}"
+        ".set-score{display:flex;gap:0.35rem;align-items:center;font-size:1.55rem;}"
+        ".set-score-value{display:inline-block;min-width:1.6rem;text-align:center;}"
+        ".set-score-value.winner{font-weight:bold;font-size:1.75rem;}"
+        ".set-summary{margin-top:0.75rem;font-size:1.1rem;color:#222;}"
         "nav a{margin-right:1rem;}"
         "</style>"
         "</head>"
         "<body>"
         f"{_NAV_HTML}"
         "<h1>Live Games Today</h1>"
-        f"<ul>{list_markup}</ul>"
+        f"<ul class='live-list'>{list_markup}</ul>"
         "</body>"
         "</html>"
     )
