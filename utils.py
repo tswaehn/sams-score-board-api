@@ -445,6 +445,8 @@ def _filter_matches_for_today(document: Dict[str, Any]) -> List[Dict[str, Any]]:
                     "scheduledIso": scheduled_dt.isoformat(),
                     "team1": match.get("teamDescription1"),
                     "team2": match.get("teamDescription2"),
+                    "team1Id": match.get("team1"),
+                    "team2Id": match.get("team2"),
                     "finished": state.get("finished"),
                     "finalized": state.get("finalized"),
                     "sets": raw_sets,
@@ -458,6 +460,18 @@ def _filter_matches_for_today(document: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 
 
+
+
+
+
+def _logo_img_tag(logo_url: str, team_name: str) -> str:
+    if not logo_url:
+        return ""
+    safe_url = escape(logo_url)
+    safe_name = escape(team_name)
+    return f"<img src='{safe_url}' alt='{safe_name} logo' class='team-logo' />"
+
+
 def render_live_games_html(payload: str) -> str:
     document = json.loads(payload)
     series_mapping = extract_series_mapping(payload)
@@ -465,17 +479,30 @@ def render_live_games_html(payload: str) -> str:
 
     items: List[str] = []
     for game in games:
-        series_name = series_mapping.get(game.get("seriesUuid"), "")
-        team1 = escape(game.get("team1", "Unknown"))
-        team2 = escape(game.get("team2", "Unknown"))
+        series_uuid = game.get("seriesUuid")
+        series_info = document.get("matchSeries", {}).get(series_uuid, {})
+        team_entries = {
+            team.get("id"): team
+            for team in series_info.get("teams", [])
+            if isinstance(team, dict)
+        }
+
+        team1_name = game.get("team1", "Unknown")
+        team2_name = game.get("team2", "Unknown")
+        team1 = escape(team1_name)
+        team2 = escape(team2_name)
         scheduled = escape(game.get("scheduledIso") or "Unknown time")
         status = _render_status(game)
-        sets = game.get("sets") or []
+
+        team1_info = team_entries.get(game.get("team1Id"), {})
+        team2_info = team_entries.get(game.get("team2Id"), {})
+        team1_logo_raw = team1_info.get("logoImage200") or ""
+        team2_logo_raw = team2_info.get("logoImage200") or ""
 
         set_rows: List[str] = []
         team1_wins = 0
         team2_wins = 0
-        for match_set in sets:
+        for match_set in game.get("sets", []):
             number = match_set.get("number")
             team1_points = match_set.get("team1")
             team2_points = match_set.get("team2")
@@ -522,14 +549,26 @@ def render_live_games_html(payload: str) -> str:
                 "</div>"
             )
 
+        logo_markup = ""
+        if team1_logo_raw or team2_logo_raw:
+            logo_markup = (
+                "<div class='match-logos'>"
+                f"<div class='team-logo-container'>{_logo_img_tag(team1_logo_raw, team1_name)}</div>"
+                f"<div class='team-logo-container'>{_logo_img_tag(team2_logo_raw, team2_name)}</div>"
+                "</div>"
+            )
+
+        series_name = escape(series_info.get("name", series_mapping.get(series_uuid, "")))
+
         items.append(
             "<li class='live-match'>"
             "<div class='match-content'>"
             "<div class='match-details'>"
-            f"<div class='match-series'>{escape(series_name)}</div>"
+            f"<div class='match-series'>{series_name}</div>"
             f"<div class='match-teams'>{team1} vs {team2}</div>"
             f"<div class='match-time'>{scheduled}</div>"
             f"<div class='match-status'>{status}</div>"
+            f"{logo_markup}"
             "</div>"
             f"{sets_markup}"
             "</div>"
@@ -550,14 +589,17 @@ def render_live_games_html(payload: str) -> str:
         "body{font-family:Arial,sans-serif;margin:2rem;background:#f5f5f5;}"
         "h1{margin-bottom:1rem;}"
         "ul{list-style:none;padding:0;}"
-        "li.live-match{background:#fff;padding:1rem;margin-bottom:1rem;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);}"
+        "li.live-match{background:#fff;padding:1rem;margin-bottom:1rem;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);"
         ".match-content{display:flex;justify-content:space-between;align-items:flex-start;gap:1.5rem;flex-wrap:wrap;}"
-        ".match-details{flex:1 1 240px;}"
+        ".match-details{flex:1 1 260px;}"
         ".match-series{font-weight:bold;color:#005a9c;margin-bottom:0.5rem;}"
         ".match-teams{font-size:1.2rem;margin-bottom:0.5rem;}"
         ".match-time{color:#555;margin-bottom:0.25rem;}"
         ".match-status{font-size:0.95rem;color:#777;}"
-        ".match-sets-container{flex:0 0 220px;text-align:right;}"
+        ".match-logos{display:flex;gap:1rem;margin-top:0.75rem;}"
+        ".team-logo-container{width:64px;height:64px;border-radius:8px;background:#efefef;display:flex;align-items:center;justify-content:center;overflow:hidden;}"
+        ".team-logo{max-width:100%;max-height:100%;object-fit:contain;}"
+        ".match-sets-container{flex:0 0 240px;text-align:right;}"
         ".match-sets{font-size:1.3rem;color:#333;margin-bottom:0.75rem;}"
         ".set-list{list-style:none;padding:0;margin:0;}"
         ".set-row{display:flex;justify-content:space-between;align-items:center;font-size:1.25rem;margin-bottom:0.4rem;}"
