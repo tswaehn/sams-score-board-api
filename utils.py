@@ -138,12 +138,29 @@ def render_upcoming_games_html(payload: str, limit: int = 10) -> str:
         team1 = escape(game.get("team1", "Unknown"))
         team2 = escape(game.get("team2", "Unknown"))
         status = _render_status(game)
+        sets = game.get("sets") or []
+        set_items = []
+        for match_set in sets:
+            number = match_set.get("number")
+            team1_points = match_set.get("team1")
+            team2_points = match_set.get("team2")
+            set_items.append(
+                f"<li>Set {number}: {team1_points}-{team2_points}</li>"
+            )
+        if set_items:
+            sets_markup = (
+                f"<div class='match-sets'>Sets played: {len(sets)}</div>"
+                f"<ul class='set-list'>{''.join(set_items)}</ul>"
+            )
+        else:
+            sets_markup = "<div class='match-sets'>Sets played: 0</div>"
         items.append(
             "<li>"
             f"<div class='match-series'>{escape(series_name)}</div>"
             f"<div class='match-teams'>{team1} vs {team2}</div>"
             f"<div class='match-time'>{escape(scheduled)}</div>"
             f"<div class='match-status'>{status}</div>"
+            f"{sets_markup}"
             "</li>"
         )
 
@@ -167,6 +184,9 @@ def render_upcoming_games_html(payload: str, limit: int = 10) -> str:
         ".match-teams{font-size:1.1rem;margin-bottom:0.25rem;}"
         ".match-time{color:#555;margin-bottom:0.25rem;}"
         ".match-status{font-size:0.9rem;color:#777;}"
+        ".match-sets{margin-top:0.5rem;color:#333;}"
+        ".set-list{list-style:none;padding:0;margin:0.5rem 0 0;display:flex;flex-wrap:wrap;gap:0.5rem;}"
+        ".set-list li{background:#e7effa;padding:0.25rem 0.5rem;border-radius:4px;}"
         "nav a{margin-right:1rem;}"
         "</style>"
         "</head>"
@@ -396,18 +416,44 @@ def _filter_matches_for_today(document: Dict[str, Any]) -> List[Dict[str, Any]]:
 
             match_uuid = match.get("id")
             state = match_states.get(match_uuid, {}) if match_uuid else {}
-            games.append({
-                "matchUuid": match_uuid,
-                "seriesUuid": match.get("matchSeries"),
-                "scheduledIso": scheduled_dt.isoformat(),
-                "team1": match.get("teamDescription1"),
-                "team2": match.get("teamDescription2"),
-                "finished": state.get("finished"),
-                "finalized": state.get("finalized"),
-            })
+            raw_sets = []
+            for match_set in state.get("matchSets") or []:
+                set_number = match_set.get("setNumber")
+                set_score = match_set.get("setScore") or {}
+                team1_points = set_score.get("team1")
+                team2_points = set_score.get("team2")
+                if not (
+                    isinstance(set_number, int)
+                    and isinstance(team1_points, int)
+                    and isinstance(team2_points, int)
+                ):
+                    continue
+                raw_sets.append(
+                    {
+                        "number": set_number,
+                        "team1": team1_points,
+                        "team2": team2_points,
+                    }
+                )
+
+            raw_sets.sort(key=lambda entry: entry["number"])
+
+            games.append(
+                {
+                    "matchUuid": match_uuid,
+                    "seriesUuid": match.get("matchSeries"),
+                    "scheduledIso": scheduled_dt.isoformat(),
+                    "team1": match.get("teamDescription1"),
+                    "team2": match.get("teamDescription2"),
+                    "finished": state.get("finished"),
+                    "finalized": state.get("finalized"),
+                    "sets": raw_sets,
+                }
+            )
 
     games.sort(key=lambda entry: entry.get("scheduledIso") or "")
     return games
+
 
 
 def render_live_games_html(payload: str) -> str:
@@ -421,13 +467,30 @@ def render_live_games_html(payload: str) -> str:
         team1 = escape(game.get("team1", "Unknown"))
         team2 = escape(game.get("team2", "Unknown"))
         scheduled = escape(game.get("scheduledIso") or "Unknown time")
-        status = "Finished" if game.get("finished") else ("Finalized" if game.get("finalized") else "Scheduled")
+        status = _render_status(game)
+        sets = game.get("sets") or []
+        set_items = []
+        for match_set in sets:
+            number = match_set.get("number")
+            team1_points = match_set.get("team1")
+            team2_points = match_set.get("team2")
+            set_items.append(
+                f"<li>Set {number}: {team1_points}-{team2_points}</li>"
+            )
+        if set_items:
+            sets_markup = (
+                f"<div class='match-sets'>Sets played: {len(sets)}</div>"
+                f"<ul class='set-list'>{''.join(set_items)}</ul>"
+            )
+        else:
+            sets_markup = "<div class='match-sets'>Sets played: 0</div>"
         items.append(
             "<li>"
             f"<div class='match-series'>{escape(series_name)}</div>"
             f"<div class='match-teams'>{team1} vs {team2}</div>"
             f"<div class='match-time'>{scheduled}</div>"
             f"<div class='match-status'>{status}</div>"
+            f"{sets_markup}"
             "</li>"
         )
 
@@ -451,6 +514,9 @@ def render_live_games_html(payload: str) -> str:
         ".match-teams{font-size:1.1rem;margin-bottom:0.25rem;}"
         ".match-time{color:#555;margin-bottom:0.25rem;}"
         ".match-status{font-size:0.9rem;color:#777;}"
+        ".match-sets{margin-top:0.5rem;color:#333;}"
+        ".set-list{list-style:none;padding:0;margin:0.5rem 0 0;display:flex;flex-wrap:wrap;gap:0.5rem;}"
+        ".set-list li{background:#e7effa;padding:0.25rem 0.5rem;border-radius:4px;}"
         "nav a{margin-right:1rem;}"
         "</style>"
         "</head>"
