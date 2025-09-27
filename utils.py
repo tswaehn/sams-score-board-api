@@ -453,7 +453,7 @@ def _filter_matches_for_today(document: Dict[str, Any]) -> List[Dict[str, Any]]:
                 }
             )
 
-    games.sort(key=lambda entry: entry.get("scheduledIso") or "")
+    games.sort(key=lambda entry: entry.get("scheduledIso") or "", reverse=True)
     return games
 
 
