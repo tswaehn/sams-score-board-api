@@ -559,8 +559,13 @@ def render_live_games_html(payload: str) -> str:
 
         series_name = escape(series_info.get("name", series_mapping.get(series_uuid, "")))
 
+        classes = ['live-match']
+        if game.get("finished"):
+            classes.append('finished')
+        li_class = ' '.join(classes)
+
         items.append(
-            "<li class='live-match'>"
+            f"<li class='{li_class}'>"
             "<div class='match-content'>"
             "<div class='match-details'>"
             f"<div class='match-series'>{series_name}</div>"
@@ -589,6 +594,7 @@ def render_live_games_html(payload: str) -> str:
         "h1{margin-bottom:1rem;}"
         "ul.live-list{display:flex;flex-wrap:wrap;gap:1.5rem;list-style:none;padding:0;margin:0;}"
         "li.live-match{background:#fff;padding:1rem;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);flex:1 1 calc(33.333% - 1.5rem);max-width:calc(33.333% - 1.5rem);box-sizing:border-box;display:flex;}"
+        "li.live-match.finished{background:#f1f2f4;}"
         "li.live-match.empty{justify-content:center;align-items:center;text-align:center;}"
         "@media (max-width:1024px){li.live-match{flex:1 1 calc(50% - 1.5rem);max-width:calc(50% - 1.5rem);}}"
         "@media (max-width:640px){li.live-match{flex:1 1 100%;max-width:100%;}}"
