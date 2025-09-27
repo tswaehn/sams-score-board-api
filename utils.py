@@ -13,8 +13,10 @@ _NAV_HTML = (
     "<nav>"
     "<a href='/'>Home</a>"
     "<a href='/upcoming-games'>Upcoming Games</a>"
+    "<a href='/live'>Live</a>"
     "<a href='/series'>Series</a>"
-    "<a href='/teams'>Teams</a><a href='/rankings'>Rankings</a>"
+    "<a href='/teams'>Teams</a>"
+    "<a href='/rankings'>Rankings</a>"
     "<a href='/health'>Health</a>"
     "</nav>"
 )
@@ -375,6 +377,90 @@ def _compute_series_stats(document: Dict[str, Any], series_uuid: str) -> Dict[st
             stats[loser_id]["points"] += loser_points
 
     return stats
+
+
+
+def _filter_matches_for_today(document: Dict[str, Any]) -> List[Dict[str, Any]]:
+    today = datetime.now(timezone.utc).date()
+    match_states = document.get("matchStates") or {}
+    games: List[Dict[str, Any]] = []
+
+    for day in document.get("matchDays") or []:
+        for match in day.get("matches", []):
+            scheduled_ms = match.get("date")
+            if not isinstance(scheduled_ms, (int, float)):
+                continue
+            scheduled_dt = datetime.fromtimestamp(scheduled_ms / 1000, tz=timezone.utc)
+            if scheduled_dt.date() != today:
+                continue
+
+            match_uuid = match.get("id")
+            state = match_states.get(match_uuid, {}) if match_uuid else {}
+            games.append({
+                "matchUuid": match_uuid,
+                "seriesUuid": match.get("matchSeries"),
+                "scheduledIso": scheduled_dt.isoformat(),
+                "team1": match.get("teamDescription1"),
+                "team2": match.get("teamDescription2"),
+                "finished": state.get("finished"),
+                "finalized": state.get("finalized"),
+            })
+
+    games.sort(key=lambda entry: entry.get("scheduledIso") or "")
+    return games
+
+
+def render_live_games_html(payload: str) -> str:
+    document = json.loads(payload)
+    series_mapping = extract_series_mapping(payload)
+    games = _filter_matches_for_today(document)
+
+    items: List[str] = []
+    for game in games:
+        series_name = series_mapping.get(game.get("seriesUuid"), "")
+        team1 = escape(game.get("team1", "Unknown"))
+        team2 = escape(game.get("team2", "Unknown"))
+        scheduled = escape(game.get("scheduledIso") or "Unknown time")
+        status = "Finished" if game.get("finished") else ("Finalized" if game.get("finalized") else "Scheduled")
+        items.append(
+            "<li>"
+            f"<div class='match-series'>{escape(series_name)}</div>"
+            f"<div class='match-teams'>{team1} vs {team2}</div>"
+            f"<div class='match-time'>{scheduled}</div>"
+            f"<div class='match-status'>{status}</div>"
+            "</li>"
+        )
+
+    if not items:
+        items.append("<li>No games scheduled for today.</li>")
+
+    list_markup = "\n".join(items)
+    return (
+        "<!DOCTYPE html>"
+        "<html lang='en'>"
+        "<head>"
+        "<meta charset='utf-8'/>"
+        "<title>Live Games</title>"
+        "<style>"
+        "body{font-family:Arial,sans-serif;margin:2rem;background:#f5f5f5;}"
+        "h1{margin-bottom:1rem;}"
+        "ul{list-style:none;padding:0;}"
+        "li{background:#fff;padding:1rem;margin-bottom:1rem;border-radius:8px;"
+        "box-shadow:0 1px 3px rgba(0,0,0,0.1);}"
+        ".match-series{font-weight:bold;color:#005a9c;margin-bottom:0.25rem;}"
+        ".match-teams{font-size:1.1rem;margin-bottom:0.25rem;}"
+        ".match-time{color:#555;margin-bottom:0.25rem;}"
+        ".match-status{font-size:0.9rem;color:#777;}"
+        "nav a{margin-right:1rem;}"
+        "</style>"
+        "</head>"
+        "<body>"
+        f"{_NAV_HTML}"
+        "<h1>Live Games Today</h1>"
+        f"<ul>{list_markup}</ul>"
+        "</body>"
+        "</html>"
+    )
 
 def render_rankings_html(payload: str, selected_series_uuid: Optional[str] = None) -> str:
     """Render an HTML page with a series dropdown and rankings table."""

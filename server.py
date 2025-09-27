@@ -9,6 +9,7 @@ from utils import (
     render_series_html,
     render_rankings_html,
     render_teams_html,
+    render_live_games_html,
     render_upcoming_games_html,
 )
 
@@ -32,6 +33,8 @@ class ScoreboardRequestHandler(BaseHTTPRequestHandler):
             self._serve_teams(parse_qs(parsed_path.query))
         elif route == "/rankings":
             self._serve_rankings(parse_qs(parsed_path.query))
+        elif route == "/live":
+            self._serve_live()
         elif route == "/health":
             self._write_response(200, b"ok", content_type="text/plain; charset=utf-8")
         else:
@@ -78,6 +81,16 @@ class ScoreboardRequestHandler(BaseHTTPRequestHandler):
         except Exception as exc:  # noqa: BLE001 - surface unexpected errors
             message = f"Internal server error: {exc}".encode("utf-8")
             self._write_response(500, message, content_type="text/plain; charset=utf-8")
+
+    def _serve_live(self) -> None:
+        try:
+            payload = execute_get_request()
+            html = render_live_games_html(payload)
+            self._write_response(200, html.encode("utf-8"))
+        except Exception as exc:  # noqa: BLE001 - surface unexpected errors
+            message = f"Internal server error: {exc}".encode("utf-8")
+            self._write_response(500, message, content_type="text/plain; charset=utf-8")
+
 
     def _write_response(
         self,
