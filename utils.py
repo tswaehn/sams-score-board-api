@@ -473,6 +473,8 @@ def _logo_img_tag(logo_url: str, team_name: str) -> str:
 
 
 
+
+
 def render_live_games_html(payload: str) -> str:
     document = json.loads(payload)
     series_mapping = extract_series_mapping(payload)
@@ -559,10 +561,10 @@ def render_live_games_html(payload: str) -> str:
 
         series_name = escape(series_info.get("name", series_mapping.get(series_uuid, "")))
 
-        classes = ['live-match']
+        classes = ["live-match"]
         if game.get("finished"):
-            classes.append('finished')
-        li_class = ' '.join(classes)
+            classes.append("finished")
+        li_class = " ".join(classes)
 
         items.append(
             f"<li class='{li_class}'>"
@@ -616,13 +618,50 @@ def render_live_games_html(payload: str) -> str:
         ".set-score-value{display:inline-block;min-width:1.6rem;text-align:center;}"
         ".set-score-value.winner{font-weight:bold;font-size:1.75rem;}"
         ".set-summary{margin-top:0.75rem;font-size:1.1rem;color:#222;}"
+        ".live-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;gap:1rem;}"
+        ".live-refresh{font-size:0.95rem;color:#333;}"
+        ".live-refresh input{margin-right:0.35rem;}"
         "nav a{margin-right:1rem;}"
         "</style>"
         "</head>"
         "<body>"
         f"{_NAV_HTML}"
+        "<div class='live-header'>"
         "<h1>Live Games Today</h1>"
+        "<label class='live-refresh'>"
+        "<input type='checkbox' id='auto-refresh' /> Auto refresh"
+        "</label>"
+        "</div>"
         f"<ul class='live-list'>{list_markup}</ul>"
+        "<script>"
+        "const refreshCheckbox = document.getElementById('auto-refresh');"
+        "let refreshTimer = null;"
+        "const liveList = document.querySelector('.live-list');"
+        "function scheduleRefresh() {"
+        "    if (refreshTimer) {"
+        "        clearInterval(refreshTimer);"
+        "        refreshTimer = null;"
+        "    }"
+        "    if (refreshCheckbox && refreshCheckbox.checked) {"
+        "        refreshTimer = setInterval(() => {"
+        "            fetch(window.location.pathname, { headers: { 'X-Requested-With': 'fetch' } })"
+        "                .then(resp => resp.text())"
+        "                .then(html => {"
+        "                    const parser = new DOMParser();"
+        "                    const doc = parser.parseFromString(html, 'text/html');"
+        "                    const newList = doc.querySelector('.live-list');"
+        "                    if (newList && liveList) {"
+        "                        liveList.innerHTML = newList.innerHTML;"
+        "                    }"
+        "                })"
+        "                .catch(() => {});"
+        "        }, 1000);"
+        "    }"
+        "}"
+        "if (refreshCheckbox) {"
+        "    refreshCheckbox.addEventListener('change', scheduleRefresh);"
+        "}"
+        "</script>"
         "</body>"
         "</html>"
     )
