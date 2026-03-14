@@ -1,8 +1,16 @@
-import { NavLink, Route, Routes } from "react-router-dom";
+import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import {
+  AppBar,
+  Box,
+  Container,
+  Tab,
+  Tabs,
+  Toolbar,
+  Typography
+} from "@mui/material";
 import Teams from "./pages/Teams.jsx";
 import Plan from "./pages/Plan.jsx";
 import Live from "./pages/Live.jsx";
-import "./App.css";
 
 const navItems = [
   { path: "/teams", label: "Teams" },
@@ -10,40 +18,69 @@ const navItems = [
   { path: "/live", label: "Live" }
 ];
 
+function NavTabs() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const current =
+    navItems.find((item) => location.pathname.startsWith(item.path))?.path ??
+    "/teams";
+
+  return (
+    <Tabs
+      value={current}
+      onChange={(_, value) => navigate(value)}
+      textColor="inherit"
+      indicatorColor="secondary"
+      aria-label="Main navigation"
+    >
+      {navItems.map((item) => (
+        <Tab key={item.path} label={item.label} value={item.path} />
+      ))}
+    </Tabs>
+  );
+}
+
 export default function App() {
   return (
-    <div className="app">
-      <header className="app-header">
-        <div className="brand">
-          <span className="brand-mark">S</span>
-          <div>
-            <div className="brand-title">DM U16 Dresden</div>
-            <div className="brand-subtitle">Teams, Plan, Live</div>
-          </div>
-        </div>
-        <nav className="app-nav">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              className={({ isActive }) =>
-                isActive ? "nav-link nav-link-active" : "nav-link"
-              }
-            >
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
-      </header>
+    <Box
+      sx={{
+        minHeight: "100vh",
+        background:
+          "radial-gradient(circle at top left, #fff7e6 0%, #f5f1ea 45%, #efe3d3 100%)"
+      }}
+    >
+      <AppBar
+        position="sticky"
+        elevation={0}
+        sx={{
+          background: "rgba(255, 247, 230, 0.95)",
+          color: "primary.main",
+          borderBottom: "1px solid rgba(20, 17, 15, 0.08)",
+          backdropFilter: "blur(12px)"
+        }}
+      >
+        <Toolbar sx={{ py: 1.5, display: "flex", gap: 3 }}>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+              DM U16 Dresden
+            </Typography>
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              Teams, Plan, Live
+            </Typography>
+          </Box>
+          <Box sx={{ flex: 1 }} />
+          <NavTabs />
+        </Toolbar>
+      </AppBar>
 
-      <main className="app-main">
+      <Container sx={{ py: 4 }}>
         <Routes>
           <Route path="/" element={<Teams />} />
           <Route path="/teams" element={<Teams />} />
           <Route path="/plan" element={<Plan />} />
           <Route path="/live" element={<Live />} />
         </Routes>
-      </main>
-    </div>
+      </Container>
+    </Box>
   );
 }

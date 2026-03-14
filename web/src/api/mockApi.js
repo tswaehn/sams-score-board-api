@@ -84,7 +84,7 @@ const database = {
       {
         uuid: "5d1b7c2a-9f6e-4b3c-8a2d-6e1f7b2c9a5d",
         short_name: "TVM",
-        name: "TV Mömlingen",
+        name: "TV Moemlingen",
         logo_url: "https://placehold.co/120x120?text=TVM"
       },
       {
@@ -386,11 +386,60 @@ const database = {
     ]
   },
   "/api/live": {
-    match: {
-      home: "Metagons",
-      away: "North City",
-      score: { home: 18, away: 14 }
-    },
+    courts: [
+      {
+        id: "court-1",
+        name: "Court 1",
+        match: {
+          home_uuid: "e5b01a1b-3c7f-4f27-8d0f-4a0b4f5f2b41",
+          away_uuid: "0e1a9b36-71d0-4b6d-9a44-2b6b5af5b0c2",
+          sets_home: 1,
+          sets_away: 0,
+          points_home: 18,
+          points_away: 14,
+          status: "live"
+        }
+      },
+      {
+        id: "court-2",
+        name: "Court 2",
+        match: {
+          home_uuid: "9e3f2d61-8f85-4c34-9b7d-0f6f3c62d1a9",
+          away_uuid: "6c6b3d25-0f9a-4c62-9f4e-7a1f6f2e3b9a",
+          sets_home: 2,
+          sets_away: 1,
+          points_home: 21,
+          points_away: 19,
+          status: "live"
+        }
+      },
+      {
+        id: "court-3",
+        name: "Court 3",
+        match: {
+          home_uuid: "7a2b9c1e-5d6f-4c2a-8b3f-9e1a7c2d5f6b",
+          away_uuid: "1f6b2c9a-4d7e-4b1c-8a3f-5c2d7e1b9f6a",
+          sets_home: 0,
+          sets_away: 1,
+          points_home: 12,
+          points_away: 18,
+          status: "live"
+        }
+      },
+      {
+        id: "court-4",
+        name: "Court 4",
+        match: {
+          home_uuid: "8c2d7f1a-5b6e-4c2a-9f1b-6d7c2a5e9b3f",
+          away_uuid: "5d1b7c2a-9f6e-4b3c-8a2d-6e1f7b2c9a5d",
+          sets_home: 1,
+          sets_away: 1,
+          points_home: 20,
+          points_away: 20,
+          status: "live"
+        }
+      }
+    ],
     stats: [
       { id: 1, label: "Possession", value: "62%" },
       { id: 2, label: "Fouls", value: "7" },

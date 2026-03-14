@@ -1,4 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  Avatar,
+  Box,
+  Paper,
+  Stack,
+  Tab,
+  Tabs,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  Typography
+} from "@mui/material";
 import { fetchJson } from "../api/mockApi.js";
 
 export default function Plan() {
@@ -34,133 +48,195 @@ export default function Plan() {
 
   const teamById = useMemo(() => {
     const map = new Map();
-    teams.forEach((team) => {
-      map.set(team.uuid, team);
-    });
+    teams.forEach((team) => map.set(team.uuid, team));
     return map;
   }, [teams]);
 
+  const activeStage = stages.find((stage) => stage.id === activeStageId);
+
   return (
-    <section className="page">
-      <div className="page-header">
-        <h1>Plan</h1>
-        <p>Stages and group standings.</p>
-      </div>
-      {loading && <p className="muted">Loading plan...</p>}
-      {error && <p className="error">{error}</p>}
+    <Box sx={{ display: "grid", gap: 2 }}>
+      <Box>
+        <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
+          Plan
+        </Typography>
+        <Typography color="text.secondary">
+          Stages and group standings.
+        </Typography>
+      </Box>
+
+      {loading && (
+        <Typography color="text.secondary">Loading plan...</Typography>
+      )}
+      {error && (
+        <Typography color="error" sx={{ fontWeight: 600 }}>
+          {error}
+        </Typography>
+      )}
+
       {!loading && !error && (
-        <div className="stage-tabs">
-          <div className="tab-list" role="tablist" aria-label="Stages">
+        <Box sx={{ display: "grid", gap: 2 }}>
+          <Tabs
+            value={activeStageId}
+            onChange={(_, value) => setActiveStageId(value)}
+            variant="scrollable"
+            allowScrollButtonsMobile
+            textColor="inherit"
+            indicatorColor="secondary"
+          >
             {stages.map((stage) => (
-              <button
-                key={stage.id}
-                type="button"
-                role="tab"
-                aria-selected={activeStageId === stage.id}
-                className={
-                  activeStageId === stage.id ? "tab tab-active" : "tab"
-                }
-                onClick={() => setActiveStageId(stage.id)}
-              >
-                {stage.name}
-              </button>
+              <Tab key={stage.id} value={stage.id} label={stage.name} />
             ))}
-          </div>
-          {stages
-            .filter((stage) => stage.id === activeStageId)
-            .map((stage) => (
-              <section key={stage.id} className="stage-card">
-                <h2>{stage.name}</h2>
-                {stage.groups && (
-                  <div className="group-grid">
-                    {stage.groups.map((group) => (
-                      <div key={group.id} className="group-card">
-                        <div className="group-title">Group {group.name}</div>
-                        <div className="group-table">
-                          <div className="group-header">
-                            <span>Team</span>
-                            <span>Spiele</span>
-                            <span>S/N</span>
-                            <span>Sätze</span>
-                            <span>Bälle</span>
-                            <span>Punkte</span>
-                          </div>
+          </Tabs>
+
+          {activeStage && (
+            <Paper
+              elevation={0}
+              sx={{
+                p: 3,
+                borderRadius: 3,
+                border: "1px solid rgba(20, 17, 15, 0.08)",
+                background: "#fffdf8",
+                display: "grid",
+                gap: 2
+              }}
+            >
+              <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                {activeStage.name}
+              </Typography>
+
+              {activeStage.groups && (
+                <Stack spacing={2}>
+                  {activeStage.groups.map((group) => (
+                    <Paper
+                      key={group.id}
+                      elevation={0}
+                      sx={{
+                        p: 2,
+                        borderRadius: 2.5,
+                        border: "1px solid rgba(20, 17, 15, 0.08)",
+                        background: "white"
+                      }}
+                    >
+                      <Typography
+                        variant="subtitle1"
+                        sx={{ fontWeight: 700, mb: 1.5 }}
+                      >
+                        Gruppe {group.name}
+                      </Typography>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Team</TableCell>
+                            <TableCell align="right">Spiele</TableCell>
+                            <TableCell align="right">S/N</TableCell>
+                            <TableCell align="right">Sätze</TableCell>
+                            <TableCell align="right">Bälle</TableCell>
+                            <TableCell align="right">Punkte</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
                           {group.teams.map((team) => {
                             const meta = teamById.get(team.uuid);
                             return (
-                              <div key={team.uuid} className="group-row">
-                                <span className="team-cell">
-                                  {meta && (
-                                    <img
-                                      className="group-logo"
-                                      src={meta.logo_url}
-                                      alt={`${meta.name} logo`}
+                              <TableRow key={team.uuid} hover>
+                                <TableCell>
+                                  <Stack
+                                    direction="row"
+                                    spacing={1.5}
+                                    alignItems="center"
+                                  >
+                                    <Avatar
+                                      src={meta?.logo_url}
+                                      alt={`${meta?.name ?? "Team"} logo`}
+                                      sx={{ width: 36, height: 36, bgcolor: "#f3ebe0" }}
                                     />
-                                  )}
-                                  <span>
-                                    <div className="team-name">
+                                    <Typography sx={{ fontWeight: 600 }}>
                                       {meta ? meta.name : "Unknown team"}
-                                    </div>
-                                  </span>
-                                </span>
-                                <span>{team.played}</span>
-                                <span>
+                                    </Typography>
+                                  </Stack>
+                                </TableCell>
+                                <TableCell align="right">{team.played}</TableCell>
+                                <TableCell align="right">
                                   {team.wins}/{team.lost}
-                                </span>
-                                <span>
+                                </TableCell>
+                                <TableCell align="right">
                                   {team.sets_won}:{team.sets_lost}
-                                </span>
-                                <span>
+                                </TableCell>
+                                <TableCell align="right">
                                   {team.ball_points_won}:{team.ball_points_lost}
-                                </span>
-                                <span>{team.points}</span>
-                              </div>
+                                </TableCell>
+                                <TableCell align="right">{team.points}</TableCell>
+                              </TableRow>
                             );
                           })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {stage.matches && (
-                  <div className="match-list">
-                    {stage.matches.map((match) => {
-                      const home = teamById.get(match.home_uuid);
-                      const away = teamById.get(match.away_uuid);
-                      return (
-                        <div key={match.id} className="match-row">
-                          <div className="match-team">
-                            {home && (
-                              <img
-                                className="match-logo"
-                                src={home.logo_url}
-                                alt={`${home.name} logo`}
-                              />
-                            )}
-                            <span>{home ? home.name : "Unknown team"}</span>
-                          </div>
-                          <div className="match-score">
-                            {match.sets_home}:{match.sets_away}
-                          </div>
-                          <div className="match-team match-team-right">
-                            <span>{away ? away.name : "Unknown team"}</span>
-                            {away && (
-                              <img
-                                className="match-logo"
-                                src={away.logo_url}
-                                alt={`${away.name} logo`}
-                              />
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </section>
-            ))}
-        </div>
+                        </TableBody>
+                      </Table>
+                    </Paper>
+                  ))}
+                </Stack>
+              )}
+
+              {activeStage.matches && (
+                <Stack spacing={1.2}>
+                  {activeStage.matches.map((match) => {
+                    const home = teamById.get(match.home_uuid);
+                    const away = teamById.get(match.away_uuid);
+                    return (
+                      <Paper
+                        key={match.id}
+                        elevation={0}
+                        sx={{
+                          p: 1.6,
+                          borderRadius: 2.5,
+                          border: "1px solid rgba(20, 17, 15, 0.08)",
+                          background: "white",
+                          display: "grid",
+                          gridTemplateColumns: "1fr auto 1fr",
+                          alignItems: "center",
+                          gap: 2
+                        }}
+                      >
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                          <Avatar
+                            src={home?.logo_url}
+                            alt={`${home?.name ?? "Team"} logo`}
+                            sx={{ width: 32, height: 32, bgcolor: "#f3ebe0" }}
+                          />
+                          <Typography sx={{ fontWeight: 600 }}>
+                            {home ? home.name : "Unknown team"}
+                          </Typography>
+                        </Stack>
+                        <Typography
+                          variant="h6"
+                          sx={{ fontWeight: 700, color: "primary.main" }}
+                        >
+                          {match.sets_home}:{match.sets_away}
+                        </Typography>
+                        <Stack
+                          direction="row"
+                          spacing={1.5}
+                          alignItems="center"
+                          justifyContent="flex-end"
+                        >
+                          <Typography sx={{ fontWeight: 600 }}>
+                            {away ? away.name : "Unknown team"}
+                          </Typography>
+                          <Avatar
+                            src={away?.logo_url}
+                            alt={`${away?.name ?? "Team"} logo`}
+                            sx={{ width: 32, height: 32, bgcolor: "#f3ebe0" }}
+                          />
+                        </Stack>
+                      </Paper>
+                    );
+                  })}
+                </Stack>
+              )}
+            </Paper>
+          )}
+        </Box>
       )}
-    </section>
+    </Box>
   );
 }

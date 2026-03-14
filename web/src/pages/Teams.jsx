@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Avatar, Box, Paper, Stack, Typography } from "@mui/material";
 import { fetchJson } from "../api/mockApi.js";
 
 export default function Teams() {
@@ -29,29 +30,58 @@ export default function Teams() {
   }, []);
 
   return (
-    <section className="page">
-      <div className="page-header">
-        <h1>Setzliste</h1>
-      </div>
-      {loading && <p className="muted">Loading teams...</p>}
-      {error && <p className="error">{error}</p>}
+    <Box sx={{ display: "grid", gap: 2 }}>
+      <Box>
+        <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
+          Teams
+        </Typography>
+        <Typography color="text.secondary">
+          Active rosters and status snapshots.
+        </Typography>
+      </Box>
+
+      {loading && (
+        <Typography color="text.secondary">Loading teams...</Typography>
+      )}
+      {error && (
+        <Typography color="error" sx={{ fontWeight: 600 }}>
+          {error}
+        </Typography>
+      )}
+
       {!loading && !error && (
-        <div className="team-list">
+        <Stack spacing={1.2}>
           {teams.map((team) => (
-            <article key={team.uuid} className="team-row">
-              <img
-                className="team-logo"
+            <Paper
+              key={team.uuid}
+              elevation={0}
+              sx={{
+                p: 1.5,
+                display: "flex",
+                alignItems: "center",
+                gap: 2,
+                borderRadius: 2.5,
+                border: "1px solid rgba(20, 17, 15, 0.08)",
+                background: "#fffdf8"
+              }}
+            >
+              <Avatar
                 src={team.logo_url}
                 alt={`${team.name} logo`}
+                sx={{ width: 56, height: 56, bgcolor: "#f3ebe0" }}
               />
-              <div className="team-meta">
-                <p className="muted">{team.short_name}</p>
-                <h2>{team.name}</h2>
-              </div>
-            </article>
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary">
+                  {team.short_name}
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  {team.name}
+                </Typography>
+              </Box>
+            </Paper>
           ))}
-        </div>
+        </Stack>
       )}
-    </section>
+    </Box>
   );
 }
