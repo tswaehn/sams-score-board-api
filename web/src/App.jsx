@@ -62,7 +62,7 @@ export default function App() {
         <Toolbar sx={{ py: 1.5, display: "flex", gap: 3 }}>
           <Box>
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              DM U16 Dresden
+              DM U16 Dresden 2026
             </Typography>
             <Typography variant="body2" sx={{ color: "text.secondary" }}>
               Teams, Plan, Live
