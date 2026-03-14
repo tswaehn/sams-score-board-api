@@ -58,10 +58,39 @@ def get_upcoming_games(limit: int = 10, url: Optional[str] = None) -> List[dict]
     return extract_upcoming_games(payload, limit=limit)
 
 
+def decode_match_series(document: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    """Normalize top-level ``matchSeries`` into a dict keyed by series UUID."""
+    raw_match_series = document.get("matchSeries")
+
+    if isinstance(raw_match_series, dict):
+        return {
+            series_uuid: series_info
+            for series_uuid, series_info in raw_match_series.items()
+            if isinstance(series_uuid, str) and isinstance(series_info, dict)
+        }
+
+    if isinstance(raw_match_series, list):
+        normalized: Dict[str, Dict[str, Any]] = {}
+        for series_info in raw_match_series:
+            if not isinstance(series_info, dict):
+                continue
+            series_uuid = (
+                series_info.get("uuid")
+                or series_info.get("id")
+                or series_info.get("seriesUuid")
+            )
+            if not isinstance(series_uuid, str) or not series_uuid:
+                continue
+            normalized[series_uuid] = series_info
+        return normalized
+
+    return {}
+
+
 def extract_series_mapping(payload: str) -> Dict[str, str]:
     """Return a mapping of match-series UUIDs to their display names."""
     document = json.loads(payload)
-    match_series = document.get("matchSeries") or {}
+    match_series = decode_match_series(document)
 
     return {
         series_uuid: series_info.get("name", "")
@@ -73,7 +102,7 @@ def extract_series_mapping(payload: str) -> Dict[str, str]:
 def extract_series_list(payload: str) -> List[Dict[str, Any]]:
     """Return a list of match series with metadata suitable for rendering."""
     document = json.loads(payload)
-    match_series = document.get("matchSeries") or {}
+    match_series = decode_match_series(document)
 
     series_list: List[Dict[str, Any]] = []
     for series_uuid, series_info in match_series.items():
@@ -257,7 +286,7 @@ def render_series_html(payload: str) -> str:
 def render_teams_html(payload: str, selected_series_uuid: Optional[str] = None) -> str:
     """Render a page with a dropdown of series and a team table for the selection."""
     document = json.loads(payload)
-    match_series = document.get("matchSeries") or {}
+    match_series = decode_match_series(document)
     series_list = extract_series_list(payload)
 
     if not series_list:
@@ -477,13 +506,14 @@ def _logo_img_tag(logo_url: str, team_name: str) -> str:
 
 def render_live_games_html(payload: str) -> str:
     document = json.loads(payload)
+    match_series = decode_match_series(document)
     series_mapping = extract_series_mapping(payload)
     games = _filter_matches_for_today(document)
 
     items: List[str] = []
     for game in games:
         series_uuid = game.get("seriesUuid")
-        series_info = document.get("matchSeries", {}).get(series_uuid, {})
+        series_info = match_series.get(series_uuid, {})
         team_entries = {
             team.get("id"): team
             for team in series_info.get("teams", [])
@@ -670,7 +700,7 @@ def render_live_games_html(payload: str) -> str:
 def render_rankings_html(payload: str, selected_series_uuid: Optional[str] = None) -> str:
     """Render an HTML page with a series dropdown and rankings table."""
     document = json.loads(payload)
-    match_series = document.get("matchSeries") or {}
+    match_series = decode_match_series(document)
     series_list = extract_series_list(payload)
 
     if not series_list:
