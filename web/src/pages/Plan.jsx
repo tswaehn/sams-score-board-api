@@ -56,14 +56,6 @@ export default function Plan() {
 
   return (
     <Box sx={{ display: "grid", gap: 2 }}>
-      <Box>
-        <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
-          Plan
-        </Typography>
-        <Typography color="text.secondary">
-          Stages and group standings.
-        </Typography>
-      </Box>
 
       {loading && (
         <Typography color="text.secondary">Loading plan...</Typography>
@@ -115,7 +107,7 @@ export default function Plan() {
                         p: 2,
                         borderRadius: 2.5,
                         border: "1px solid rgba(20, 17, 15, 0.08)",
-                        bgcolor: "background.paper"
+                        bgcolor: "teamInfo.main"
                       }}
                     >
                       <Typography
@@ -125,7 +117,7 @@ export default function Plan() {
                         Gruppe {group.name}
                       </Typography>
                       <Table size="small">
-                        <TableHead>
+                        <TableHead sx={{ bgcolor: "teamInfo.main" }}>
                           <TableRow>
                             <TableCell>Team</TableCell>
                             <TableCell align="right">Spiele</TableCell>
@@ -142,7 +134,7 @@ export default function Plan() {
                               <TableRow
                                 key={team.uuid}
                                 hover
-                                sx={{ bgcolor: "background.paper" }}
+                                sx={{ bgcolor: "teamInfo.main" }}
                               >
                                 <TableCell>
                                   <Stack
@@ -194,7 +186,7 @@ export default function Plan() {
                           p: 1.6,
                           borderRadius: 2.5,
                           border: "1px solid rgba(20, 17, 15, 0.08)",
-                          bgcolor: "background.paper",
+                          bgcolor: "teamInfo.main",
                           display: "grid",
                           gridTemplateColumns: "1fr auto 1fr",
                           alignItems: "center",

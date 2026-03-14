@@ -31,14 +31,6 @@ export default function Teams() {
 
   return (
     <Box sx={{ display: "grid", gap: 2 }}>
-      <Box>
-        <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
-          Teams
-        </Typography>
-        <Typography color="text.secondary">
-          Active rosters and status snapshots.
-        </Typography>
-      </Box>
 
       {loading && (
         <Typography color="text.secondary">Loading teams...</Typography>
@@ -50,37 +42,52 @@ export default function Teams() {
       )}
 
       {!loading && !error && (
-        <Stack spacing={1.2}>
-          {teams.map((team) => (
-            <Paper
-              key={team.uuid}
-              elevation={0}
-              sx={{
-                p: 1.5,
-                display: "flex",
-                alignItems: "center",
-                gap: 2,
-                borderRadius: 2.5,
-                border: "1px solid rgba(20, 17, 15, 0.08)",
-                bgcolor: "background.paper"
-              }}
-            >
-              <Avatar
-                src={team.logo_url}
-                alt={`${team.name} logo`}
-                sx={{ width: 56, height: 56, bgcolor: "#f3ebe0" }}
-              />
-              <Box>
-                <Typography variant="subtitle2" color="text.secondary">
-                  {team.short_name}
-                </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  {team.name}
-                </Typography>
-              </Box>
-            </Paper>
-          ))}
-        </Stack>
+        <Paper
+          elevation={0}
+          sx={{
+            p: 2,
+            borderRadius: 3,
+            border: "1px solid rgba(20, 17, 15, 0.08)",
+            bgcolor: "background.paper",
+            gap: 2
+          }}
+        >
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>
+            Setzliste
+          </Typography>
+
+          <Stack spacing={1.2}>
+            {teams.map((team) => (
+              <Paper
+                key={team.uuid}
+                elevation={0}
+                sx={{
+                  p: 1.5,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 2,
+                  borderRadius: 2.5,
+                  border: "1px solid rgba(20, 17, 15, 0.08)",
+                  bgcolor: "teamInfo.main"
+                }}
+              >
+                <Avatar
+                  src={team.logo_url}
+                  alt={`${team.name} logo`}
+                  sx={{ width: 56, height: 56, bgcolor: "#f3ebe0" }}
+                />
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    {team.short_name}
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    {team.name}
+                  </Typography>
+                </Box>
+              </Paper>
+            ))}
+          </Stack>
+        </Paper>
       )}
     </Box>
   );

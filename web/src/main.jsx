@@ -10,6 +10,7 @@ const theme = createTheme({
     mode: "light",
     primary: { main: "#264653" },
     secondary: { main: "#e4572e" },
+    teamInfo: { main: "#fefefe" },
     background: {
       default: "#ffffff",
       paper: "#f8f4ee"
