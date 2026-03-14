@@ -45,15 +45,14 @@ export default function App() {
     <Box
       sx={{
         minHeight: "100vh",
-        background:
-          "radial-gradient(circle at top left, #fff7e6 0%, #f5f1ea 45%, #efe3d3 100%)"
+        bgcolor: "background.default"
       }}
     >
       <AppBar
         position="sticky"
         elevation={0}
         sx={{
-          background: "rgba(255, 247, 230, 0.95)",
+          background: "rgba(255, 255, 255, 0.95)",
           color: "primary.main",
           borderBottom: "1px solid rgba(20, 17, 15, 0.08)",
           backdropFilter: "blur(12px)"

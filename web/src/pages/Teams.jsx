@@ -62,7 +62,7 @@ export default function Teams() {
                 gap: 2,
                 borderRadius: 2.5,
                 border: "1px solid rgba(20, 17, 15, 0.08)",
-                background: "#fffdf8"
+                bgcolor: "background.paper"
               }}
             >
               <Avatar

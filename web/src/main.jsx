@@ -10,7 +10,10 @@ const theme = createTheme({
     mode: "light",
     primary: { main: "#264653" },
     secondary: { main: "#e4572e" },
-    background: { default: "#f5f1ea" },
+    background: {
+      default: "#ffffff",
+      paper: "#f8f4ee"
+    },
     text: {
       primary: "#1a1512",
       secondary: "#4b4039"

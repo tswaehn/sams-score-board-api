@@ -87,7 +87,7 @@ export default function Live() {
                     p: 2.5,
                     borderRadius: 3,
                     border: "1px solid rgba(20, 17, 15, 0.08)",
-                    background: "#fffdf8",
+                    bgcolor: "background.paper",
                     display: "grid",
                     gap: 2
                   }}
@@ -163,7 +163,7 @@ export default function Live() {
               p: 2.5,
               borderRadius: 3,
               border: "1px solid rgba(20, 17, 15, 0.08)",
-              background: "#fffdf8"
+              bgcolor: "background.paper"
             }}
           >
             <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
@@ -178,7 +178,7 @@ export default function Live() {
                     flex: 1,
                     p: 2,
                     borderRadius: 2,
-                    background: "white",
+                    bgcolor: "background.paper",
                     border: "1px solid rgba(20, 17, 15, 0.06)"
                   }}
                 >

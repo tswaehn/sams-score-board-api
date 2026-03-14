@@ -96,7 +96,7 @@ export default function Plan() {
                 p: 3,
                 borderRadius: 3,
                 border: "1px solid rgba(20, 17, 15, 0.08)",
-                background: "#fffdf8",
+                bgcolor: "background.paper",
                 display: "grid",
                 gap: 2
               }}
@@ -115,7 +115,7 @@ export default function Plan() {
                         p: 2,
                         borderRadius: 2.5,
                         border: "1px solid rgba(20, 17, 15, 0.08)",
-                        background: "white"
+                        bgcolor: "background.paper"
                       }}
                     >
                       <Typography
@@ -139,7 +139,11 @@ export default function Plan() {
                           {group.teams.map((team) => {
                             const meta = teamById.get(team.uuid);
                             return (
-                              <TableRow key={team.uuid} hover>
+                              <TableRow
+                                key={team.uuid}
+                                hover
+                                sx={{ bgcolor: "background.paper" }}
+                              >
                                 <TableCell>
                                   <Stack
                                     direction="row"
@@ -190,7 +194,7 @@ export default function Plan() {
                           p: 1.6,
                           borderRadius: 2.5,
                           border: "1px solid rgba(20, 17, 15, 0.08)",
-                          background: "white",
+                          bgcolor: "background.paper",
                           display: "grid",
                           gridTemplateColumns: "1fr auto 1fr",
                           alignItems: "center",
