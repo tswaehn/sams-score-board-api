@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Avatar, Box, Paper, Stack, Typography } from "@mui/material";
-import { fetchJson } from "../api/mockApi.js";
+import { fetchJson } from "../api/index.js";
 
 export default function Teams() {
   const [teams, setTeams] = useState([]);
+  const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -14,6 +15,11 @@ export default function Teams() {
       .then((data) => {
         if (isMounted) {
           setTeams(data.teams);
+          setMeta({
+            competition: data.competition,
+            association: data.association,
+            season: data.season
+          });
           setLoading(false);
         }
       })
@@ -55,6 +61,11 @@ export default function Teams() {
           <Typography variant="h5" sx={{ fontWeight: 700 }}>
             Setzliste
           </Typography>
+          {meta && (
+            <Typography color="text.secondary">
+              {meta.competition.name} · {meta.association.name} · {meta.season.name}
+            </Typography>
+          )}
 
           <Stack spacing={1.2}>
             {teams.map((team) => (

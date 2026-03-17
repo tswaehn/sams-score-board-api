@@ -10,7 +10,7 @@ import {
   Stack,
   Typography
 } from "@mui/material";
-import { fetchJson } from "../api/mockApi.js";
+import { fetchJson } from "../api/index.js";
 
 const filterSteps = [
   {
@@ -113,7 +113,7 @@ export default function CompetitionList() {
   useEffect(() => {
     let isMounted = true;
 
-    fetchJson("/api/competitions")
+    fetchJson("/api/competition-list")
       .then((data) => {
         if (isMounted) {
           setCompetitions(data);

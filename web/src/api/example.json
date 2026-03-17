@@ -1,0 +1,316 @@
+{
+  "data": {
+    "competition": {
+      "uuid": "d2818335-7d46-4053-bdad-9a57a98d2c05",
+      "name": "Bezirksmeisterschaft U14 männlich",
+      "gender": "MALE"
+    },
+    "association": {
+      "uuid": "d8e597e6-539f-4edc-a3be-aa30d5bc823d",
+      "name": "Bezirk Dresden",
+      "shortname": "Bezirk DD"
+    },
+    "season": {
+      "uuid": "fde078d8-b9d5-4202-be3d-5c2614cc8d95",
+      "name": "2025/26",
+      "currentSeason": true
+    },
+    "match-groups": {
+      "Spieltag 1": {
+        "uuid": "728ecc3d-afad-4547-a5b0-c1df6538ab3c",
+        "name": "Spieltag 1",
+        "tourneyLevel": 1,
+        "teams": []
+      },
+      "Spieltag 2": {
+        "uuid": "17bae327-5bb4-43fb-b011-e1233991e0a5",
+        "name": "Spieltag 2",
+        "tourneyLevel": 2,
+        "teams": []
+      },
+      "Spieltag 3": {
+        "uuid": "5a083e18-6733-46ff-8d98-c8d1bbf9e16a",
+        "name": "Spieltag 3",
+        "tourneyLevel": 3,
+        "teams": []
+      }
+    },
+    "teams": [
+      {
+        "uuid": "9d4fd0d2-df47-461f-b84a-6fe50052da7c",
+        "name": "Königsteiner Volleyball Gemeinschaft e.V.",
+        "logoImageLink": "https://dvv.sams-server.de/uploads/eb5ba9c5-a8f6-4361-85a7-b59667774ac0/KVG_logo_2017_schwarz.png"
+      },
+      {
+        "uuid": "1e3992e7-01b7-42ca-9cdc-bd18e582db60",
+        "name": "SV Motor-Mickten Dresden",
+        "logoImageLink": "https://dvv.sams-server.de/uploads/f4f1197a-42fd-49f7-900e-32c4d11d6880/svm_logo_volleyball_rgb_schatten.png"
+      },
+      {
+        "uuid": "f52fc010-17c3-4098-8ac0-0c83b4bfb377",
+        "name": "SVV 1990 Glashütte-Schlottwitz e.V.",
+        "logoImageLink": "https://dvv.sams-server.de/uploads/b96e181e-293d-4fc8-b909-8c31f104a9e4/Logo.png"
+      },
+      {
+        "uuid": "4406cb64-78d3-4bfa-a9f7-42ac48005e4d",
+        "name": "VC Dresden I",
+        "logoImageLink": "https://dvv.sams-server.de/uploads/2cf4a608-7f68-4d22-997e-259f625ac8fc/VC-Logo_ohne+Hintergrund.png"
+      },
+      {
+        "uuid": "3dcafda6-9746-4995-a0fa-abf3c7302a55",
+        "name": "VC Dresden II",
+        "logoImageLink": "https://dvv.sams-server.de/uploads/2cf4a608-7f68-4d22-997e-259f625ac8fc/VC-Logo_ohne+Hintergrund.png"
+      },
+      {
+        "uuid": "1fc37f45-0bbb-45fb-84c7-57d8b3deb6b6",
+        "name": "VSV Grün-Weiß Dresden-Coschütz",
+        "logoImageLink": "https://dvv.sams-server.de/uploads/1e69a1d8-2c4c-48ba-86f1-4c9fef6ab4a9/Logo_Sportverein_Dresden-Coschuetz_2020-11-23_Gr%C3%BCn.png"
+      },
+      {
+        "uuid": "908542fc-07fd-4dc2-ae6d-b9a33ab3d20b",
+        "name": "Minihands",
+        "logoImageLink": "https://dvv.sams-server.de/uploads/847eda92-8d6e-4c4f-a117-588a051894f3/SH_rot.png"
+      }
+    ],
+    "rankings": {
+      "Spieltag 1": {
+        "1": {
+          "teamName": "VC Dresden I",
+          "matchesPlayed": 12,
+          "wins": 4,
+          "losses": 0,
+          "setWins": 8,
+          "setLosses": 0,
+          "ballWins": 200,
+          "ballLosses": 66,
+          "ballDifference": 134
+        },
+        "2": {
+          "teamName": "VC Dresden II",
+          "matchesPlayed": 12,
+          "wins": 4,
+          "losses": 0,
+          "setWins": 8,
+          "setLosses": 0,
+          "ballWins": 200,
+          "ballLosses": 78,
+          "ballDifference": 122
+        },
+        "3": {
+          "teamName": "SV Motor-Mickten Dresden",
+          "matchesPlayed": 12,
+          "wins": 2,
+          "losses": 2,
+          "setWins": 4,
+          "setLosses": 4,
+          "ballWins": 157,
+          "ballLosses": 174,
+          "ballDifference": -17
+        },
+        "4": {
+          "teamName": "VSV Grün-Weiß Dresden-Coschütz",
+          "matchesPlayed": 12,
+          "wins": 2,
+          "losses": 2,
+          "setWins": 4,
+          "setLosses": 4,
+          "ballWins": 133,
+          "ballLosses": 182,
+          "ballDifference": -49
+        },
+        "5": {
+          "teamName": "Minihands",
+          "matchesPlayed": 12,
+          "wins": 1,
+          "losses": 3,
+          "setWins": 2,
+          "setLosses": 6,
+          "ballWins": 134,
+          "ballLosses": 183,
+          "ballDifference": -49
+        },
+        "6": {
+          "teamName": "SVV 1990 Glashütte-Schlottwitz e.V.",
+          "matchesPlayed": 12,
+          "wins": 1,
+          "losses": 3,
+          "setWins": 2,
+          "setLosses": 6,
+          "ballWins": 139,
+          "ballLosses": 190,
+          "ballDifference": -51
+        },
+        "7": {
+          "teamName": "Königsteiner Volleyball Gemeinschaft e.V.",
+          "matchesPlayed": 12,
+          "wins": 0,
+          "losses": 4,
+          "setWins": 0,
+          "setLosses": 8,
+          "ballWins": 110,
+          "ballLosses": 200,
+          "ballDifference": -90
+        }
+      },
+      "Spieltag 2": {
+        "1": {
+          "teamName": "VC Dresden I",
+          "matchesPlayed": 12,
+          "wins": 4,
+          "losses": 0,
+          "setWins": 8,
+          "setLosses": 0,
+          "ballWins": 200,
+          "ballLosses": 101,
+          "ballDifference": 99
+        },
+        "2": {
+          "teamName": "Minihands",
+          "matchesPlayed": 12,
+          "wins": 4,
+          "losses": 0,
+          "setWins": 8,
+          "setLosses": 1,
+          "ballWins": 213,
+          "ballLosses": 151,
+          "ballDifference": 62
+        },
+        "3": {
+          "teamName": "SV Motor-Mickten Dresden",
+          "matchesPlayed": 12,
+          "wins": 3,
+          "losses": 1,
+          "setWins": 7,
+          "setLosses": 2,
+          "ballWins": 208,
+          "ballLosses": 175,
+          "ballDifference": 33
+        },
+        "4": {
+          "teamName": "SVV 1990 Glashütte-Schlottwitz e.V.",
+          "matchesPlayed": 12,
+          "wins": 2,
+          "losses": 2,
+          "setWins": 4,
+          "setLosses": 5,
+          "ballWins": 172,
+          "ballLosses": 191,
+          "ballDifference": -19
+        },
+        "5": {
+          "teamName": "VSV Grün-Weiß Dresden-Coschütz",
+          "matchesPlayed": 12,
+          "wins": 1,
+          "losses": 3,
+          "setWins": 3,
+          "setLosses": 6,
+          "ballWins": 166,
+          "ballLosses": 178,
+          "ballDifference": -12
+        },
+        "6": {
+          "teamName": "VC Dresden II",
+          "matchesPlayed": 12,
+          "wins": 0,
+          "losses": 4,
+          "setWins": 0,
+          "setLosses": 8,
+          "ballWins": 146,
+          "ballLosses": 210,
+          "ballDifference": -64
+        },
+        "7": {
+          "teamName": "Königsteiner Volleyball Gemeinschaft e.V.",
+          "matchesPlayed": 12,
+          "wins": 0,
+          "losses": 4,
+          "setWins": 0,
+          "setLosses": 8,
+          "ballWins": 101,
+          "ballLosses": 200,
+          "ballDifference": -99
+        }
+      },
+      "Spieltag 3": {
+        "1": {
+          "teamName": "VC Dresden I",
+          "matchesPlayed": 12,
+          "wins": 4,
+          "losses": 0,
+          "setWins": 8,
+          "setLosses": 0,
+          "ballWins": 200,
+          "ballLosses": 105,
+          "ballDifference": 95
+        },
+        "2": {
+          "teamName": "VC Dresden II",
+          "matchesPlayed": 12,
+          "wins": 3,
+          "losses": 1,
+          "setWins": 6,
+          "setLosses": 2,
+          "ballWins": 180,
+          "ballLosses": 95,
+          "ballDifference": 85
+        },
+        "3": {
+          "teamName": "Minihands",
+          "matchesPlayed": 12,
+          "wins": 3,
+          "losses": 1,
+          "setWins": 6,
+          "setLosses": 3,
+          "ballWins": 182,
+          "ballLosses": 155,
+          "ballDifference": 27
+        },
+        "4": {
+          "teamName": "VSV Grün-Weiß Dresden-Coschütz",
+          "matchesPlayed": 12,
+          "wins": 2,
+          "losses": 2,
+          "setWins": 5,
+          "setLosses": 4,
+          "ballWins": 171,
+          "ballLosses": 150,
+          "ballDifference": 21
+        },
+        "5": {
+          "teamName": "SV Motor-Mickten Dresden",
+          "matchesPlayed": 12,
+          "wins": 1,
+          "losses": 3,
+          "setWins": 3,
+          "setLosses": 7,
+          "ballWins": 142,
+          "ballLosses": 216,
+          "ballDifference": -74
+        },
+        "6": {
+          "teamName": "SVV 1990 Glashütte-Schlottwitz e.V.",
+          "matchesPlayed": 12,
+          "wins": 1,
+          "losses": 3,
+          "setWins": 2,
+          "setLosses": 6,
+          "ballWins": 148,
+          "ballLosses": 185,
+          "ballDifference": -37
+        },
+        "7": {
+          "teamName": "Königsteiner Volleyball Gemeinschaft e.V.",
+          "matchesPlayed": 12,
+          "wins": 0,
+          "losses": 4,
+          "setWins": 0,
+          "setLosses": 8,
+          "ballWins": 83,
+          "ballLosses": 200,
+          "ballDifference": -117
+        }
+      }
+    }
+  },
+  "requestId": "afe17077-c8ae-4ee3-b175-0f0b06c7321b"
+}
