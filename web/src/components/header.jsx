@@ -4,34 +4,47 @@ import { AppBar, Box, Tab, Tabs, Toolbar, Typography } from "@mui/material";
 import { fetchJson } from "../api/index.js";
 
 const navItems = [
-  { path: "/teams", label: "Teams" },
-  { path: "/plan", label: "Plan" },
-  { path: "/live", label: "Live" }
+  { section: "teams", label: "Teams" },
+  { section: "plan", label: "Plan" },
+  { section: "live", label: "Live" }
 ];
+
+function getCompetitionUuidFromPath(pathname) {
+  const match = pathname.match(/^\/competition\/([^/]+)(?:\/|$)/);
+  return match?.[1] ?? "";
+}
 
 function NavTabs() {
   const location = useLocation();
   const navigate = useNavigate();
+  const competitionUuid = getCompetitionUuidFromPath(location.pathname);
   const current =
-    navItems.find((item) => location.pathname.startsWith(item.path))?.path ??
-    "/teams";
+    navItems.find((item) =>
+      location.pathname.startsWith(`/competition/${competitionUuid}/${item.section}`)
+    )?.section ?? false;
 
   return (
     <Tabs
       value={current}
-      onChange={(_, value) => navigate(value)}
+      onChange={(_, value) => navigate(`/competition/${competitionUuid}/${value}`)}
       textColor="inherit"
       indicatorColor="secondary"
       aria-label="Main navigation"
     >
       {navItems.map((item) => (
-        <Tab key={item.path} label={item.label} value={item.path} />
+        <Tab
+          key={item.section}
+          label={item.label}
+          value={item.section}
+          disabled={!competitionUuid}
+        />
       ))}
     </Tabs>
   );
 }
 
 export default function Header() {
+  const location = useLocation();
   const [headerTitle, setHeaderTitle] = useState({
     name: "Competition",
     shortname: ""
@@ -41,8 +54,7 @@ export default function Header() {
     let isMounted = true;
 
     const readHeaderTitle = async () => {
-      const competitionUuid =
-        window.localStorage.getItem("competition-uuid") ?? "";
+      const competitionUuid = getCompetitionUuidFromPath(location.pathname);
 
       if (!competitionUuid) {
         if (isMounted) {
@@ -76,15 +88,11 @@ export default function Header() {
     };
 
     readHeaderTitle();
-    window.addEventListener("storage", readHeaderTitle);
-    window.addEventListener("competition-uuid-updated", readHeaderTitle);
 
     return () => {
       isMounted = false;
-      window.removeEventListener("storage", readHeaderTitle);
-      window.removeEventListener("competition-uuid-updated", readHeaderTitle);
     };
-  }, []);
+  }, [location.pathname]);
 
   return (
     <AppBar

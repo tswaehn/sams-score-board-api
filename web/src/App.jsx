@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { Box, Container } from "@mui/material";
 import Teams from "./pages/Teams.jsx";
 import Plan from "./pages/Plan.jsx";
@@ -19,11 +19,18 @@ export default function App() {
 
       <Container sx={{ py: 4 }}>
         <Routes>
-          <Route path="/" element={<Teams />} />
-          <Route path="/teams" element={<Teams />} />
+          <Route path="/" element={<CompetitionList />} />
           <Route path="/competitions" element={<CompetitionList />} />
-          <Route path="/plan" element={<Plan />} />
-          <Route path="/live" element={<Live />} />
+          <Route path="/competition" element={<Navigate to="/competitions" replace />} />
+          <Route path="/competition/" element={<Navigate to="/competitions" replace />} />
+          <Route
+            path="/competition/:competitionUuid"
+            element={<Navigate to="teams" replace />}
+          />
+          <Route path="/competition/:competitionUuid/teams" element={<Teams />} />
+          <Route path="/competition/:competitionUuid/plan" element={<Plan />} />
+          <Route path="/competition/:competitionUuid/live" element={<Live />} />
+          <Route path="/competition/*" element={<Navigate to="/competitions" replace />} />
         </Routes>
       </Container>
 

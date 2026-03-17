@@ -1,23 +1,14 @@
-import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { Box, Container, Link, Typography } from "@mui/material";
 
+function getCompetitionUuidFromPath(pathname) {
+  const match = pathname.match(/^\/competition\/([^/]+)(?:\/|$)/);
+  return match?.[1] ?? "";
+}
+
 export default function Footer() {
-  const [competitionUuid, setCompetitionUuid] = useState("");
-
-  useEffect(() => {
-    const readCompetitionUuid = () => {
-      setCompetitionUuid(window.localStorage.getItem("competition-uuid") ?? "");
-    };
-
-    readCompetitionUuid();
-    window.addEventListener("storage", readCompetitionUuid);
-    window.addEventListener("competition-uuid-updated", readCompetitionUuid);
-
-    return () => {
-      window.removeEventListener("storage", readCompetitionUuid);
-      window.removeEventListener("competition-uuid-updated", readCompetitionUuid);
-    };
-  }, []);
+  const location = useLocation();
+  const competitionUuid = getCompetitionUuidFromPath(location.pathname);
 
   return (
     <Box

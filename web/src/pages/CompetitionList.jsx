@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Button,
   Box,
@@ -92,7 +93,14 @@ const selectSx = {
   }
 };
 
+function getCompetitionUuidFromPath(pathname) {
+  const match = pathname.match(/^\/competition\/([^/]+)(?:\/|$)/);
+  return match?.[1] ?? "";
+}
+
 export default function CompetitionList() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [competitions, setCompetitions] = useState([]);
   const [selectedFilters, setSelectedFilters] = useState({
     association: "",
@@ -104,11 +112,7 @@ export default function CompetitionList() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [appliedUuid, setAppliedUuid] = useState("");
-
-  useEffect(() => {
-    setAppliedUuid(window.localStorage.getItem("competition-uuid") ?? "");
-  }, []);
+  const appliedUuid = getCompetitionUuidFromPath(location.pathname);
 
   useEffect(() => {
     let isMounted = true;
@@ -352,12 +356,7 @@ export default function CompetitionList() {
                     <Button
                       variant="contained"
                       onClick={() => {
-                        window.localStorage.setItem(
-                          "competition-uuid",
-                          resolvedCompetition.uuid
-                        );
-                        window.dispatchEvent(new Event("competition-uuid-updated"));
-                        setAppliedUuid(resolvedCompetition.uuid);
+                        navigate(`/competition/${resolvedCompetition.uuid}/teams`);
                       }}
                     >
                       Apply

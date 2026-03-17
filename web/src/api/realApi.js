@@ -42,8 +42,9 @@ function getSortedMatchGroups(data) {
   );
 }
 
-function getStoredCompetitionUuid() {
-  return window.localStorage.getItem("competition-uuid") ?? "";
+function getCompetitionUuidFromPath() {
+  const match = window.location.pathname.match(/^\/competition\/([^/]+)(?:\/|$)/);
+  return match?.[1] ?? "";
 }
 
 async function fetchWithTimeout(url) {
@@ -92,7 +93,7 @@ async function fetchCompetitionList() {
 }
 
 async function fetchCurrentCompetitionData() {
-  const uuid = getStoredCompetitionUuid();
+  const uuid = getCompetitionUuidFromPath();
 
   if (!uuid) {
     throw new Error("Missing competition uuid");
