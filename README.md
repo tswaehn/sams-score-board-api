@@ -1,31 +1,114 @@
-# Scoreboard API Web Viewer
+# client-api
 
-## Getting Started
+The `client-api` directory contains a FastAPI server for exposing competition data from the upstream SAMS API.
 
-1. **Create and activate a virtual environment (optional but recommended):**
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   ```
-2. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-   > If no `requirements.txt` exists yet, install the standard library only approach used here or add your own dependencies and update the file accordingly.
-3. **Run the HTTP server:**
-   ```bash
-   python3 server.py
-   ```
-4. **Open the web interface:**
-   Visit `http://127.0.0.1:8000/` in your browser. The navigation bar links to upcoming games, team lists, league rankings, and health status.
+Install dependencies:
 
-## Project Overview
+```bash
+cd client-api
+pip install -r requirements.txt
+```
 
-This project provides a lightweight web interface over the SAMS scoreboard API. It fetches the configured JSON feed, exposes helpers for downloading or inspecting the payload, and renders several pages:
+Run the API server:
 
-- **Upcoming Games:** lists scheduled matches with status information.
-- **Teams:** lets you select a league and explore registered teams.
-- **Rankings:** shows league standings, including played, wins, and losses.
-- **Series Directory:** summarises all available leagues and links directly to their rankings.
+```bash
+cd client-api
+SSVB_API_KEY=your_api_key uvicorn server:app --host 0.0.0.0 --port 8000
+```
 
-All data originates from the remote API at runtime; no persistent storage is required. The code stays dependency-light, relying primarily on Python's standard library.
+Optional environment variables:
+
+* `HOST` defaults to `0.0.0.0`
+* `PORT` defaults to `8000`
+* `LOG_LEVEL` defaults to `info`
+
+Endpoints:
+
+* `GET /competition/<uuid>` returns the result of `get_competition(<uuid>)` as JSON
+* `GET /health`
+* `GET /healthz`
+
+Example:
+
+```bash
+curl http://127.0.0.1:8000/competition/<uuid>
+curl http://127.0.0.1:8000/healthz
+```
+
+
+# wiki
+
+* https://wiki.sams-server.de/wiki/REST-API-Schnittstelle
+
+
+```
+{
+  "_links": {
+    "self": {
+      "href": "https://www.ssvb.org/api/v2/"
+    },
+    "swagger": {
+      "href": "https://www.ssvb.org/api/v2/swagger.json"
+    },
+    "associations": {
+      "href": "https://www.ssvb.org/api/v2/associations"
+    },
+    "seasons": {
+      "href": "https://www.ssvb.org/api/v2/seasons"
+    },
+    "teams": {
+      "href": "https://www.ssvb.org/api/v2/teams"
+    },
+    "leagues": {
+      "href": "https://www.ssvb.org/api/v2/leagues"
+    },
+    "match_groups": {
+      "href": "https://www.ssvb.org/api/v2/match-groups"
+    },
+    "event_types": {
+      "href": "https://www.ssvb.org/api/v2/event-types"
+    },
+    "competitions": {
+      "href": "https://www.ssvb.org/api/v2/competitions"
+    },
+    "committees": {
+      "href": "https://www.ssvb.org/api/v2/committees"
+    },
+    "league_hierarchies": {
+      "href": "https://www.ssvb.org/api/v2/league-hierarchies"
+    },
+    "user_details": {
+      "href": "https://www.ssvb.org/api/v2/user-details"
+    },
+    "league_matches": {
+      "href": "https://www.ssvb.org/api/v2/league-matches"
+    },
+    "super_competitions": {
+      "href": "https://www.ssvb.org/api/v2/super-competitions"
+    },
+    "competition_matches": {
+      "href": "https://www.ssvb.org/api/v2/competition-matches"
+    },
+    "sportsclubs": {
+      "href": "https://www.ssvb.org/api/v2/sportsclubs"
+    },
+    "match_days": {
+      "href": "https://www.ssvb.org/api/v2/match-days"
+    },
+    "locations": {
+      "href": "https://www.ssvb.org/api/v2/locations"
+    },
+    "events": {
+      "href": "https://www.ssvb.org/api/v2/events"
+    }
+  }
+}
+```
+
+# sams ticker
+
+* https://backend.sams-ticker.de/live/indoor/tickers/dvv
+* https://backend.sams-ticker.de/live/indoor/tickers/ssvb
+
+front end 
+* https://ssvb.sams-ticker.de/
