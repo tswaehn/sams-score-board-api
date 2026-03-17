@@ -11,6 +11,8 @@ import {
 import Teams from "./pages/Teams.jsx";
 import Plan from "./pages/Plan.jsx";
 import Live from "./pages/Live.jsx";
+import CompetitionList from "./pages/CompetitionList.jsx";
+import Footer from "./components/footer.jsx";
 
 const navItems = [
   { path: "/teams", label: "Teams" },
@@ -76,10 +78,13 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Teams />} />
           <Route path="/teams" element={<Teams />} />
+          <Route path="/competitions" element={<CompetitionList />} />
           <Route path="/plan" element={<Plan />} />
           <Route path="/live" element={<Live />} />
         </Routes>
       </Container>
+
+      <Footer />
     </Box>
   );
 }
