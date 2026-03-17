@@ -1,2 +1,4 @@
 confluent_kafka
 requests
+fastapi
+uvicorn
