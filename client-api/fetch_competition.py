@@ -22,6 +22,7 @@ DEFAULT_HEADERS = {
 PAGE_SIZE = 100
 PAGE_DELAY_SECONDS = 0.3
 LAST_REQUEST_COMPLETED_AT = 0.0
+ENDPOINT_CACHE: dict[str, dict] = {}
 
 
 def build_url(endpoint: str) -> str:
@@ -95,7 +96,7 @@ def fetch_page(url: str, api_key: str, page: int, size: int = PAGE_SIZE) -> dict
         globals()["LAST_REQUEST_COMPLETED_AT"] = time.monotonic()
 
 
-def fetch_endpoint(endpoint: str) -> dict:
+def _fetch_endpoint(endpoint: str) -> dict:
     api_key = os.getenv("SSVB_API_KEY")
     if not api_key:
         raise RuntimeError("Missing environment variable: SSVB_API_KEY")
@@ -126,6 +127,15 @@ def fetch_endpoint(endpoint: str) -> dict:
     aggregated_response["size"] = PAGE_SIZE
     aggregated_response["pagesFetched"] = pages_fetched
     return aggregated_response
+
+
+def fetch_endpoint(endpoint: str) -> dict:
+    normalized_endpoint = endpoint.strip("/")
+
+    if normalized_endpoint not in ENDPOINT_CACHE:
+        ENDPOINT_CACHE[normalized_endpoint] = _fetch_endpoint(normalized_endpoint)
+
+    return ENDPOINT_CACHE[normalized_endpoint]
 
 def get_competition_list():
     competitions = fetch_endpoint(f"/competitions")
