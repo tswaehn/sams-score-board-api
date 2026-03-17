@@ -1,4 +1,5 @@
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const competitionListUrl = "/competition-list.json";
 
 const database = {
   "/api/teams": {
@@ -450,6 +451,16 @@ const database = {
 
 export async function fetchJson(endpoint) {
   await delay(450);
+
+  if (endpoint === "/api/competitions") {
+    const response = await fetch(competitionListUrl);
+
+    if (!response.ok) {
+      throw new Error(`Failed to load ${competitionListUrl}: ${response.status}`);
+    }
+
+    return response.json();
+  }
 
   if (!(endpoint in database)) {
     throw new Error(`Unknown endpoint: ${endpoint}`);
