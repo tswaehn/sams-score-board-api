@@ -156,6 +156,10 @@ export default function CompetitionList() {
   const uuidOptions = sortOptions([
     ...new Set(fullyFilteredCompetitions.map((competition) => competition.uuid))
   ]);
+  const showUuidCards =
+    Boolean(selectedFilters.shortname) &&
+    fullyFilteredCompetitions.length > 1 &&
+    fullyFilteredCompetitions.length < 5;
   const resolvedCompetition =
     fullyFilteredCompetitions.find(
       (competition) => competition.uuid === selectedFilters.uuid
@@ -237,7 +241,9 @@ export default function CompetitionList() {
                   </FormControl>
                 ))}
 
-              {Boolean(selectedFilters.shortname) && uuidOptions.length > 1 && (
+              {Boolean(selectedFilters.shortname) &&
+                uuidOptions.length > 1 &&
+                !showUuidCards && (
                 <FormControl fullWidth>
                   <InputLabel id="uuid-label">UUID</InputLabel>
                   <Select
@@ -268,6 +274,52 @@ export default function CompetitionList() {
             <Typography color="text.secondary" variant="body2">
               Matching entries: {fullyFilteredCompetitions.length}
             </Typography>
+
+            {showUuidCards && (
+              <Stack spacing={1.2}>
+                {fullyFilteredCompetitions.map((competition) => (
+                  <Paper
+                    key={competition.uuid}
+                    elevation={0}
+                    sx={{
+                      p: 1.5,
+                      borderRadius: 2.5,
+                      border: "1px solid rgba(20, 17, 15, 0.08)",
+                      bgcolor: "teamInfo.main"
+                    }}
+                  >
+                    <Stack spacing={0.5}>
+                      <Typography
+                        variant="subtitle2"
+                        color="text.secondary"
+                        sx={{ wordBreak: "break-all" }}
+                      >
+                        {competition.uuid}
+                      </Typography>
+                      <Typography sx={{ fontWeight: 600 }}>
+                        {competition.name}
+                      </Typography>
+                      <Typography color="text.secondary">
+                        {competition.shortname}
+                      </Typography>
+                      <Box sx={{ pt: 1 }}>
+                        <Button
+                          variant="contained"
+                          onClick={() =>
+                            setSelectedFilters((current) => ({
+                              ...current,
+                              uuid: competition.uuid
+                            }))
+                          }
+                        >
+                          Select
+                        </Button>
+                      </Box>
+                    </Stack>
+                  </Paper>
+                ))}
+              </Stack>
+            )}
 
             {resolvedCompetition && (
               <Paper
