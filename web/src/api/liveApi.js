@@ -1,7 +1,6 @@
+import { getApiBaseUrl } from "./api.js";
+
 const fetchTimeoutMs = 60000;
-const defaultApiBaseUrl = "http://localhost:8000/api";
-const apiBaseUrl = window.__APP_CONFIG__?.apiBaseUrl ?? defaultApiBaseUrl;
-const liveApiUrl = `${apiBaseUrl}/live`;
 
 function unwrapResponseData(payload) {
   if (
@@ -38,6 +37,7 @@ async function fetchWithTimeout(url) {
 }
 
 export async function fetchLiveJson(path = "") {
+  const liveApiUrl = `${getApiBaseUrl()}/live`;
   const url = path ? `${liveApiUrl}${path}` : liveApiUrl;
   const response = await fetchWithTimeout(url);
 

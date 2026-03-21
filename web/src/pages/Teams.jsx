@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Avatar, Box, Paper, Stack, Typography } from "@mui/material";
-import { fetchJson } from "../api/index.js";
+import { fetchJson } from "../api/api.js";
 
 export default function Teams() {
   const [teams, setTeams] = useState([]);

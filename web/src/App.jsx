@@ -7,7 +7,7 @@ import Live from "./pages/Live.jsx";
 import CompetitionList from "./pages/CompetitionList.jsx";
 import Header from "./components/header.jsx";
 import Footer from "./components/footer.jsx";
-import { fetchJson } from "./api/index.js";
+import { fetchJson } from "./api/api.js";
 
 const selectedCompetitionUuidStorageKey = "competition-uuid";
 

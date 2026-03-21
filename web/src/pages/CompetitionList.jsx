@@ -11,7 +11,7 @@ import {
   Stack,
   Typography
 } from "@mui/material";
-import { fetchJson } from "../api/index.js";
+import { fetchJson } from "../api/api.js";
 
 const competitionListFiltersStorageKey = "competition-list-filters";
 const selectedCompetitionUuidStorageKey = "competition-uuid";

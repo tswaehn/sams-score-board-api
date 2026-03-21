@@ -11,7 +11,7 @@ import {
   Typography
 } from "@mui/material";
 import { useParams } from "react-router-dom";
-import { fetchMatchesByCompetitionUuid } from "../api/index.js";
+import { fetchMatchesByCompetitionUuid } from "../api/api.js";
 
 function formatMatchDate(timestamp) {
   return new Intl.DateTimeFormat("de-DE", {

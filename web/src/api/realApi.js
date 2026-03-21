@@ -1,6 +1,6 @@
+import { getApiBaseUrl } from "./api.js";
+
 const fetchTimeoutMs = 60000;
-const defaultApiBaseUrl = "http://localhost:8000/api";
-const apiBaseUrl = window.__APP_CONFIG__?.apiBaseUrl ?? defaultApiBaseUrl;
 
 function deepCopy(value) {
   return JSON.parse(JSON.stringify(value));
@@ -71,6 +71,7 @@ async function fetchWithTimeout(url) {
 }
 
 async function fetchCompetitionByUuid(uuid) {
+  const apiBaseUrl = getApiBaseUrl();
   const response = await fetchWithTimeout(`${apiBaseUrl}/competition/${uuid}`);
 
   if (!response.ok) {
@@ -83,6 +84,7 @@ async function fetchCompetitionByUuid(uuid) {
 }
 
 async function fetchCompetitionList() {
+  const apiBaseUrl = getApiBaseUrl();
   const response = await fetchWithTimeout(`${apiBaseUrl}/competition-list`);
 
   if (!response.ok) {

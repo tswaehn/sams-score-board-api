@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AppBar, Box, Tab, Tabs, Toolbar, Typography } from "@mui/material";
-import { fetchJson } from "../api/index.js";
+import { fetchJson } from "../api/api.js";
 
 const navItems = [
   { section: "teams", label: "Teams" },
