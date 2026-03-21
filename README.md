@@ -66,16 +66,25 @@ If `VITE_API_BASE_URL` is not set during local development, the frontend default
 http://localhost:8000/api
 ```
 
-For Docker/runtime deployments, the frontend reads `API_BASE_URL` when the container starts and writes it into `/app-config.js`. Example:
+For Docker/runtime deployments, the frontend reads `API_BASE_URL` and `LIVE_API_URL` when the container starts and writes them into `/app-config.js`. Example:
 
 ```bash
-docker run -e API_BASE_URL=https://your-api.example/api -p 8080:80 <image>
+docker run \
+  -e API_BASE_URL=https://your-api.example/api \
+  -e LIVE_API_URL=https://backend.sams-ticker.de/live/indoor/tickers/ssvb \
+  -p 8080:80 <image>
 ```
 
-If `API_BASE_URL` is not set in the container, the runtime default is also:
+If `API_BASE_URL` is not set in the container, the runtime default is:
 
 ```text
 http://localhost:8000/api
+```
+
+If `LIVE_API_URL` is not set in the container, the runtime default is:
+
+```text
+http://localhost:9000/live
 ```
 
 

@@ -366,6 +366,15 @@ export default function Live() {
     let isInitialLoad = true;
 
     async function loadMatches() {
+      if (!competitionUuid) {
+        if (isMounted) {
+          setMatches([]);
+          setError("Missing competition uuid");
+          setLoading(false);
+        }
+        return;
+      }
+
       if (isInitialLoad) {
         setLoading(true);
         setError("");
