@@ -94,6 +94,10 @@ export default function Header() {
     };
   }, [location.pathname]);
 
+  useEffect(() => {
+    document.title = headerTitle.name || "Competition";
+  }, [headerTitle]);
+
   return (
     <AppBar
       position="sticky"

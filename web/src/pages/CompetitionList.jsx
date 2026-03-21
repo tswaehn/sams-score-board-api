@@ -13,6 +13,8 @@ import {
 } from "@mui/material";
 import { fetchJson } from "../api/index.js";
 
+const competitionListFiltersStorageKey = "competition-list-filters";
+
 const filterSteps = [
   {
     key: "association",
@@ -98,18 +100,39 @@ function getCompetitionUuidFromPath(pathname) {
   return match?.[1] ?? "";
 }
 
-export default function CompetitionList() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [competitions, setCompetitions] = useState([]);
-  const [selectedFilters, setSelectedFilters] = useState({
+function getDefaultSelectedFilters() {
+  return {
     association: "",
     season: "",
     gender: "",
     name: "",
     shortname: "",
     uuid: ""
-  });
+  };
+}
+
+function readStoredSelectedFilters() {
+  try {
+    const rawValue = window.localStorage.getItem(competitionListFiltersStorageKey);
+
+    if (!rawValue) {
+      return getDefaultSelectedFilters();
+    }
+
+    return {
+      ...getDefaultSelectedFilters(),
+      ...JSON.parse(rawValue)
+    };
+  } catch {
+    return getDefaultSelectedFilters();
+  }
+}
+
+export default function CompetitionList() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [competitions, setCompetitions] = useState([]);
+  const [selectedFilters, setSelectedFilters] = useState(readStoredSelectedFilters);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const appliedUuid = getCompetitionUuidFromPath(location.pathname);
@@ -135,6 +158,61 @@ export default function CompetitionList() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      competitionListFiltersStorageKey,
+      JSON.stringify(selectedFilters)
+    );
+  }, [selectedFilters]);
+
+  useEffect(() => {
+    if (competitions.length === 0) {
+      return;
+    }
+
+    setSelectedFilters((current) => {
+      const nextSelections = { ...getDefaultSelectedFilters(), ...current };
+
+      filterSteps.forEach((step, index) => {
+        const availableCompetitions = getFilteredCompetitions(
+          competitions,
+          nextSelections,
+          index - 1
+        );
+        const options = getStepOptions(availableCompetitions, step);
+
+        if (
+          nextSelections[step.key] &&
+          !options.includes(nextSelections[step.key])
+        ) {
+          nextSelections[step.key] = "";
+
+          filterSteps.slice(index + 1).forEach((followingStep) => {
+            nextSelections[followingStep.key] = "";
+          });
+
+          nextSelections.uuid = "";
+        }
+      });
+
+      const fullyFiltered = getFilteredCompetitions(
+        competitions,
+        nextSelections,
+        filterSteps.length - 1
+      );
+      const availableUuids = new Set(fullyFiltered.map((competition) => competition.uuid));
+
+      if (nextSelections.uuid && !availableUuids.has(nextSelections.uuid)) {
+        nextSelections.uuid = "";
+      }
+
+      const changed =
+        JSON.stringify(current) !== JSON.stringify(nextSelections);
+
+      return changed ? nextSelections : current;
+    });
+  }, [competitions]);
 
   const selections = filterSteps.map((step, index) => {
     const filteredCompetitions = getFilteredCompetitions(

@@ -2,7 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Avatar,
   Box,
+  FormControl,
+  InputLabel,
   Paper,
+  MenuItem,
+  Select,
   Stack,
   Tab,
   Tabs,
@@ -26,6 +30,55 @@ function getRankingRows(rankings, matchGroupName) {
     }));
 }
 
+function getSortedMatches(matchGroup) {
+  return Object.values(matchGroup?.matches ?? {}).sort((left, right) => {
+    const leftDateTime = `${left.date ?? ""}T${left.time ?? "00:00"}`;
+    const rightDateTime = `${right.date ?? ""}T${right.time ?? "00:00"}`;
+
+    return leftDateTime.localeCompare(rightDateTime);
+  });
+}
+
+function getSetBallPoints(match, side) {
+  const sets = match?.results?.sets ?? [];
+
+  return sets.map((set) => {
+    const [leftPoints = "-", rightPoints = "-"] = (set.ballPoints ?? "").split(":");
+    return side === "left" ? leftPoints : rightPoints;
+  });
+}
+
+function getSetPointStyles(leftPoints, rightPoints, side) {
+  const leftValue = Number(leftPoints);
+  const rightValue = Number(rightPoints);
+
+  if (Number.isNaN(leftValue) || Number.isNaN(rightValue) || leftValue === rightValue) {
+    return {};
+  }
+
+  const isHigher =
+    (side === "left" && leftValue > rightValue) ||
+    (side === "right" && rightValue > leftValue);
+
+  return {
+    bgcolor: isHigher ? "rgba(178, 232, 187, 0.6)" : "rgba(244, 199, 199, 0.7)",
+    borderRadius: 1,
+    px: 0.75,
+    py: 0.25,
+    fontWeight: isHigher ? 700 : 400
+  };
+}
+
+function getMatchBallPoints(match) {
+  const [leftPoints = "-", rightPoints = "-"] = (match?.results?.ballPoints ?? "").split(":");
+  return { leftPoints, rightPoints };
+}
+
+function getMatchSetPoints(match) {
+  const [leftPoints = "-", rightPoints = "-"] = (match?.results?.setPoints ?? "").split(":");
+  return { leftPoints, rightPoints };
+}
+
 export default function Plan() {
   const [competition, setCompetition] = useState(null);
   const [association, setAssociation] = useState(null);
@@ -36,6 +89,7 @@ export default function Plan() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeMatchGroupId, setActiveMatchGroupId] = useState(null);
+  const [selectedTeamUuid, setSelectedTeamUuid] = useState("all");
 
   useEffect(() => {
     let isMounted = true;
@@ -75,11 +129,51 @@ export default function Plan() {
     return map;
   }, [teams]);
 
+  const teamByUuid = useMemo(() => {
+    const map = new Map();
+
+    teams.forEach((team) => {
+      map.set(team.uuid, team);
+    });
+
+    return map;
+  }, [teams]);
+
   const activeMatchGroup =
     matchGroups.find((matchGroup) => matchGroup.uuid === activeMatchGroupId) ?? null;
   const rankingRows = activeMatchGroup
     ? getRankingRows(rankings, activeMatchGroup.name)
     : [];
+  const matchRows = activeMatchGroup ? getSortedMatches(activeMatchGroup) : [];
+  const filteredMatchRows = matchRows.filter((match) => {
+    if (selectedTeamUuid === "all") {
+      return true;
+    }
+
+    return match.team1_uuid === selectedTeamUuid || match.team2_uuid === selectedTeamUuid;
+  });
+  const selectableTeams = useMemo(() => {
+    const uuids = new Set();
+
+    matchRows.forEach((match) => {
+      if (match.team1_uuid) {
+        uuids.add(match.team1_uuid);
+      }
+
+      if (match.team2_uuid) {
+        uuids.add(match.team2_uuid);
+      }
+    });
+
+    return Array.from(uuids)
+      .map((teamUuid) => teamByUuid.get(teamUuid))
+      .filter(Boolean)
+      .sort((left, right) => left.name.localeCompare(right.name));
+  }, [matchRows, teamByUuid]);
+
+  useEffect(() => {
+    setSelectedTeamUuid("all");
+  }, [activeMatchGroupId]);
 
   return (
     <Box sx={{ display: "grid", gap: 2 }}>
@@ -199,6 +293,232 @@ export default function Plan() {
                     })}
                   </TableBody>
                 </Table>
+              </Paper>
+
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2,
+                  borderRadius: 2.5,
+                  border: "1px solid rgba(20, 17, 15, 0.08)",
+                  bgcolor: "teamInfo.main",
+                  display: "grid",
+                  gap: 1.5
+                }}
+              >
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  Matches
+                </Typography>
+
+                <FormControl size="small" sx={{ minWidth: 220, maxWidth: 320 }}>
+                  <InputLabel id="plan-team-filter-label">Team</InputLabel>
+                  <Select
+                    labelId="plan-team-filter-label"
+                    value={selectedTeamUuid}
+                    label="Team"
+                    onChange={(event) => setSelectedTeamUuid(event.target.value)}
+                  >
+                    <MenuItem value="all">All teams</MenuItem>
+                    {selectableTeams.map((team) => (
+                      <MenuItem key={team.uuid} value={team.uuid}>
+                        {team.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                {matchRows.length === 0 && (
+                  <Typography color="text.secondary">
+                    No matches available for this group.
+                  </Typography>
+                )}
+
+                {matchRows.length > 0 && filteredMatchRows.length === 0 && (
+                  <Typography color="text.secondary">
+                    No matches found for the selected team.
+                  </Typography>
+                )}
+
+                {filteredMatchRows.map((match) => {
+                  const team1 = teamByUuid.get(match.team1_uuid);
+                  const team2 = teamByUuid.get(match.team2_uuid);
+                  const team1SetPoints = getSetBallPoints(match, "left");
+                  const team2SetPoints = getSetBallPoints(match, "right");
+                  const totalBallPoints = getMatchBallPoints(match);
+                  const totalSetPoints = getMatchSetPoints(match);
+                  const winnerUuid = match.results?.winner;
+
+                  return (
+                    <Box
+                      key={match.uuid}
+                      sx={{
+                        p: 1.5,
+                        borderRadius: 1,
+                        bgcolor: "background.paper",
+                        display: "grid",
+                        gap: 1
+                      }}
+                    >
+                      <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        justifyContent="space-between"
+                        alignItems={{ xs: "flex-start", sm: "center" }}
+                        spacing={0.5}
+                      >
+                        <Typography
+                          sx={{ fontWeight: 600, color: "rgba(26, 21, 18, 0.45)" }}
+                        >
+                          {match.date} · {match.time}
+                        </Typography>
+                        <Typography sx={{ color: "rgba(26, 21, 18, 0.45)" }}>
+                          {match.location?.name}
+                        </Typography>
+                      </Stack>
+
+                      <Box
+                        sx={{
+                          display: "grid",
+                          gridTemplateColumns: "minmax(0, 2fr) 32px minmax(0, 1fr)",
+                          alignItems: "center",
+                          columnGap: 1.5
+                        }}
+                      >
+                        <Typography
+                          sx={{
+                            fontWeight: winnerUuid === match.team1_uuid ? 700 : 500
+                          }}
+                        >
+                          {team1?.name ?? match.team1_uuid}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            width: 32,
+                            textAlign: "center",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontWeight: 700
+                          }}
+                        >
+                          {totalSetPoints.leftPoints}
+                        </Typography>
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          justifyContent="flex-end"
+                          sx={{ justifySelf: "end" }}
+                        >
+                          {team1SetPoints.map((points, index) => {
+                            const opposingPoints = team2SetPoints[index] ?? "-";
+
+                            return (
+                              <Typography
+                                key={`${match.uuid}-team1-set-${index + 1}`}
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{
+                                  width: 32,
+                                  textAlign: "center",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  ...getSetPointStyles(points, opposingPoints, "left")
+                                }}
+                              >
+                                {points}
+                              </Typography>
+                            );
+                          })}
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              width: 40,
+                              textAlign: "center",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              color: "rgba(26, 21, 18, 0.45)"
+                            }}
+                          >
+                            {totalBallPoints.leftPoints}
+                          </Typography>
+                        </Stack>
+                      </Box>
+
+                      <Box
+                        sx={{
+                          display: "grid",
+                          gridTemplateColumns: "minmax(0, 2fr) 32px minmax(0, 1fr)",
+                          alignItems: "center",
+                          columnGap: 1.5
+                        }}
+                      >
+                        <Typography
+                          sx={{
+                            fontWeight: winnerUuid === match.team2_uuid ? 700 : 500
+                          }}
+                        >
+                          {team2?.name ?? match.team2_uuid}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            width: 32,
+                            textAlign: "center",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontWeight: 700
+                          }}
+                        >
+                          {totalSetPoints.rightPoints}
+                        </Typography>
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          justifyContent="flex-end"
+                          sx={{ justifySelf: "end" }}
+                        >
+                          {team2SetPoints.map((points, index) => {
+                            const opposingPoints = team1SetPoints[index] ?? "-";
+
+                            return (
+                              <Typography
+                                key={`${match.uuid}-team2-set-${index + 1}`}
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{
+                                  width: 32,
+                                  textAlign: "center",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  ...getSetPointStyles(opposingPoints, points, "right")
+                                }}
+                              >
+                                {points}
+                              </Typography>
+                            );
+                          })}
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              width: 40,
+                              textAlign: "center",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              color: "rgba(26, 21, 18, 0.45)"
+                            }}
+                          >
+                            {totalBallPoints.rightPoints}
+                          </Typography>
+                        </Stack>
+                      </Box>
+                    </Box>
+                  );
+                })}
               </Paper>
             </Paper>
           )}
