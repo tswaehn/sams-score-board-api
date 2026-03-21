@@ -31,7 +31,7 @@ def get_season(season_uuid: str) -> dict:
 
 
 def get_match_groups(competition_uuid: str) -> dict:
-    match_groups = fetch_endpoint(f"/competitions/{competition_uuid}/match-groups")["content"]
+    match_groups = fetch_endpoint(f"/competitions/{competition_uuid}/match-groups", cache_duration_seconds=5*60)["content"]
     result = {}
 
     for match_group in match_groups:
@@ -90,7 +90,7 @@ def get_rankings(competition_uuid: str) -> dict:
     return result
 
 def get_competition_matches(competition_uuid: str) -> dict:
-    matches = fetch_endpoint(f"/match-groups/{competition_uuid}/competition-matches")["content"]
+    matches = fetch_endpoint(f"/match-groups/{competition_uuid}/competition-matches", cache_duration_seconds=60)["content"]
     result = {}
     for match in matches:
         team1_link = match["_links"].get("team1")
