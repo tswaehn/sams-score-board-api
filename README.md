@@ -32,7 +32,7 @@ Endpoints:
 * `GET /api/healthz` returns `{ "status": "ok", "requestId": ... }`
 * `GET /api/competition/<uuid>` returns the competition payload as JSON
 * `GET /api/competition-list` returns `{ "data": [...], "requestId": ... }`
-* `GET /api/live` proxies `LIVE_API_URL`, returns the raw upstream JSON payload, and reuses a cached response for about 1 second
+* `GET /api/live` fetches `LIVE_API_URL` once, then keeps the payload updated through the ticker websocket and returns the raw live JSON payload
 * `GET /docs` serves the Swagger UI
 * `GET /redoc` serves the ReDoc UI
 
