@@ -67,7 +67,7 @@ def get_teams(competition_uuid: str) -> list[dict]:
 
 
 def get_rankings(competition_uuid: str) -> dict:
-    rankings = fetch_endpoint(f"/competitions/{competition_uuid}/rankings")["content"]
+    rankings = fetch_endpoint(f"/competitions/{competition_uuid}/rankings", cache_duration_seconds=60)["content"]
     result = {}
 
     for ranking in rankings:
