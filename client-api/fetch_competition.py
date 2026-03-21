@@ -78,15 +78,20 @@ def get_competition_matches(competition_uuid: str) -> dict:
     matches = fetch_endpoint(f"/match-groups/{competition_uuid}/competition-matches")["content"]
     result = {}
     for match in matches:
-        team1_uuid = extract_uuid_from_url(match["_links"]["team1"]["href"])
-        team2_uuid = extract_uuid_from_url(match["_links"]["team2"]["href"])
+        team1_link = match["_links"].get("team1")
+        team2_link = match["_links"].get("team2")
+        team1_uuid = extract_uuid_from_url(team1_link["href"]) if team1_link else None
+        team2_uuid = extract_uuid_from_url(team2_link["href"]) if team2_link else None
         result[match["uuid"]] = {
             "uuid": match["uuid"],
             "date": match["date"],
             "time": match["time"],
             "location": match["location"],
+            "matchNumber": match["matchNumber"],
             "team1_uuid": team1_uuid,
             "team2_uuid": team2_uuid,
+            "team1_name": match["team1Description"],
+            "team2_name": match["team2Description"],
             "results": match["results"],
         }
     return result
