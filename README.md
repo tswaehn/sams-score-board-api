@@ -24,20 +24,26 @@ Optional environment variables:
 * `PORT` defaults to `8000`
 * `LOG_LEVEL` defaults to `info`
 * `LIVE_API_URL` sets the upstream JSON endpoint for `GET /api/live`
+* `WARM_CACHE_ENABLED` enables background cache warm-up when set to `1`, `true`, `yes`, or `on`; disabled by default
 
 Endpoints:
 
-* `GET /competition/<uuid>` returns the result of `get_competition(<uuid>)` as JSON
-* `GET /live` proxies the JSON response from `LIVE_API_URL`
-* `GET /health`
-* `GET /healthz`
+* `GET /api/health` returns `{ "status": "ok", "requestId": ... }`
+* `GET /api/healthz` returns `{ "status": "ok", "requestId": ... }`
+* `GET /api/competition/<uuid>` returns the competition payload as JSON
+* `GET /api/competition-list` returns `{ "data": [...], "requestId": ... }`
+* `GET /api/live` proxies `LIVE_API_URL`, returns the raw upstream JSON payload, and reuses a cached response for about 1 second
+* `GET /docs` serves the Swagger UI
+* `GET /redoc` serves the ReDoc UI
 
 Example:
 
 ```bash
-curl http://127.0.0.1:8000/competition/<uuid>
-curl http://127.0.0.1:8000/live
-curl http://127.0.0.1:8000/healthz
+curl http://127.0.0.1:8000/api/competition/<uuid>
+curl http://127.0.0.1:8000/api/competition-list
+curl http://127.0.0.1:8000/api/live
+curl http://127.0.0.1:8000/api/healthz
+curl http://127.0.0.1:8000/docs
 ```
 
 # web

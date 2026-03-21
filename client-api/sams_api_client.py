@@ -31,6 +31,7 @@ ENDPOINT_CACHE: dict[str, dict] = {}
 CACHE_LOCK = threading.RLock()
 ENDPOINT_FETCH_LOCKS: dict[str, threading.Lock] = {}
 WARM_CACHE_THREAD: threading.Thread | None = None
+WARM_CACHE_ENABLED = os.getenv("WARM_CACHE_ENABLED", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def build_url(endpoint: str) -> str:
@@ -187,6 +188,9 @@ def load_cache() -> None:
                 "cache_file": str(cache_file),
                 "value": value,
             }
+
+    if not WARM_CACHE_ENABLED:
+        return
 
     if WARM_CACHE_THREAD is None or not WARM_CACHE_THREAD.is_alive():
         def warm_cache_runner() -> None:
