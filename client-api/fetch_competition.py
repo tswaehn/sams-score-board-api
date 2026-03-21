@@ -45,6 +45,7 @@ def get_teams(competition_uuid: str) -> list[dict]:
         result.append({
             "uuid": team["uuid"],
             "name": team["name"],
+            "shortName": team["shortName"],
             "logoImageLink": team["logoImageLink"],
         })
 
