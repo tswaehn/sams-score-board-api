@@ -342,6 +342,8 @@ export default function Plan() {
                 {filteredMatchRows.map((match) => {
                   const team1 = teamByUuid.get(match.team1_uuid);
                   const team2 = teamByUuid.get(match.team2_uuid);
+                  const team1Label = team1?.name ?? match.team1_name ?? match.team1_uuid ?? "";
+                  const team2Label = team2?.name ?? match.team2_name ?? match.team2_uuid ?? "";
                   const team1SetPoints = getSetBallPoints(match, "left");
                   const team2SetPoints = getSetBallPoints(match, "right");
                   const totalBallPoints = getMatchBallPoints(match);
@@ -368,7 +370,9 @@ export default function Plan() {
                         <Typography
                           sx={{ fontWeight: 600, color: "rgba(26, 21, 18, 0.45)" }}
                         >
-                          {match.date} · {match.time}
+                          {match.date}
+                          {match.time ? ` · ${match.time}` : ""}
+                          {match.matchNumber != null ? `  (Spiel ${match.matchNumber})` : ""}
                         </Typography>
                         <Typography sx={{ color: "rgba(26, 21, 18, 0.45)" }}>
                           {match.location?.name}
@@ -388,7 +392,7 @@ export default function Plan() {
                             fontWeight: winnerUuid === match.team1_uuid ? 700 : 500
                           }}
                         >
-                          {team1?.name ?? match.team1_uuid}
+                          {team1Label}
                         </Typography>
                         <Typography
                           variant="body2"
@@ -459,7 +463,7 @@ export default function Plan() {
                             fontWeight: winnerUuid === match.team2_uuid ? 700 : 500
                           }}
                         >
-                          {team2?.name ?? match.team2_uuid}
+                          {team2Label}
                         </Typography>
                         <Typography
                           variant="body2"
