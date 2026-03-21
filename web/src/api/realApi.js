@@ -32,7 +32,8 @@ function normalizeTeam(team) {
   return {
     uuid: team.uuid,
     name: team.name,
-    short_name: createShortName(team.name),
+    short_name:
+      team.shortName ?? team.short_name ?? team.shortname ?? createShortName(team.name),
     logo_url: team.logoImageLink
   };
 }

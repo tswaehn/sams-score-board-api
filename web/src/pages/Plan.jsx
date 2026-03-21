@@ -273,7 +273,7 @@ export default function Plan() {
                                 sx={{ width: 36, height: 36, bgcolor: "#f3ebe0" }}
                               />
                               <Typography sx={{ fontWeight: 600 }}>
-                                {row.teamName}
+                                {team?.name ?? row.teamName}
                               </Typography>
                             </Stack>
                           </TableCell>

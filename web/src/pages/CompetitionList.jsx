@@ -28,14 +28,14 @@ const filterSteps = [
     getValue: (competition) => competition.season?.name ?? ""
   },
   {
-    key: "gender",
-    label: "Gender",
-    getValue: (competition) => competition.gender ?? ""
-  },
-  {
     key: "name",
     label: "Competition Name",
     getValue: (competition) => competition.name ?? ""
+  },
+  {
+    key: "gender",
+    label: "Gender",
+    getValue: (competition) => competition.gender ?? ""
   },
   {
     key: "shortname",
@@ -291,7 +291,7 @@ export default function CompetitionList() {
               </Typography>
               <Typography color="text.secondary">
                 Filters are ordered by how strongly they reduce the dataset:
-                association, season, gender, competition name, then short name.
+                association, season, competition name, gender, then short name.
               </Typography>
             </Box>
 

@@ -89,7 +89,7 @@ export default function Teams() {
                 />
                 <Box>
                   <Typography variant="subtitle2" color="text.secondary">
-                    {team.short_name}
+                    {team.short_name ?? team.name}
                   </Typography>
                   <Typography variant="h6" sx={{ fontWeight: 600 }}>
                     {team.name}
