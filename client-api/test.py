@@ -22,6 +22,7 @@ def test_competition():
     competition_id = "71556c84-7e05-4516-88f7-4bf890f9873a"
     competition_id = "dfcdd4c1-6d94-42ce-9028-9bba43d36d56"
     competition_id = "d2f619a3-7fea-4b1e-9d86-a300e335e2ec"
+    competition_id = "d2818335-7d46-4053-bdad-9a57a98d2c05"
 
     payload = get_competition(competition_id)
 
@@ -33,5 +34,5 @@ def test_competition():
 
 
 if __name__ == "__main__":
-    # store_competition_list()
+    store_competition_list()
     test_competition()

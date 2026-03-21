@@ -1,6 +1,21 @@
 from sams_api_client import extract_endpoint_from_url, fetch_endpoint
 
 
+def verify_competition_list(competition_list):
+    verified_competitions = []
+    seen_uuids = set()
+
+    for competition in competition_list:
+        competition_uuid = competition["uuid"]
+        if competition_uuid in seen_uuids:
+            continue
+
+        seen_uuids.add(competition_uuid)
+        verified_competitions.append(competition)
+
+    return verified_competitions
+
+
 def get_competition_list():
     competitions = fetch_endpoint("/competitions")
     competition_list = []
@@ -36,4 +51,4 @@ def get_competition_list():
             "name": season_cache[season_url]["name"],
         }
 
-    return competition_list
+    return verify_competition_list(competition_list)
