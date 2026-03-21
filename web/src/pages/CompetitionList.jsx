@@ -14,6 +14,7 @@ import {
 import { fetchJson } from "../api/index.js";
 
 const competitionListFiltersStorageKey = "competition-list-filters";
+const selectedCompetitionUuidStorageKey = "competition-uuid";
 
 const filterSteps = [
   {
@@ -434,6 +435,10 @@ export default function CompetitionList() {
                     <Button
                       variant="contained"
                       onClick={() => {
+                        window.localStorage.setItem(
+                          selectedCompetitionUuidStorageKey,
+                          resolvedCompetition.uuid
+                        );
                         navigate(`/competition/${resolvedCompetition.uuid}/teams`);
                       }}
                     >
