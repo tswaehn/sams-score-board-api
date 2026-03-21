@@ -1,5 +1,9 @@
+import hashlib
+import json
 import os
+import threading
 import time
+from pathlib import Path
 from urllib.parse import urlparse
 from uuid import UUID
 
@@ -19,8 +23,12 @@ DEFAULT_HEADERS = {
 }
 PAGE_SIZE = 100
 PAGE_DELAY_SECONDS = 0.3
+DEFAULT_CACHE_DURATION_SECONDS = 24 * 60 * 60
 LAST_REQUEST_COMPLETED_AT = 0.0
+CACHE_DIR = Path(__file__).with_name("cache")
+ENDPOINT_CACHE_FILE_PREFIX = "endpoint_cache_"
 ENDPOINT_CACHE: dict[str, dict] = {}
+WARM_CACHE_THREAD: threading.Thread | None = None
 
 
 def build_url(endpoint: str) -> str:
@@ -134,10 +142,101 @@ def _fetch_endpoint(endpoint: str) -> dict:
     return aggregated_response
 
 
-def fetch_endpoint(endpoint: str) -> dict:
+def _build_cache_file_path(endpoint: str) -> Path:
+    endpoint_hash = hashlib.sha256(endpoint.encode("utf-8")).hexdigest()
+    return CACHE_DIR / f"{ENDPOINT_CACHE_FILE_PREFIX}{endpoint_hash}.json"
+
+
+def load_cache() -> None:
+    global WARM_CACHE_THREAD
+
+    CACHE_DIR.mkdir(exist_ok=True)
+
+    for cache_file in CACHE_DIR.glob(f"{ENDPOINT_CACHE_FILE_PREFIX}*.json"):
+        try:
+            with cache_file.open("r", encoding="utf-8") as input_file:
+                cache_entry = json.load(input_file)
+        except (OSError, json.JSONDecodeError):
+            continue
+
+        endpoint = cache_entry.get("endpoint")
+        cache_timestamp = cache_entry.get("cache_timestamp")
+        value = cache_entry.get("value")
+
+        if not isinstance(endpoint, str):
+            continue
+        if not isinstance(cache_timestamp, (int, float)):
+            continue
+        if not isinstance(value, dict):
+            continue
+
+        ENDPOINT_CACHE[endpoint] = {
+            "cache_timestamp": cache_timestamp,
+            "cache_file": str(cache_file),
+            "value": value,
+        }
+
+    if WARM_CACHE_THREAD is None or not WARM_CACHE_THREAD.is_alive():
+        def warm_cache_runner() -> None:
+            from warm_cache import warm_cache
+
+            warm_cache()
+
+        WARM_CACHE_THREAD = threading.Thread(target=warm_cache_runner, name="warm-cache", daemon=True)
+        WARM_CACHE_THREAD.start()
+
+    return
+
+
+def _get_cached_value(endpoint: str, cache_duration_seconds: float) -> dict | None:
+    cache_entry = ENDPOINT_CACHE.get(endpoint)
+    if cache_entry is None:
+        return None
+
+    cache_timestamp = cache_entry["cache_timestamp"]
+    if time.time() - cache_timestamp > cache_duration_seconds:
+        return None
+
+    return cache_entry["value"]
+
+
+def _cache_value(endpoint: str, value: dict) -> dict:
+    CACHE_DIR.mkdir(exist_ok=True)
+    cache_timestamp = time.time()
+    cache_file = _build_cache_file_path(endpoint)
+    serialized_entry = {
+        "endpoint": endpoint,
+        "cache_timestamp": cache_timestamp,
+        "value": value,
+    }
+
+    with cache_file.open("w", encoding="utf-8") as output_file:
+        json.dump(serialized_entry, output_file)
+
+    ENDPOINT_CACHE[endpoint] = {
+        "cache_timestamp": cache_timestamp,
+        "cache_file": str(cache_file),
+        "value": value,
+    }
+    return ENDPOINT_CACHE[endpoint]["value"]
+
+
+def fetch_endpoint_with_cache_status(
+    endpoint: str,
+    cache_duration_seconds: float = DEFAULT_CACHE_DURATION_SECONDS,
+) -> tuple[dict, bool]:
     normalized_endpoint = endpoint.strip("/")
+    cached_value = _get_cached_value(normalized_endpoint, cache_duration_seconds)
 
-    if normalized_endpoint not in ENDPOINT_CACHE:
-        ENDPOINT_CACHE[normalized_endpoint] = _fetch_endpoint(normalized_endpoint)
+    if cached_value is not None:
+        return cached_value, True
 
-    return ENDPOINT_CACHE[normalized_endpoint]
+    return _cache_value(normalized_endpoint, _fetch_endpoint(normalized_endpoint)), False
+
+
+def fetch_endpoint(endpoint: str, cache_duration_seconds: float = DEFAULT_CACHE_DURATION_SECONDS) -> dict:
+    value, _ = fetch_endpoint_with_cache_status(endpoint, cache_duration_seconds=cache_duration_seconds)
+    return value
+
+
+load_cache()

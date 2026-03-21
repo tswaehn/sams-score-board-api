@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import json
 import logging
 import os
-from pathlib import Path
 from uuid import UUID, uuid4
 
 import uvicorn
@@ -13,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from fetch_competition import get_competition
+from fetch_competition_list import get_competition_list
 
 
 HOST = os.getenv("HOST", "0.0.0.0")
@@ -24,8 +23,6 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
 LOGGER = logging.getLogger("competition-api")
-CACHE_DIR = Path(__file__).with_name("cache")
-COMPETITION_LIST_PATH = CACHE_DIR / "competition-list.json"
 
 app = FastAPI(
     title="Competition API",
@@ -112,12 +109,13 @@ async def health(request: Request) -> dict:
 @app.get("/api/competition/{competition_id}")
 async def competition(competition_id: UUID, request: Request) -> dict:
     try:
-        payload = get_competition(str(competition_id))
+        payload, was_cached = get_competition(str(competition_id))
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail="Failed to fetch competition data") from exc
 
     return {
         "data": payload,
+        "cached": was_cached,
         "requestId": request.state.request_id,
     }
 
@@ -125,12 +123,9 @@ async def competition(competition_id: UUID, request: Request) -> dict:
 @app.get("/api/competition-list")
 async def competition_list(request: Request) -> dict:
     try:
-        with COMPETITION_LIST_PATH.open("r", encoding="utf-8") as input_file:
-            payload = json.load(input_file)
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail="competition-list.json not found") from exc
-    except json.JSONDecodeError as exc:
-        raise HTTPException(status_code=500, detail="competition-list.json is invalid") from exc
+        payload = get_competition_list()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail="Failed to fetch competition list") from exc
 
     return {
         "data": payload,

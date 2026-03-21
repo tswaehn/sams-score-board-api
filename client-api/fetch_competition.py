@@ -1,8 +1,16 @@
-from sams_api_client import extract_uuid_from_url, fetch_endpoint
+from sams_api_client import extract_uuid_from_url, fetch_endpoint, fetch_endpoint_with_cache_status
+
+
+ONE_WEEK_SECONDS = 7 * 24 * 60 * 60
+THREE_WEEKS_SECONDS = 3 * ONE_WEEK_SECONDS
+FOUR_WEEKS_SECONDS = 4 * ONE_WEEK_SECONDS
 
 
 def get_association(association_uuid: str) -> dict:
-    association = fetch_endpoint(f"/associations/{association_uuid}")
+    association = fetch_endpoint(
+        f"/associations/{association_uuid}",
+        cache_duration_seconds=THREE_WEEKS_SECONDS,
+    )
     return {
         "uuid": association["uuid"],
         "name": association["name"],
@@ -11,7 +19,10 @@ def get_association(association_uuid: str) -> dict:
 
 
 def get_season(season_uuid: str) -> dict:
-    season = fetch_endpoint(f"/seasons/{season_uuid}")
+    season = fetch_endpoint(
+        f"/seasons/{season_uuid}",
+        cache_duration_seconds=FOUR_WEEKS_SECONDS,
+    )
     return {
         "uuid": season["uuid"],
         "name": season["name"],
@@ -38,7 +49,10 @@ def get_match_groups(competition_uuid: str) -> dict:
 
 
 def get_teams(competition_uuid: str) -> list[dict]:
-    teams = fetch_endpoint(f"/competitions/{competition_uuid}/teams")["content"]
+    teams = fetch_endpoint(
+        f"/competitions/{competition_uuid}/teams",
+        cache_duration_seconds=ONE_WEEK_SECONDS,
+    )["content"]
     result = []
 
     for team in teams:
@@ -97,8 +111,8 @@ def get_competition_matches(competition_uuid: str) -> dict:
         }
     return result
 
-def get_competition(competition_id: str) -> dict:
-    competition = fetch_endpoint(f"/competitions/{competition_id}")
+def get_competition(competition_id: str) -> tuple[dict, bool]:
+    competition, was_cached = fetch_endpoint_with_cache_status(f"/competitions/{competition_id}")
 
     association_uuid = extract_uuid_from_url(competition["_links"]["association"]["href"])
     season_uuid = extract_uuid_from_url(competition["_links"]["season"]["href"])
@@ -121,4 +135,4 @@ def get_competition(competition_id: str) -> dict:
         "rankings": get_rankings(competition_id),
     }
 
-    return result
+    return result, was_cached

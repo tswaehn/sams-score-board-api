@@ -3,6 +3,7 @@ from pathlib import Path
 
 from fetch_competition import get_competition
 from fetch_competition_list import get_competition_list
+from warm_cache import warm_cache
 
 
 CACHE_DIR = Path(__file__).with_name("cache")
@@ -28,15 +29,17 @@ def test_competition():
     competition_id = "d2f619a3-7fea-4b1e-9d86-a300e335e2ec"
     competition_id = "d2818335-7d46-4053-bdad-9a57a98d2c05"
 
-    payload = get_competition(competition_id)
+    payload, was_cached = get_competition(competition_id)
 
     output_path = build_output_path("competition")
     with open(output_path, "w", encoding="utf-8") as output_file:
         json.dump(payload, output_file, indent=2)
+    print(f"Competition cached: {was_cached}")
     print(json.dumps(payload, indent=2))
 
 
 
 if __name__ == "__main__":
-    store_competition_list()
-    test_competition()
+    # store_competition_list()
+    warm_cache()
+    #test_competition()
