@@ -35,6 +35,37 @@ curl http://127.0.0.1:8000/competition/<uuid>
 curl http://127.0.0.1:8000/healthz
 ```
 
+# web
+
+The `web` directory contains the Vite frontend.
+
+Install dependencies:
+
+```bash
+cd web
+npm install
+```
+
+Run the frontend:
+
+```bash
+cd web
+npm run dev
+```
+
+Configure the frontend API base URL with `VITE_API_BASE_URL`:
+
+```bash
+cd web
+VITE_API_BASE_URL=https://your-api.example/api npm run dev
+```
+
+If `VITE_API_BASE_URL` is not set, the frontend defaults to:
+
+```text
+http://localhost:8000/api
+```
+
 
 # wiki
 

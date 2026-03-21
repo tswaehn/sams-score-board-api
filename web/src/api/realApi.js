@@ -1,5 +1,6 @@
-const apiBaseUrl = "http://localhost:8000/api";
 const fetchTimeoutMs = 60000;
+const defaultApiBaseUrl = "http://localhost:8000/api";
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? defaultApiBaseUrl;
 
 function deepCopy(value) {
   return JSON.parse(JSON.stringify(value));
