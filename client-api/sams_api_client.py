@@ -1,6 +1,7 @@
 import os
 import time
 from urllib.parse import urlparse
+from uuid import UUID
 
 import requests
 from requests import RequestException
@@ -42,6 +43,18 @@ def extract_endpoint_from_url(url: str) -> str:
         raise RuntimeError(f"URL does not contain an endpoint after the API prefix: {url!r}")
 
     return endpoint
+
+
+def extract_uuid_from_url(url: str) -> str:
+    endpoint = extract_endpoint_from_url(url)
+
+    for segment in endpoint.split("/"):
+        try:
+            return str(UUID(segment))
+        except ValueError:
+            continue
+
+    raise RuntimeError(f"URL does not contain a UUID segment: {url!r}")
 
 
 def wait_for_request_slot(min_delay_seconds: float = PAGE_DELAY_SECONDS) -> None:

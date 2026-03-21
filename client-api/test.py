@@ -31,10 +31,7 @@ def test_competition():
     print(json.dumps(payload, indent=2))
 
 
-def run_test() -> None:
-    # store_competition_list()
-    test_competition()
-
 
 if __name__ == "__main__":
-    run_test()
+    # store_competition_list()
+    test_competition()
