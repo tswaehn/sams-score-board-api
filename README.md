@@ -53,14 +53,26 @@ cd web
 npm run dev
 ```
 
-Configure the frontend API base URL with `VITE_API_BASE_URL`:
+Configure the frontend API base URL for local development with `VITE_API_BASE_URL`:
 
 ```bash
 cd web
 VITE_API_BASE_URL=https://your-api.example/api npm run dev
 ```
 
-If `VITE_API_BASE_URL` is not set, the frontend defaults to:
+If `VITE_API_BASE_URL` is not set during local development, the frontend defaults to:
+
+```text
+http://localhost:8000/api
+```
+
+For Docker/runtime deployments, the frontend reads `API_BASE_URL` when the container starts and writes it into `/app-config.js`. Example:
+
+```bash
+docker run -e API_BASE_URL=https://your-api.example/api -p 8080:80 <image>
+```
+
+If `API_BASE_URL` is not set in the container, the runtime default is also:
 
 ```text
 http://localhost:8000/api
