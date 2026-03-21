@@ -5,9 +5,13 @@ from fetch_competition import get_competition
 from fetch_competition_list import get_competition_list
 
 
+CACHE_DIR = Path(__file__).with_name("cache")
+
+
 def build_output_path(endpoint: str) -> Path:
     filename = endpoint.strip("/").replace("/", "_")
-    return Path(__file__).with_name(f"{filename}.json")
+    CACHE_DIR.mkdir(exist_ok=True)
+    return CACHE_DIR / f"{filename}.json"
 
 
 def store_competition_list() -> None:

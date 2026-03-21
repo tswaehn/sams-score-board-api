@@ -24,7 +24,8 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
 LOGGER = logging.getLogger("competition-api")
-COMPETITION_LIST_PATH = Path(__file__).with_name("competition-list.json")
+CACHE_DIR = Path(__file__).with_name("cache")
+COMPETITION_LIST_PATH = CACHE_DIR / "competition-list.json"
 
 app = FastAPI(
     title="Competition API",
