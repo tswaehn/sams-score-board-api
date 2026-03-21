@@ -13,7 +13,9 @@ Run the API server:
 
 ```bash
 cd client-api
-SSVB_API_KEY=your_api_key uvicorn server:app --host 0.0.0.0 --port 8000
+SSVB_API_KEY=your_api_key \
+LIVE_API_URL=https://example.com/live.json \
+uvicorn server:app --host 0.0.0.0 --port 8000
 ```
 
 Optional environment variables:
@@ -21,10 +23,12 @@ Optional environment variables:
 * `HOST` defaults to `0.0.0.0`
 * `PORT` defaults to `8000`
 * `LOG_LEVEL` defaults to `info`
+* `LIVE_API_URL` sets the upstream JSON endpoint for `GET /api/live`
 
 Endpoints:
 
 * `GET /competition/<uuid>` returns the result of `get_competition(<uuid>)` as JSON
+* `GET /live` proxies the JSON response from `LIVE_API_URL`
 * `GET /health`
 * `GET /healthz`
 
@@ -32,6 +36,7 @@ Example:
 
 ```bash
 curl http://127.0.0.1:8000/competition/<uuid>
+curl http://127.0.0.1:8000/live
 curl http://127.0.0.1:8000/healthz
 ```
 
@@ -66,12 +71,11 @@ If `VITE_API_BASE_URL` is not set during local development, the frontend default
 http://localhost:8000/api
 ```
 
-For Docker/runtime deployments, the frontend reads `API_BASE_URL` and `LIVE_API_URL` when the container starts and writes them into `/app-config.js`. Example:
+For Docker/runtime deployments, the frontend reads `API_BASE_URL` when the container starts and writes it into `/app-config.js`. The live feed is loaded from the same base URL at the `/live` endpoint. Example:
 
 ```bash
 docker run \
   -e API_BASE_URL=https://your-api.example/api \
-  -e LIVE_API_URL=https://backend.sams-ticker.de/live/indoor/tickers/ssvb \
   -p 8080:80 <image>
 ```
 
@@ -79,12 +83,6 @@ If `API_BASE_URL` is not set in the container, the runtime default is:
 
 ```text
 http://localhost:8000/api
-```
-
-If `LIVE_API_URL` is not set in the container, the runtime default is:
-
-```text
-http://localhost:9000/live
 ```
 
 

@@ -1,6 +1,7 @@
 const fetchTimeoutMs = 60000;
-const defaultLiveApiUrl = "http://localhost:9000/live";
-const liveApiUrl = window.__APP_CONFIG__?.liveApiUrl ?? defaultLiveApiUrl;
+const defaultApiBaseUrl = "http://localhost:8000/api";
+const apiBaseUrl = window.__APP_CONFIG__?.apiBaseUrl ?? defaultApiBaseUrl;
+const liveApiUrl = `${apiBaseUrl}/live`;
 
 function unwrapResponseData(payload) {
   if (
