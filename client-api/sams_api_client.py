@@ -28,6 +28,8 @@ LAST_REQUEST_COMPLETED_AT = 0.0
 CACHE_DIR = Path(__file__).with_name("cache")
 ENDPOINT_CACHE_FILE_PREFIX = "endpoint_cache_"
 ENDPOINT_CACHE: dict[str, dict] = {}
+CACHE_LOCK = threading.RLock()
+ENDPOINT_FETCH_LOCKS: dict[str, threading.Lock] = {}
 WARM_CACHE_THREAD: threading.Thread | None = None
 
 
@@ -147,6 +149,15 @@ def _build_cache_file_path(endpoint: str) -> Path:
     return CACHE_DIR / f"{ENDPOINT_CACHE_FILE_PREFIX}{endpoint_hash}.json"
 
 
+def _get_endpoint_fetch_lock(endpoint: str) -> threading.Lock:
+    with CACHE_LOCK:
+        endpoint_lock = ENDPOINT_FETCH_LOCKS.get(endpoint)
+        if endpoint_lock is None:
+            endpoint_lock = threading.Lock()
+            ENDPOINT_FETCH_LOCKS[endpoint] = endpoint_lock
+        return endpoint_lock
+
+
 def load_cache() -> None:
     global WARM_CACHE_THREAD
 
@@ -170,11 +181,12 @@ def load_cache() -> None:
         if not isinstance(value, dict):
             continue
 
-        ENDPOINT_CACHE[endpoint] = {
-            "cache_timestamp": cache_timestamp,
-            "cache_file": str(cache_file),
-            "value": value,
-        }
+        with CACHE_LOCK:
+            ENDPOINT_CACHE[endpoint] = {
+                "cache_timestamp": cache_timestamp,
+                "cache_file": str(cache_file),
+                "value": value,
+            }
 
     if WARM_CACHE_THREAD is None or not WARM_CACHE_THREAD.is_alive():
         def warm_cache_runner() -> None:
@@ -189,15 +201,16 @@ def load_cache() -> None:
 
 
 def _get_cached_value(endpoint: str, cache_duration_seconds: float) -> dict | None:
-    cache_entry = ENDPOINT_CACHE.get(endpoint)
-    if cache_entry is None:
-        return None
+    with CACHE_LOCK:
+        cache_entry = ENDPOINT_CACHE.get(endpoint)
+        if cache_entry is None:
+            return None
 
-    cache_timestamp = cache_entry["cache_timestamp"]
-    if time.time() - cache_timestamp > cache_duration_seconds:
-        return None
+        cache_timestamp = cache_entry["cache_timestamp"]
+        if time.time() - cache_timestamp > cache_duration_seconds:
+            return None
 
-    return cache_entry["value"]
+        return cache_entry["value"]
 
 
 def _cache_value(endpoint: str, value: dict) -> dict:
@@ -213,12 +226,13 @@ def _cache_value(endpoint: str, value: dict) -> dict:
     with cache_file.open("w", encoding="utf-8") as output_file:
         json.dump(serialized_entry, output_file)
 
-    ENDPOINT_CACHE[endpoint] = {
-        "cache_timestamp": cache_timestamp,
-        "cache_file": str(cache_file),
-        "value": value,
-    }
-    return ENDPOINT_CACHE[endpoint]["value"]
+    with CACHE_LOCK:
+        ENDPOINT_CACHE[endpoint] = {
+            "cache_timestamp": cache_timestamp,
+            "cache_file": str(cache_file),
+            "value": value,
+        }
+        return ENDPOINT_CACHE[endpoint]["value"]
 
 
 def fetch_endpoint_with_cache_status(
@@ -231,7 +245,13 @@ def fetch_endpoint_with_cache_status(
     if cached_value is not None:
         return cached_value, True
 
-    return _cache_value(normalized_endpoint, _fetch_endpoint(normalized_endpoint)), False
+    endpoint_lock = _get_endpoint_fetch_lock(normalized_endpoint)
+    with endpoint_lock:
+        cached_value = _get_cached_value(normalized_endpoint, cache_duration_seconds)
+        if cached_value is not None:
+            return cached_value, True
+
+        return _cache_value(normalized_endpoint, _fetch_endpoint(normalized_endpoint)), False
 
 
 def fetch_endpoint(endpoint: str, cache_duration_seconds: float = DEFAULT_CACHE_DURATION_SECONDS) -> dict:
