@@ -1,4 +1,4 @@
-from api_client import extract_endpoint_from_url, fetch_endpoint
+from sams_api_client import extract_endpoint_from_url, fetch_endpoint
 
 
 def get_competition_list():
