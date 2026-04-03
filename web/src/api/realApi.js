@@ -96,6 +96,17 @@ async function fetchCompetitionList() {
   return unwrapResponseData(await response.json());
 }
 
+async function fetchLivePayload() {
+  const apiBaseUrl = getApiBaseUrl();
+  const response = await fetchWithTimeout(`${apiBaseUrl}/live`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to load ${apiBaseUrl}/live: ${response.status}`);
+  }
+
+  return unwrapResponseData(await response.json());
+}
+
 async function fetchCurrentCompetitionData() {
   const uuid = getCompetitionUuidFromPath();
 
@@ -130,16 +141,7 @@ const handlers = {
       rankings: data.rankings ?? {}
     };
   },
-  "/api/live": async () => {
-    const data = await fetchCurrentCompetitionData();
-
-    return {
-      competition: data.competition,
-      association: data.association,
-      season: data.season,
-      matchGroups: getSortedMatchGroups(data)
-    };
-  },
+  "/api/live": fetchLivePayload,
   "/api/competition-list": fetchCompetitionList
 };
 

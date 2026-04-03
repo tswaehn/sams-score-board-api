@@ -191,6 +191,12 @@ def ensure_live_ws_worker() -> None:
         LIVE_API_WS_THREAD.start()
 
 
+def startup_live_endpoint() -> None:
+    parse_live_api_config()
+    store_live_payload(fetch_live_snapshot())
+    ensure_live_ws_worker()
+
+
 def get_live_payload() -> dict:
     parse_live_api_config()
     ensure_live_ws_worker()

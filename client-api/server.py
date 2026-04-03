@@ -13,7 +13,7 @@ from requests import RequestException
 
 from fetch_competition import COMPETITION
 from fetch_competition_list import COMPETITION_LIST_STORE
-from live_endpoint import get_live_payload
+from live_endpoint import LIVE_API_URL, get_live_payload, startup_live_endpoint
 
 
 HOST = os.getenv("HOST", "0.0.0.0")
@@ -40,6 +40,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+async def startup() -> None:
+    if not LIVE_API_URL:
+        LOGGER.info("Skipping live endpoint startup: LIVE_API_URL is not configured")
+        return
+
+    try:
+        startup_live_endpoint()
+    except Exception:
+        LOGGER.exception("Live endpoint startup failed")
 
 
 @app.middleware("http")
