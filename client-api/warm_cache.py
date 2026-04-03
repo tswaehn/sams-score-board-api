@@ -1,8 +1,8 @@
 import sys
 
+from endpoint_cache import get_cache_snapshot
 from fetch_competition import get_competition
 from fetch_competition_list import get_competition_list
-from sams_api_client import CACHE_LOCK, ENDPOINT_CACHE
 
 
 def get_deep_size_bytes(value, seen: set[int] | None = None) -> int:
@@ -27,8 +27,7 @@ def get_deep_size_bytes(value, seen: set[int] | None = None) -> int:
 
 
 def get_cache_size_mb() -> float:
-    with CACHE_LOCK:
-        return get_deep_size_bytes(ENDPOINT_CACHE) / (1024 * 1024)
+    return get_deep_size_bytes(get_cache_snapshot()) / (1024 * 1024)
 
 
 def warm_cache() -> None:
