@@ -97,12 +97,34 @@ class PeriodicUpdater:
             stored_at = self.store_item_stored_at.get(key)
             return stored_at if isinstance(stored_at, (int, float)) else None
 
-    def wait_for_uuid(self, uuid: str | None = None) -> None:
+    def _run_coalesced_update(self, uuid: str | None = None) -> bool:
         update_key = uuid if uuid is not None else "__all__"
 
-        while True:
-            should_update = False
+        with self.lock:
+            update_event = self.inflight_updates.get(update_key)
+            if update_event is None:
+                update_event = threading.Event()
+                self.inflight_updates[update_key] = update_event
+                should_update = True
+            else:
+                should_update = False
 
+        if not should_update:
+            update_event.wait()
+            return False
+
+        try:
+            self.update_store(uuid)
+        finally:
+            with self.lock:
+                current_update_event = self.inflight_updates.pop(update_key, None)
+                if current_update_event is not None:
+                    current_update_event.set()
+
+        return True
+
+    def wait_for_uuid(self, uuid: str | None = None) -> None:
+        while True:
             with self.lock:
                 if uuid is None:
                     if not self.is_store_expired():
@@ -112,24 +134,8 @@ class PeriodicUpdater:
                     if store_item is not None and not self.is_store_item_expired(uuid):
                         return
 
-                update_event = self.inflight_updates.get(update_key)
-                if update_event is None:
-                    update_event = threading.Event()
-                    self.inflight_updates[update_key] = update_event
-                    should_update = True
-
-            if not should_update:
-                update_event.wait()
-                continue
-
-            try:
-                self.update_store(uuid)
-            finally:
-                with self.lock:
-                    current_update_event = self.inflight_updates.pop(update_key, None)
-                    if current_update_event is not None:
-                        current_update_event.set()
-            return
+            if self._run_coalesced_update(uuid):
+                return
 
     def load_store(self) -> None:
         if not self.store_file_path.exists():

@@ -61,6 +61,9 @@ class CompetitionListStore(PeriodicUpdater):
         if not isinstance(competitions, list):
             raise RuntimeError("Expected competition list content to be a list")
 
+        next_store: dict[str, dict] = {}
+        raw_payload: dict[str, dict] = {}
+
         for competition in competitions:
             if not isinstance(competition, dict):
                 continue
@@ -68,7 +71,12 @@ class CompetitionListStore(PeriodicUpdater):
             competition_uuid = competition.get("uuid")
             if not isinstance(competition_uuid, str):
                 continue
-            self._update_store(competition_uuid, competition)
+            next_store[competition_uuid] = self.build_competition_entry_from_payload(competition)
+            raw_payload[competition_uuid] = competition
+
+        raw_file_path = self.store_file_path.parent / "competition-list-store-raw.json"
+        self._write_json_file(raw_file_path, raw_payload)
+        self.replace_store(next_store)
 
     def seconds_until_next_update_all(self) -> float:
         now = datetime.now()
@@ -86,7 +94,7 @@ class CompetitionListStore(PeriodicUpdater):
     def run_update_all_loop(self) -> None:
         if self.should_update_all_on_startup():
             try:
-                self.update_all()
+                self._run_coalesced_update()
             except Exception:
                 self.logger.exception("Competition list startup update_all failed")
 
@@ -94,7 +102,7 @@ class CompetitionListStore(PeriodicUpdater):
             sleep_seconds = self.seconds_until_next_update_all()
             time.sleep(sleep_seconds)
             try:
-                self.update_all()
+                self._run_coalesced_update()
             except Exception:
                 self.logger.exception("Competition list scheduled update_all failed")
 
@@ -133,15 +141,18 @@ class CompetitionListStore(PeriodicUpdater):
             },
         }
 
+    def build_competition_entry_from_payload(self, competition_payload: dict) -> dict:
+        season_uuid = extract_uuid_from_url(competition_payload["_links"]["season"]["href"])
+        season_payload = SEASON.get(season_uuid)
+        return self.build_competition_entry(competition_payload, season_payload)
+
     def _update_store(self, uuid: str, competition_payload: dict | None = None) -> None:
         if competition_payload is None:
             competition_payload = fetch_endpoint_direct(f"/competitions/{uuid}")
             if not isinstance(competition_payload, dict):
                 raise RuntimeError(f"Expected competition payload to be a dict for {uuid!r}")
 
-        season_uuid = extract_uuid_from_url(competition_payload["_links"]["season"]["href"])
-        season_payload = SEASON.get(season_uuid)
-        competition_entry = self.build_competition_entry(competition_payload, season_payload)
+        competition_entry = self.build_competition_entry_from_payload(competition_payload)
 
         self.dump_raw_json("competition-list-store-raw.json", uuid, competition_payload)
         self.set_store_item(uuid, competition_entry)
