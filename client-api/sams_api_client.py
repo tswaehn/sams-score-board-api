@@ -98,7 +98,7 @@ def fetch_page(url: str, api_key: str, page: int, size: int = PAGE_SIZE) -> dict
             url,
             headers=headers,
             params={"page": page, "size": size},
-            timeout=30,
+            timeout=5,
         )
         response.raise_for_status()
         payload = response.json()
