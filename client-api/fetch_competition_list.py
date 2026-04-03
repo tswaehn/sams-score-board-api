@@ -37,42 +37,52 @@ class CompetitionListStore(PeriodicUpdater):
         self.competition_uuids_by_season = season_map
 
     def update_all(self) -> None:
-        SEASON.update_all()
         seasons_payload = SEASON.get_all()
+        next_store: dict[str, dict] = {}
+        raw_payload_by_season: dict[str, dict] = {}
 
         for season in seasons_payload:
             season_uuid = season.get("uuid")
             if not isinstance(season_uuid, str):
                 continue
-            self.update_competition_list_by_season(season_uuid)
+
+            season_payload = SEASON.get(season_uuid)
+            if not isinstance(season_payload, dict):
+                raise RuntimeError(f"Expected season payload to be a dict for {season_uuid!r}")
+
+            if not season_payload.get("currentSeason"):
+                continue
+
+            competitions_payload = fetch_endpoint_direct(f"/competitions?season={season_uuid}")
+            if not isinstance(competitions_payload, dict):
+                raise RuntimeError(
+                    f"Expected competition list payload to be a dict for season {season_uuid!r}"
+                )
+
+            competitions = competitions_payload.get("content", [])
+            if not isinstance(competitions, list):
+                raise RuntimeError(
+                    f"Expected competition list content to be a list for season {season_uuid!r}"
+                )
+
+            season_competitions = [
+                self.build_competition_entry(competition, season_payload)
+                for competition in competitions
+            ]
+            updated_competitions = self.verify_competition_list(season_competitions)
+            for competition in updated_competitions:
+                next_store[competition["uuid"]] = competition
+
+            raw_payload_by_season[season_uuid] = competitions_payload
+
+        self.dump_raw_json("competition-list-store-raw.json", raw_payload_by_season)
+        self.replace_store(next_store)
 
     def get(self) -> list[dict]:
         self.wait_until_store_loaded()
 
         with self.lock:
             return [copy.deepcopy(competition) for competition in self.store.values()]
-
-    def update_competition_list_by_season(self, season_uuid: str) -> None:
-        season_payload = self.get_season_payload(season_uuid)
-        competitions_payload = fetch_endpoint_direct(f"/competitions?season={season_uuid}")
-        if not isinstance(competitions_payload, dict):
-            raise RuntimeError(f"Expected competition list payload to be a dict for season {season_uuid!r}")
-
-        competitions = competitions_payload.get("content", [])
-        if not isinstance(competitions, list):
-            raise RuntimeError(f"Expected competition list content to be a list for season {season_uuid!r}")
-
-        season_competitions = [
-            self.build_competition_entry(competition, season_payload)
-            for competition in competitions
-        ]
-        self.store_competitions_for_season(season_uuid, season_competitions, competitions_payload)
-
-    def get_season_payload(self, season_uuid: str) -> dict:
-        payload = SEASON.get(season_uuid)
-        if not isinstance(payload, dict):
-            raise RuntimeError(f"Expected season payload to be a dict for {season_uuid!r}")
-        return payload
 
     def build_competition_entry(
         self,
@@ -103,30 +113,6 @@ class CompetitionListStore(PeriodicUpdater):
             },
         }
 
-    def store_competitions_for_season(
-        self,
-        season_uuid: str,
-        competition_list: list[dict],
-        raw_payload: dict,
-    ) -> None:
-        updated_competitions = self.verify_competition_list(competition_list)
-        updated_competition_ids = {competition["uuid"] for competition in updated_competitions}
-
-        with self.lock:
-            next_store = dict(self.store)
-            previous_competition_ids = self.competition_uuids_by_season.get(season_uuid, set())
-            for competition_uuid in previous_competition_ids - updated_competition_ids:
-                next_store.pop(competition_uuid, None)
-
-            for competition in updated_competitions:
-                next_store[competition["uuid"]] = competition
-
-        self.dump_raw_json(
-            f"competition-list-store-raw-season-{season_uuid}.json",
-            raw_payload,
-        )
-        self.replace_store(next_store)
-
     def verify_competition_list(self, competition_list: list[dict]) -> list[dict]:
         verified_competitions = []
         seen_uuids = set()
@@ -143,15 +129,3 @@ class CompetitionListStore(PeriodicUpdater):
 
 
 COMPETITION_LIST_STORE = CompetitionListStore()
-
-
-def update_competition_list_by_season(season_uuid: str) -> None:
-    COMPETITION_LIST_STORE.update_competition_list_by_season(season_uuid)
-
-
-def update_all() -> None:
-    COMPETITION_LIST_STORE.update_all()
-
-
-def get_competition_list() -> list[dict]:
-    return COMPETITION_LIST_STORE.get()

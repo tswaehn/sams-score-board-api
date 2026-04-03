@@ -25,13 +25,10 @@ class PeriodicUpdater:
         self.idle_loop_entered = threading.Event()
         self.logger = logging.getLogger(logger_name)
         self.store_file_path = Path(__file__).with_name("cache") / store_file_name
+        self.thread_name = thread_name
+        self.update_thread: threading.Thread | None = None
+        self.update_thread_lock = threading.Lock()
         self.load_store()
-        self.update_thread = threading.Thread(
-            target=self.run_update_loop,
-            name=thread_name,
-            daemon=True,
-        )
-        self.update_thread.start()
 
     def on_store_loaded(self) -> None:
         pass
@@ -75,7 +72,20 @@ class PeriodicUpdater:
             return self.store.get(key)
 
     def wait_until_store_loaded(self) -> None:
+        self.ensure_update_thread_started()
         self.idle_loop_entered.wait()
+
+    def ensure_update_thread_started(self) -> None:
+        with self.update_thread_lock:
+            if self.update_thread is not None and self.update_thread.is_alive():
+                return
+
+            self.update_thread = threading.Thread(
+                target=self.run_update_loop,
+                name=self.thread_name,
+                daemon=True,
+            )
+            self.update_thread.start()
 
     def load_store(self) -> None:
         if not self.store_file_path.exists():

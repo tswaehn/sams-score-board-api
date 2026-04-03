@@ -171,7 +171,14 @@ def fetch_endpoint_direct(endpoint: str) -> dict | list:
     normalized_endpoint = endpoint.strip("/")
     if not normalized_endpoint:
         raise RuntimeError("Endpoint must not be empty")
-    return _fetch_endpoint_from_upstream(normalized_endpoint)
+    try:
+        return _fetch_endpoint_from_upstream(normalized_endpoint)
+    except Exception:
+        LOGGER.exception(
+            "Direct upstream fetch failed for endpoint=%s",
+            normalized_endpoint,
+        )
+        return {}
 
 
 def fetch_endpoint_with_cache_status(

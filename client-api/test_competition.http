@@ -1,0 +1,6 @@
+@baseUrl = http://127.0.0.1:8000
+@competitionUuid = 0003162d-e89a-4dc1-9a41-90c1e4eadc55
+
+### Competition
+GET {{baseUrl}}/api/competition/{{competitionUuid}}
+Accept: application/json

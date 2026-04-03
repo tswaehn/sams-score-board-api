@@ -27,10 +27,23 @@ class CompetitionRanking(PeriodicUpdater):
             competition_uuid = competition.get("uuid")
             if not isinstance(competition_uuid, str):
                 continue
-            next_store[competition_uuid] = self.get_rankings(
-                competition_uuid,
+            rankings_payload = fetch_endpoint(
+                f"/competitions/{competition_uuid}/rankings",
                 current_season=bool(competition.get("currentSeason")),
             )
+            if not isinstance(rankings_payload, dict):
+                raise RuntimeError(f"Expected rankings payload to be a dict for {competition_uuid!r}")
+
+            rankings = rankings_payload.get("content", [])
+            if not isinstance(rankings, list):
+                raise RuntimeError(f"Expected rankings content to be a list for {competition_uuid!r}")
+
+            normalized_rankings = self._normalize_rankings(rankings)
+            self.dump_raw_json(
+                f"competition-ranking-store-raw-competition-{competition_uuid}.json",
+                rankings_payload,
+            )
+            next_store[competition_uuid] = normalized_rankings
 
         self.replace_store(next_store)
 
@@ -38,30 +51,9 @@ class CompetitionRanking(PeriodicUpdater):
         self.wait_until_store_loaded()
 
         rankings = self.get_store_item(competition_uuid)
-        if rankings is not None:
-            return copy.deepcopy(rankings)
-
-        return self.get_rankings(competition_uuid, current_season)
-
-    def get_rankings(self, competition_uuid: str, current_season: bool) -> dict:
-        rankings_payload = fetch_endpoint(
-            f"/competitions/{competition_uuid}/rankings",
-            current_season=current_season,
-        )
-        if not isinstance(rankings_payload, dict):
-            raise RuntimeError(f"Expected rankings payload to be a dict for {competition_uuid!r}")
-
-        rankings = rankings_payload.get("content", [])
-        if not isinstance(rankings, list):
-            raise RuntimeError(f"Expected rankings content to be a list for {competition_uuid!r}")
-
-        normalized_rankings = self._normalize_rankings(rankings)
-        self.dump_raw_json(
-            f"competition-ranking-store-raw-competition-{competition_uuid}.json",
-            rankings_payload,
-        )
-        self.set_store_item(competition_uuid, normalized_rankings)
-        return copy.deepcopy(normalized_rankings)
+        if rankings is None:
+            raise KeyError(f"Competition {competition_uuid!r} not found in ranking store")
+        return copy.deepcopy(rankings)
 
     def _normalize_rankings(self, rankings: list[dict]) -> dict:
         result: dict[str, dict] = {}

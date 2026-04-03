@@ -58,12 +58,12 @@ files:
       role: Teams class with an in-process global team store keyed by team uuid, update_all() via /teams, get(uuid) via direct upstream fetches, and a background updater thread
     - path: client-api/fetch_competition_team.py
       role: CompetitionTeams class using the shared updater/store base with a competition-uuid-keyed team-list store, get(competition_uuid), and update_all() that refreshes competition-scoped teams by iterating competitions
-    - path: client-api/fetch_match_group.py
-      role: MatchGroup class using the shared updater/store base with persisted raw match-group storage, get(uuid), and get_by_competition_uuid() returning the normalized competition match-group shape including normalized matches
+    - path: client-api/fetch_competition_match_group.py
+      role: MatchGroup class using the shared updater/store base with persisted raw competition-scoped match-group storage and get(competition_uuid, current_season) returning the normalized competition match-group shape including normalized matches
     - path: client-api/fetch_competition_match.py
       role: CompetitionMatch class using the shared updater/store base with persisted raw competition-match storage, get(uuid), and get_by_match_group_uuid() returning normalized competition matches
     - path: client-api/fetch_competition_ranking.py
-      role: CompetitionRanking class using the shared updater/store base with persisted normalized competition-ranking storage, get(competition_uuid), and update_all() that refreshes rankings by iterating competitions and reusing its internal get_rankings() method
+      role: CompetitionRanking class using the shared updater/store base with persisted normalized competition-ranking storage, get(competition_uuid), and update_all() that refreshes rankings by iterating competitions with direct endpoint fetches
     - path: client-api/periodic_updater.py
       role: shared base class for daemon updater threads that run on startup only when the persisted store TTL has expired and then nightly at local time 01:00, for the primary in-memory store plus lock used by derived store classes, and for pretty-printed persisted JSON snapshots plus raw reference dumps with timestamps
     - path: client-api/fetch_competition.py
@@ -363,7 +363,7 @@ payload_shapes:
     - CompetitionTeams dumps raw /competitions/{uuid}/teams payloads to cache for reference when replacing a competition teams entry
   match_group_access:
     - MatchGroup.get(uuid, current_season) returns a normalized single match-group object while storing the raw upstream match-group payload internally
-    - MatchGroup.get_by_competition_uuid(competition_uuid, current_season) returns the normalized competition match-group map keyed by match-group name while storing raw upstream match-group payloads internally
+    - MatchGroup.get(competition_uuid, current_season) returns the normalized competition match-group map keyed by match-group name while storing raw upstream match-group payloads internally
     - match data inside the normalized return value is loaded through CompetitionMatch.get_by_match_group_uuid()
     - MatchGroup uses the same base-class store pattern as Season, including persisted raw store snapshots and TTL-aware startup refresh behavior
     - MatchGroup dumps raw /match-groups and /competitions/{uuid}/match-groups payloads to cache for reference when replacing the store
@@ -375,9 +375,9 @@ payload_shapes:
     - Competition persists its store snapshot to cache/competition-store.json with a storedAt timestamp
     - Competition dumps the raw /competitions payload to cache/competition-store-raw.json when refreshing the store
     - Competition startup refresh is skipped when the persisted store snapshot is newer than the base TTL
-    - fetch_competition.get(uuid) returns the assembled API response plus a cache-hit flag, and uses get_competition(raw_competition) as the composition helper around Competition.get(uuid), Season.get(uuid), Association.get(uuid), MatchGroup.get_by_competition_uuid(), CompetitionTeams.get(uuid), and CompetitionRanking.get(uuid)
+    - fetch_competition.get(uuid) returns the assembled API response plus a cache-hit flag, and uses get_competition(raw_competition) as the composition helper around Competition.get(uuid), Season.get(uuid), Association.get(uuid), MatchGroup.get(), CompetitionTeams.get(uuid), and CompetitionRanking.get(uuid)
   competition_ranking_access:
-    - CompetitionRanking.update_all(current_season=None) refreshes rankings for all stored competitions by iterating CompetitionListStore.get() and reusing its internal get_rankings(competition_uuid, current_season) method
+    - CompetitionRanking.update_all(current_season=None) refreshes rankings for all stored competitions by iterating CompetitionListStore.get() and fetching /competitions/{uuid}/rankings directly
     - CompetitionRanking.get(competition_uuid, current_season) returns cached normalized rankings for a competition or fetches and stores them on demand
     - CompetitionRanking uses the base-class store as its competition-uuid-keyed in-memory ranking map
     - CompetitionRanking persists its store snapshot to cache/competition-ranking-store.json with a storedAt timestamp

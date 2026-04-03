@@ -28,12 +28,25 @@ class CompetitionTeams(PeriodicUpdater):
             if not isinstance(competition_uuid, str):
                 continue
 
-            payload, teams = self._fetch_teams_for_competition(competition_uuid)
+            payload = fetch_endpoint_direct(f"/competitions/{competition_uuid}/teams")
+            if not isinstance(payload, dict):
+                raise RuntimeError(f"Expected teams payload to be a dict for {competition_uuid!r}")
+
+            teams = payload.get("content", [])
+            if not isinstance(teams, list):
+                raise RuntimeError(f"Expected teams content to be a list for {competition_uuid!r}")
+
+            normalized_teams = []
+            for team in teams:
+                if not isinstance(team, dict):
+                    continue
+                normalized_teams.append(self._normalize_team(team))
+
             self.dump_raw_json(
                 f"competition-teams-store-raw-competition-{competition_uuid}.json",
                 payload,
             )
-            next_store[competition_uuid] = teams
+            next_store[competition_uuid] = normalized_teams
 
         self.replace_store(next_store)
 
