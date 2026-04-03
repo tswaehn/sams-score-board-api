@@ -46,8 +46,10 @@ files:
   root:
     - path: client-api/server.py
       role: FastAPI application, routing, middleware, exception shaping, uvicorn bootstrap
+    - path: client-api/endpoint_cache.py
+      role: standalone endpoint cache with in-memory dict, persisted JSON storage, fetch queue, worker thread, and in-flight deduplication
     - path: client-api/sams_api_client.py
-      role: upstream SSVB API client, pagination, rate limiting, disk-backed cache, cache preloading, optional warm-cache thread
+      role: upstream SSVB API client, pagination, rate limiting, cache-facing fetch wrappers, optional warm-cache thread
     - path: client-api/fetch_competition.py
       role: composition layer building full competition payload from multiple upstream endpoints
     - path: client-api/fetch_competition_list.py
@@ -203,19 +205,30 @@ upstream_integrations:
     reconnect_delay_seconds: 3
 
 caching:
-  primary_module: client-api/sams_api_client.py
+  primary_module: client-api/endpoint_cache.py
   cache_storage:
     type:
       - in-memory dictionary
       - on-disk JSON files
     directory: client-api/cache
-    filename_pattern: endpoint_cache_<sha256(endpoint)>.json
+    in_memory_shape: CACHE[endpoint_key][uuid_key] = {payload, fetched_at}
+    disk_layout: cache/<endpoint_key>/<uuid_key>.json
+    collection_uuid_key: _collection
+    endpoint_key_examples:
+      - competitions
+      - associations
+      - seasons
+      - competitions__match-groups
+      - competitions__teams
+      - competitions__rankings
+      - match-groups__competition-matches
   initialization:
     trigger: module import
-    function: load_cache()
+    function: _load_persisted_cache()
     side_effects:
       - creates cache directory if missing
-      - loads endpoint cache files into memory
+      - loads persisted endpoint folders into memory
+      - starts cache worker thread lazily on first cache miss
       - may start warm-cache background thread when WARM_CACHE_ENABLED is truthy
   freshness_defaults:
     default_endpoint_ttl_seconds: 86400
@@ -228,8 +241,17 @@ caching:
       competition_teams: 604800
   concurrency:
     global_cache_lock: RLock
-    per_endpoint_fetch_lock: true
-    goal: prevent duplicate concurrent fetches for the same endpoint
+    fetch_queue: queue.Queue
+    worker_threads: 1
+    in_flight_deduplication: IN_FLIGHT[(endpoint_key, uuid_key)]
+    behavior:
+      - cache miss enqueues exactly one fetch request for a key
+      - concurrent requests for the same missing key wait on the same event
+      - all waiting requests unblock when the first fetch resolves
+      - fetched payload is persisted before the request is marked complete
+  logging:
+    cache_logger: competition-api.cache
+    upstream_client_logger: competition-api.client
 
 live_state_model:
   module: client-api/live_endpoint.py
@@ -279,13 +301,14 @@ operational_notes:
   strengths:
     - small codebase with clear module split
     - cache files allow warm startup behavior without immediate upstream refetch
-    - endpoint-level locking reduces duplicate fetches
+    - queue-based cache deduplicates concurrent misses per endpoint/uuid key
     - live route can recover from websocket disconnects by reconnect loop
   constraints:
     - import-time side effects exist in sams_api_client.py
     - cache directory is large and should be treated as normal runtime state, not noise
     - test.py is a manual utility script, not an automated test suite
     - project uses plain module imports rather than a packaged Python module structure
+    - collection endpoints are stored with uuid key _collection because they do not have a real UUID in the path
   verified_in_current_context:
     - python3 -m py_compile client-api/*.py succeeded on 2026-04-03
   local_environment_note:
@@ -295,6 +318,7 @@ codex_warmup_guidance:
   read_order:
     - conecept.yml
     - client-api/server.py
+    - client-api/endpoint_cache.py
     - client-api/sams_api_client.py
     - client-api/fetch_competition.py
     - client-api/live_endpoint.py

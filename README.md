@@ -2,6 +2,12 @@
 
 The `client-api` directory contains a FastAPI server for exposing competition data from the upstream SAMS API.
 
+Context warm-up and maintenance:
+
+* Read [`conecept.yml`](./conecept.yml) before starting work on `client-api` in a fresh Codex context
+* Treat [`conecept.yml`](./conecept.yml) as the canonical high-level concept file for `client-api`
+* Whenever `client-api` structure, behavior, environment variables, caching, live integration, or operational constraints change, update [`conecept.yml`](./conecept.yml) in the same workstream
+
 Install dependencies:
 
 ```bash
