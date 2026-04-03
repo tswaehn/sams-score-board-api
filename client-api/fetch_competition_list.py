@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import copy
+import threading
+import time
+from datetime import datetime, timedelta
 
 from fetch_association import ASSOCIATION
 from fetch_season import SEASON
@@ -20,6 +23,12 @@ class CompetitionListStore(PeriodicUpdater):
             store_file_name="competition-list-store.json",
             ttl_seconds=STORE_TTL_SECONDS,
         )
+        self.update_all_thread = threading.Thread(
+            target=self.run_update_all_loop,
+            name="competition-list-update-all",
+            daemon=True,
+        )
+        self.update_all_thread.start()
 
     def on_store_loaded(self) -> None:
         season_map: dict[str, set[str]] = {}
@@ -76,6 +85,27 @@ class CompetitionListStore(PeriodicUpdater):
                 if not isinstance(competition_uuid, str):
                     continue
                 self._update_store(competition_uuid, competition)
+
+    def seconds_until_next_update_all(self) -> float:
+        now = datetime.now()
+        next_update = now.replace(hour=1, minute=0, second=0, microsecond=0)
+        if now >= next_update:
+            next_update = next_update + timedelta(days=1)
+        return max((next_update - now).total_seconds(), 0.0)
+
+    def run_update_all_loop(self) -> None:
+        try:
+            self.update_all()
+        except Exception:
+            self.logger.exception("Competition list startup update_all failed")
+
+        while True:
+            sleep_seconds = self.seconds_until_next_update_all()
+            time.sleep(sleep_seconds)
+            try:
+                self.update_all()
+            except Exception:
+                self.logger.exception("Competition list scheduled update_all failed")
 
     def get(self) -> list[dict]:
         self.wait_for_uuid()
