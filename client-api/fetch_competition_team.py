@@ -36,7 +36,7 @@ class CompetitionTeams(PeriodicUpdater):
             normalized_teams.append(self._normalize_team(team))
 
         self.dump_raw_json(
-            f"competition-teams-store-raw-competition-{uuid}.json",
+            f"competition-teams-store-raw.json",
             uuid,
             payload,
         )
