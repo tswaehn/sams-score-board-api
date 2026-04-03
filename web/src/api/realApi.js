@@ -1,5 +1,4 @@
-import { getApiBaseUrl } from "./api.js";
-import { getTeamShortName } from "../utils/team.js";
+import { getApiBaseUrl, getTeamShortName } from "./api.js";
 
 const fetchTimeoutMs = 60000;
 

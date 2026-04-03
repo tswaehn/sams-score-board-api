@@ -17,9 +17,8 @@ import {
   TableRow,
   Typography
 } from "@mui/material";
-import { fetchJson } from "../api/api.js";
+import { fetchJson, getTeamShortName } from "../api/api.js";
 import useIsMobile from "../hooks/useIsMobile.js";
-import { getTeamShortName } from "../utils/team.js";
 
 function getRankingRows(rankings, matchGroupName) {
   const groupRankings = rankings[matchGroupName] ?? {};
@@ -83,21 +82,23 @@ function getMatchSetPoints(match) {
 
 function MatchGroupDropdown({ activeMatchGroupId, matchGroups, onChange }) {
   return (
-    <FormControl size="small" sx={{ minWidth: 220, maxWidth: 360 }}>
-      <InputLabel id="plan-match-group-label">Match group</InputLabel>
-      <Select
-        labelId="plan-match-group-label"
-        value={activeMatchGroupId ?? ""}
-        label="Match group"
-        onChange={(event) => onChange(event.target.value)}
-      >
-        {matchGroups.map((matchGroup) => (
-          <MenuItem key={matchGroup.uuid} value={matchGroup.uuid}>
-            {matchGroup.name}
-          </MenuItem>
-        ))}
-      </Select>
-    </FormControl>
+    <Box sx={{ display: "flex", justifyContent: "center" }}>
+      <FormControl size="small" sx={{ minWidth: 220, maxWidth: 360 }}>
+        <InputLabel id="plan-match-group-label">Match group</InputLabel>
+        <Select
+          labelId="plan-match-group-label"
+          value={activeMatchGroupId ?? ""}
+          label="Match group"
+          onChange={(event) => onChange(event.target.value)}
+        >
+          {matchGroups.map((matchGroup) => (
+            <MenuItem key={matchGroup.uuid} value={matchGroup.uuid}>
+              {matchGroup.name}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+    </Box>
   );
 }
 
