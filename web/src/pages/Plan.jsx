@@ -566,9 +566,17 @@ export default function Plan() {
 
   useEffect(() => {
     let isMounted = true;
+    let isInitialLoad = true;
 
-    fetchJson("/api/plan")
-      .then((data) => {
+    async function loadPlan() {
+      if (isInitialLoad) {
+        setLoading(true);
+        setError("");
+      }
+
+      try {
+        const data = await fetchJson("/api/plan");
+
         if (isMounted) {
           setCompetition(data.competition);
           setAssociation(data.association);
@@ -576,19 +584,26 @@ export default function Plan() {
           setMatchGroups(data.matchGroups);
           setRankings(data.rankings);
           setTeams(data.teams);
-          setActiveMatchGroupId(data.matchGroups[0]?.uuid ?? null);
+          setActiveMatchGroupId((current) => current ?? data.matchGroups[0]?.uuid ?? null);
           setLoading(false);
+          setError("");
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         if (isMounted) {
           setError(err.message);
           setLoading(false);
         }
-      });
+      } finally {
+        isInitialLoad = false;
+      }
+    }
+
+    loadPlan();
+    const intervalId = window.setInterval(loadPlan, 20000);
 
     return () => {
       isMounted = false;
+      window.clearInterval(intervalId);
     };
   }, []);
 
