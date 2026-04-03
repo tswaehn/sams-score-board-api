@@ -1,3 +1,6 @@
+import { useMediaQuery } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
+
 const defaultApiBaseUrl = "http://localhost:8000/api";
 
 export function getApiBaseUrl() {
@@ -17,6 +20,12 @@ export function getTeamShortName(name, shortName) {
     words.length > 1 ? words[words.length - 1].slice(-3) : "";
 
   return `${normalizedName.slice(0, 5)}...${lastWordSuffix}`;
+}
+
+export function useIsMobile() {
+  const theme = useTheme();
+
+  return useMediaQuery(theme.breakpoints.down("sm"));
 }
 
 export { fetchJson } from "./realApi.js";

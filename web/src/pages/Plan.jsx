@@ -17,8 +17,7 @@ import {
   TableRow,
   Typography
 } from "@mui/material";
-import { fetchJson, getTeamShortName } from "../api/api.js";
-import useIsMobile from "../hooks/useIsMobile.js";
+import { fetchJson, getTeamShortName, useIsMobile } from "../api/api.js";
 
 function getRankingRows(rankings, matchGroupName) {
   const groupRankings = rankings[matchGroupName] ?? {};

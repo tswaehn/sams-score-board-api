@@ -11,8 +11,7 @@ import {
   Toolbar,
   Typography
 } from "@mui/material";
-import { fetchJson } from "../api/api.js";
-import useIsMobile from "../hooks/useIsMobile.js";
+import { fetchJson, useIsMobile } from "../api/api.js";
 
 const navItems = [
   { section: "teams", label: "Teams" },
