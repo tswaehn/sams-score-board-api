@@ -34,8 +34,6 @@ PAGE_SIZE = 9999
 PAGE_DELAY_SECONDS = 0.3
 LAST_REQUEST_COMPLETED_AT = 0.0
 LAST_REQUEST_LOCK = threading.Lock()
-WARM_CACHE_THREAD: threading.Thread | None = None
-WARM_CACHE_ENABLED = os.getenv("WARM_CACHE_ENABLED", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def build_url(endpoint: str) -> str:
@@ -213,29 +211,3 @@ def fetch_endpoint(
         current_season=current_season,
     )
     return payload
-
-
-def _start_warm_cache_thread() -> None:
-    global WARM_CACHE_THREAD
-
-    if not WARM_CACHE_ENABLED:
-        return
-
-    if WARM_CACHE_THREAD is not None and WARM_CACHE_THREAD.is_alive():
-        return
-
-    def warm_cache_runner() -> None:
-        from warm_cache import warm_cache
-
-        warm_cache()
-
-    WARM_CACHE_THREAD = threading.Thread(
-        target=warm_cache_runner,
-        name="warm-cache",
-        daemon=True,
-    )
-    WARM_CACHE_THREAD.start()
-    LOGGER.info("Started season cache analysis background thread")
-
-
-_start_warm_cache_thread()

@@ -3,7 +3,6 @@ from pathlib import Path
 
 from fetch_competition import COMPETITION
 from fetch_competition_list import get_competition_list, update_all
-from warm_cache import warm_cache
 
 
 CACHE_DIR = Path(__file__).with_name("cache")
@@ -42,5 +41,5 @@ def test_competition():
 
 if __name__ == "__main__":
     # store_competition_list()
-    warm_cache()
     #test_competition()
+    pass
