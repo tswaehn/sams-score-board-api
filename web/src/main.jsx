@@ -1,11 +1,16 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { CssBaseline, ThemeProvider, createTheme } from "@mui/material";
+import {
+  CssBaseline,
+  ThemeProvider,
+  createTheme,
+  responsiveFontSizes
+} from "@mui/material";
 import App from "./App.jsx";
 import "./index.css";
 
-const theme = createTheme({
+let theme = createTheme({
   palette: {
     mode: "light",
     primary: { main: "#264653" },
@@ -22,14 +27,58 @@ const theme = createTheme({
   },
   typography: {
     fontFamily: '"Space Grotesk", "Segoe UI", sans-serif',
-    h6: { fontWeight: 700 },
-    h5: { fontWeight: 700 },
-    h4: { fontWeight: 700 }
+    body1: {
+      fontSize: "1rem",
+      "@media (max-width:600px)": {
+        fontSize: "0.8rem"
+      }
+    },
+    body2: {
+      fontSize: "0.875rem",
+      "@media (max-width:600px)": {
+        fontSize: "0.7rem"
+      }
+    },
+    subtitle1: {
+      fontSize: "1rem",
+      "@media (max-width:600px)": {
+        fontSize: "0.8rem"
+      }
+    },
+    subtitle2: {
+      fontSize: "0.875rem",
+      "@media (max-width:600px)": {
+        fontSize: "0.7rem"
+      }
+    },
+    h6: {
+      fontSize: "1.25rem",
+      fontWeight: 700,
+      "@media (max-width:600px)": {
+        fontSize: "1rem"
+      }
+    },
+    h5: {
+      fontSize: "1.5rem",
+      fontWeight: 700,
+      "@media (max-width:600px)": {
+        fontSize: "1.2rem"
+      }
+    },
+    h4: {
+      fontSize: "2.125rem",
+      fontWeight: 700,
+      "@media (max-width:600px)": {
+        fontSize: "1.7rem"
+      }
+    }
   },
   shape: {
     borderRadius: 18
   }
 });
+
+theme = responsiveFontSizes(theme);
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>

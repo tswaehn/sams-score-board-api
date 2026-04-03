@@ -12,6 +12,7 @@ import {
   Typography
 } from "@mui/material";
 import { fetchJson } from "../api/api.js";
+import { layout } from "../components/layout.js";
 
 const competitionListFiltersStorageKey = "competition-list-filters";
 const selectedCompetitionUuidStorageKey = "competition-uuid";
@@ -261,7 +262,7 @@ export default function CompetitionList() {
   };
 
   return (
-    <Box sx={{ display: "grid", gap: 2 }}>
+    <Box sx={{ display: "grid", gap: layout.gap.page }}>
       {loading && (
         <Typography color="text.secondary">
           Loading competition list...
@@ -277,14 +278,14 @@ export default function CompetitionList() {
         <Paper
           elevation={0}
           sx={{
-            p: 2,
-            borderRadius: 3,
+            p: layout.padding.surface,
+            borderRadius: layout.radius.surface,
             border: "1px solid rgba(20, 17, 15, 0.08)",
             bgcolor: "background.paper",
-            gap: 2
+            gap: layout.gap.section
           }}
         >
-          <Stack spacing={2}>
+          <Stack spacing={layout.gap.section}>
             <Box>
               <Typography variant="h5" sx={{ fontWeight: 700 }}>
                 Competition List
@@ -295,7 +296,7 @@ export default function CompetitionList() {
               </Typography>
             </Box>
 
-            <Stack spacing={2}>
+            <Stack spacing={layout.gap.section}>
               {selections
                 .filter((selection) => selection.visible)
                 .map((selection) => (
@@ -359,14 +360,14 @@ export default function CompetitionList() {
             </Typography>
 
             {showUuidCards && (
-              <Stack spacing={1.2}>
+              <Stack spacing={layout.gap.cardList}>
                 {fullyFilteredCompetitions.map((competition) => (
                   <Paper
                     key={competition.uuid}
                     elevation={0}
                     sx={{
-                      p: 1.5,
-                      borderRadius: 2.5,
+                      p: layout.padding.card,
+                      borderRadius: layout.radius.surface,
                       border: "1px solid rgba(20, 17, 15, 0.08)",
                       bgcolor: "teamInfo.main"
                     }}
@@ -408,8 +409,8 @@ export default function CompetitionList() {
               <Paper
                 elevation={0}
                 sx={{
-                  p: 1.5,
-                  borderRadius: 2.5,
+                  p: layout.padding.card,
+                  borderRadius: layout.radius.surface,
                   border: "1px solid rgba(20, 17, 15, 0.08)",
                   bgcolor: "teamInfo.main"
                 }}

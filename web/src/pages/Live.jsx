@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 import { useParams } from "react-router-dom";
 import { fetchMatchesByCompetitionUuid } from "../api/api.js";
+import { layout } from "../components/layout.js";
 
 function formatMatchDate(timestamp) {
   return new Intl.DateTimeFormat("de-DE", {
@@ -137,11 +138,11 @@ function MatchRow({ match }) {
   return (
     <Box
       sx={{
-        p: 1.5,
-        borderRadius: 1,
+        p: layout.padding.card,
+        borderRadius: layout.radius.surface,
         bgcolor: "background.paper",
         display: "grid",
-        gap: 1
+        gap: layout.gap.surface
       }}
     >
       <Stack
@@ -329,12 +330,12 @@ function MatchSection({ title, matches, emptyText }) {
     <Paper
       elevation={0}
       sx={{
-        p: 2,
-        borderRadius: 3,
+        p: layout.padding.surface,
+        borderRadius: layout.radius.surface,
         border: "1px solid rgba(20, 17, 15, 0.08)",
         bgcolor: "background.paper",
         display: "grid",
-        gap: 1.5
+        gap: layout.gap.surface
       }}
     >
       <Typography variant="h6" sx={{ fontWeight: 700 }}>
@@ -344,7 +345,7 @@ function MatchSection({ title, matches, emptyText }) {
       {matches.length === 0 ? (
         <Typography color="text.secondary">{emptyText}</Typography>
       ) : (
-        <Stack spacing={1.2}>
+        <Stack spacing={layout.gap.cardList}>
           {matches.map((match) => (
             <MatchRow key={match.id} match={match} />
           ))}
@@ -456,7 +457,7 @@ export default function Live() {
   const filteredFinishedMatches = filterMatchesByTeam(finishedMatches);
 
   return (
-    <Box sx={{ display: "grid", gap: 2 }}>
+    <Box sx={{ display: "grid", gap: layout.gap.page }}>
       {loading && <Typography color="text.secondary">Loading live feed...</Typography>}
       {error && (
         <Typography color="error" sx={{ fontWeight: 600 }}>
@@ -465,17 +466,17 @@ export default function Live() {
       )}
 
       {!loading && !error && (
-        <Box sx={{ display: "grid", gap: 2 }}>
+        <Box sx={{ display: "grid", gap: layout.gap.page }}>
           <Paper
             elevation={0}
             sx={{
-              p: 2,
-              borderRadius: 3,
+              p: layout.padding.surface,
+              borderRadius: layout.radius.surface,
               border: "1px solid rgba(20, 17, 15, 0.08)",
               bgcolor: "#ffffff"
             }}
           >
-            <Stack spacing={1.5} alignItems="center">
+            <Stack spacing={layout.gap.surface} alignItems="center">
               <Typography variant="h6" sx={{ fontWeight: 700 }}>
                 Wähle dein Team
               </Typography>

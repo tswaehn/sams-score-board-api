@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Avatar, Box, Paper, Stack, Typography } from "@mui/material";
 import { fetchJson, getTeamShortName } from "../api/api.js";
+import { layout } from "../components/layout.js";
 
 export default function Teams() {
   const [teams, setTeams] = useState([]);
@@ -36,7 +37,7 @@ export default function Teams() {
   }, []);
 
   return (
-    <Box sx={{ display: "grid", gap: 2 }}>
+    <Box sx={{ display: "grid", gap: layout.gap.page }}>
 
       {loading && (
         <Typography color="text.secondary">Loading teams...</Typography>
@@ -51,11 +52,11 @@ export default function Teams() {
         <Paper
           elevation={0}
           sx={{
-            p: 2,
-            borderRadius: 3,
+            p: layout.padding.surface,
+            borderRadius: layout.radius.surface,
             border: "1px solid rgba(20, 17, 15, 0.08)",
             bgcolor: "background.paper",
-            gap: 2
+            gap: layout.gap.section
           }}
         >
           <Typography variant="h5" sx={{ fontWeight: 700 }}>
@@ -67,17 +68,17 @@ export default function Teams() {
             </Typography>
           )}
 
-          <Stack spacing={1.2}>
+          <Stack spacing={layout.gap.cardList}>
             {teams.map((team) => (
               <Paper
                 key={team.uuid}
                 elevation={0}
                 sx={{
-                  p: 1.5,
+                  p: layout.padding.card,
                   display: "flex",
                   alignItems: "center",
-                  gap: 2,
-                  borderRadius: 2.5,
+                  gap: layout.gap.cardContent,
+                  borderRadius: layout.radius.surface,
                   border: "1px solid rgba(20, 17, 15, 0.08)",
                   bgcolor: "teamInfo.main"
                 }}
