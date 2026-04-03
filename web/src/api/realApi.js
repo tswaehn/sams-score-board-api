@@ -1,4 +1,5 @@
 import { getApiBaseUrl } from "./api.js";
+import { getTeamShortName } from "../utils/team.js";
 
 const fetchTimeoutMs = 60000;
 
@@ -19,21 +20,14 @@ function unwrapResponseData(payload) {
   return payload;
 }
 
-function createShortName(name) {
-  const parts = name
-    .split(/\s+/)
-    .map((part) => part.replace(/[^A-Za-z0-9]/g, ""))
-    .filter(Boolean);
-
-  return parts.slice(0, 3).map((part) => part[0]).join("").toUpperCase();
-}
-
 function normalizeTeam(team) {
   return {
     uuid: team.uuid,
     name: team.name,
-    short_name:
-      team.shortName ?? team.short_name ?? team.shortname ?? createShortName(team.name),
+    short_name: getTeamShortName(
+      team.name,
+      team.shortName ?? team.short_name ?? team.shortname
+    ),
     logo_url: team.logoImageLink
   };
 }

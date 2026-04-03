@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Avatar, Box, Paper, Stack, Typography } from "@mui/material";
 import { fetchJson } from "../api/api.js";
+import { getTeamShortName } from "../utils/team.js";
 
 export default function Teams() {
   const [teams, setTeams] = useState([]);
@@ -88,11 +89,11 @@ export default function Teams() {
                   sx={{ width: 56, height: 56, bgcolor: "#f3ebe0" }}
                 />
                 <Box>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    {team.short_name ?? team.name}
-                  </Typography>
                   <Typography variant="h6" sx={{ fontWeight: 600 }}>
                     {team.name}
+                  </Typography>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    {getTeamShortName(team.name, team.short_name)}
                   </Typography>
                 </Box>
               </Paper>

@@ -9,11 +9,10 @@ import {
   Tab,
   Tabs,
   Toolbar,
-  Typography,
-  useMediaQuery
+  Typography
 } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
 import { fetchJson } from "../api/api.js";
+import useIsMobile from "../hooks/useIsMobile.js";
 
 const navItems = [
   { section: "teams", label: "Teams" },
@@ -135,8 +134,7 @@ function MobileNavMenu() {
 
 export default function Header() {
   const location = useLocation();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isMobile = useIsMobile();
   const [headerTitle, setHeaderTitle] = useState({
     name: "Competition",
     shortname: ""

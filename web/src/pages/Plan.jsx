@@ -18,6 +18,8 @@ import {
   Typography
 } from "@mui/material";
 import { fetchJson } from "../api/api.js";
+import useIsMobile from "../hooks/useIsMobile.js";
+import { getTeamShortName } from "../utils/team.js";
 
 function getRankingRows(rankings, matchGroupName) {
   const groupRankings = rankings[matchGroupName] ?? {};
@@ -79,7 +81,163 @@ function getMatchSetPoints(match) {
   return { leftPoints, rightPoints };
 }
 
+function MatchGroupDropdown({ activeMatchGroupId, matchGroups, onChange }) {
+  return (
+    <FormControl size="small" sx={{ minWidth: 220, maxWidth: 360 }}>
+      <InputLabel id="plan-match-group-label">Match group</InputLabel>
+      <Select
+        labelId="plan-match-group-label"
+        value={activeMatchGroupId ?? ""}
+        label="Match group"
+        onChange={(event) => onChange(event.target.value)}
+      >
+        {matchGroups.map((matchGroup) => (
+          <MenuItem key={matchGroup.uuid} value={matchGroup.uuid}>
+            {matchGroup.name}
+          </MenuItem>
+        ))}
+      </Select>
+    </FormControl>
+  );
+}
+
+function MatchGroupTabs({ activeMatchGroupId, matchGroups, onChange }) {
+  return (
+    <Tabs
+      value={activeMatchGroupId}
+      onChange={(_, value) => onChange(value)}
+      variant="scrollable"
+      allowScrollButtonsMobile
+      textColor="inherit"
+      indicatorColor="secondary"
+    >
+      {matchGroups.map((matchGroup) => (
+        <Tab key={matchGroup.uuid} value={matchGroup.uuid} label={matchGroup.name} />
+      ))}
+    </Tabs>
+  );
+}
+
+function RankingTable({ activeMatchGroup, rankingRows, teamByName }) {
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        p: 2,
+        borderRadius: 2.5,
+        border: "1px solid rgba(20, 17, 15, 0.08)",
+        bgcolor: "teamInfo.main"
+      }}
+    >
+      <Table size="small">
+        <TableHead sx={{ bgcolor: "teamInfo.main" }}>
+          <TableRow>
+            <TableCell>Rank</TableCell>
+            <TableCell>Team</TableCell>
+            <TableCell align="right">Matches</TableCell>
+            <TableCell align="right">W/L</TableCell>
+            <TableCell align="right">Sets</TableCell>
+            <TableCell align="right">Balls</TableCell>
+            <TableCell align="right">Diff</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {rankingRows.map((row) => {
+            const team = teamByName.get(row.teamName);
+
+            return (
+              <TableRow key={`${activeMatchGroup.uuid}-${row.rank}`} hover>
+                <TableCell>{row.rank}</TableCell>
+                <TableCell>
+                  <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Avatar
+                      src={team?.logo_url}
+                      alt={`${row.teamName} logo`}
+                      sx={{ width: 36, height: 36, bgcolor: "#f3ebe0" }}
+                    />
+                    <Typography sx={{ fontWeight: 600 }}>
+                      {team?.name ?? row.teamName}
+                    </Typography>
+                  </Stack>
+                </TableCell>
+                <TableCell align="right">{row.matchesPlayed}</TableCell>
+                <TableCell align="right">
+                  {row.wins}/{row.losses}
+                </TableCell>
+                <TableCell align="right">
+                  {row.setWins}:{row.setLosses}
+                </TableCell>
+                <TableCell align="right">
+                  {row.ballWins}:{row.ballLosses}
+                </TableCell>
+                <TableCell align="right">{row.ballDifference}</TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </Paper>
+  );
+}
+
+function MobileRankingTable({ activeMatchGroup, rankingRows, teamByName }) {
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        p: 2,
+        borderRadius: 2.5,
+        border: "1px solid rgba(20, 17, 15, 0.08)",
+        bgcolor: "teamInfo.main"
+      }}
+    >
+      <Table size="small">
+        <TableHead sx={{ bgcolor: "teamInfo.main" }}>
+          <TableRow>
+            <TableCell>Team</TableCell>
+            <TableCell align="right">W/L</TableCell>
+            <TableCell align="right">Sets</TableCell>
+            <TableCell align="right">Balls</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {rankingRows.map((row) => {
+            const team = teamByName.get(row.teamName);
+
+            return (
+              <TableRow key={`${activeMatchGroup.uuid}-${row.rank}`} hover>
+                <TableCell>
+                  <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Avatar
+                      src={team?.logo_url}
+                      alt={`${row.teamName} logo`}
+                      sx={{ width: 36, height: 36, bgcolor: "#f3ebe0" }}
+                    />
+                    <Typography sx={{ fontWeight: 600 }}>
+                      {getTeamShortName(team?.name ?? row.teamName, team?.short_name)}
+                    </Typography>
+                  </Stack>
+                </TableCell>
+                <TableCell align="right">
+                  {row.wins}/{row.losses}
+                </TableCell>
+                <TableCell align="right">
+                  {row.setWins}:{row.setLosses}
+                </TableCell>
+                <TableCell align="right">
+                  {row.ballWins}:{row.ballLosses}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </Paper>
+  );
+}
+
 export default function Plan() {
+  const isMobile = useIsMobile();
   const [competition, setCompetition] = useState(null);
   const [association, setAssociation] = useState(null);
   const [season, setSeason] = useState(null);
@@ -203,18 +361,19 @@ export default function Plan() {
             </Typography>
           </Paper>
 
-          <Tabs
-            value={activeMatchGroupId}
-            onChange={(_, value) => setActiveMatchGroupId(value)}
-            variant="scrollable"
-            allowScrollButtonsMobile
-            textColor="inherit"
-            indicatorColor="secondary"
-          >
-            {matchGroups.map((matchGroup) => (
-              <Tab key={matchGroup.uuid} value={matchGroup.uuid} label={matchGroup.name} />
-            ))}
-          </Tabs>
+          {isMobile ? (
+            <MatchGroupDropdown
+              activeMatchGroupId={activeMatchGroupId}
+              matchGroups={matchGroups}
+              onChange={setActiveMatchGroupId}
+            />
+          ) : (
+            <MatchGroupTabs
+              activeMatchGroupId={activeMatchGroupId}
+              matchGroups={matchGroups}
+              onChange={setActiveMatchGroupId}
+            />
+          )}
 
           {activeMatchGroup && (
             <Paper
@@ -237,63 +396,19 @@ export default function Plan() {
                 </Typography>
               </Box>
 
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 2,
-                  borderRadius: 2.5,
-                  border: "1px solid rgba(20, 17, 15, 0.08)",
-                  bgcolor: "teamInfo.main"
-                }}
-              >
-                <Table size="small">
-                  <TableHead sx={{ bgcolor: "teamInfo.main" }}>
-                    <TableRow>
-                      <TableCell>Rank</TableCell>
-                      <TableCell>Team</TableCell>
-                      <TableCell align="right">Matches</TableCell>
-                      <TableCell align="right">W/L</TableCell>
-                      <TableCell align="right">Sets</TableCell>
-                      <TableCell align="right">Balls</TableCell>
-                      <TableCell align="right">Diff</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {rankingRows.map((row) => {
-                      const team = teamByName.get(row.teamName);
-
-                      return (
-                        <TableRow key={`${activeMatchGroup.uuid}-${row.rank}`} hover>
-                          <TableCell>{row.rank}</TableCell>
-                          <TableCell>
-                            <Stack direction="row" spacing={1.5} alignItems="center">
-                              <Avatar
-                                src={team?.logo_url}
-                                alt={`${row.teamName} logo`}
-                                sx={{ width: 36, height: 36, bgcolor: "#f3ebe0" }}
-                              />
-                              <Typography sx={{ fontWeight: 600 }}>
-                                {team?.name ?? row.teamName}
-                              </Typography>
-                            </Stack>
-                          </TableCell>
-                          <TableCell align="right">{row.matchesPlayed}</TableCell>
-                          <TableCell align="right">
-                            {row.wins}/{row.losses}
-                          </TableCell>
-                          <TableCell align="right">
-                            {row.setWins}:{row.setLosses}
-                          </TableCell>
-                          <TableCell align="right">
-                            {row.ballWins}:{row.ballLosses}
-                          </TableCell>
-                          <TableCell align="right">{row.ballDifference}</TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </Paper>
+              {isMobile ? (
+                <MobileRankingTable
+                  activeMatchGroup={activeMatchGroup}
+                  rankingRows={rankingRows}
+                  teamByName={teamByName}
+                />
+              ) : (
+                <RankingTable
+                  activeMatchGroup={activeMatchGroup}
+                  rankingRows={rankingRows}
+                  teamByName={teamByName}
+                />
+              )}
 
               <Paper
                 elevation={0}
