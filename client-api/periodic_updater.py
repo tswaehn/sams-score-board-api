@@ -6,7 +6,7 @@ import threading
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 
 class PeriodicUpdater:
@@ -17,13 +17,11 @@ class PeriodicUpdater:
         thread_name: str,
         store_file_name: str,
         ttl_seconds: float,
-        update_callback: Callable[[], None],
     ) -> None:
         self.lock = threading.RLock()
         self.store: dict[str, Any] = {}
         self.stored_at: float | None = None
         self.ttl_seconds = ttl_seconds
-        self.update_callback = update_callback
         self.idle_loop_entered = threading.Event()
         self.logger = logging.getLogger(logger_name)
         self.store_file_path = Path(__file__).with_name("cache") / store_file_name
@@ -37,6 +35,9 @@ class PeriodicUpdater:
 
     def on_store_loaded(self) -> None:
         pass
+
+    def update_all(self) -> None:
+        raise NotImplementedError
 
     def _write_json_file(self, path: Path, payload: Any) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -110,7 +111,7 @@ class PeriodicUpdater:
     def run_update_loop(self) -> None:
         if self.is_store_expired():
             try:
-                self.update_callback()
+                self.update_all()
             except Exception:
                 self.logger.exception("Background update failed")
         else:
@@ -128,6 +129,6 @@ class PeriodicUpdater:
             )
             time.sleep(sleep_seconds)
             try:
-                self.update_callback()
+                self.update_all()
             except Exception:
                 self.logger.exception("Background update failed")

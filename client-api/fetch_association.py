@@ -14,10 +14,9 @@ class Association(PeriodicUpdater):
             thread_name="association-updater",
             store_file_name="association-store.json",
             ttl_seconds=STORE_TTL_SECONDS,
-            update_callback=self.updateAll,
         )
 
-    def updateAll(self, current_season: bool | None = None) -> list[dict]:
+    def update_all(self) -> None:
         payload = fetch_endpoint_direct("/associations")
 
         if isinstance(payload, dict):
@@ -44,9 +43,7 @@ class Association(PeriodicUpdater):
             association["uuid"]: association for association in normalized_associations
         })
 
-        return normalized_associations
-
-    def get(self, association_uuid: str, current_season: bool | None = None) -> dict:
+    def get(self, association_uuid: str) -> dict:
         self.wait_until_store_loaded()
 
         association = self.get_store_item(association_uuid)

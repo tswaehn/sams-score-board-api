@@ -17,31 +17,12 @@ class CompetitionMatch(PeriodicUpdater):
             thread_name="competition-match-updater",
             store_file_name="competition-match-store.json",
             ttl_seconds=STORE_TTL_SECONDS,
-            update_callback=self.updateAll,
         )
-
-    def _normalize_match(self, match: dict) -> dict:
-        team1_link = match["_links"].get("team1")
-        team2_link = match["_links"].get("team2")
-        team1_uuid = extract_uuid_from_url(team1_link["href"]) if team1_link else None
-        team2_uuid = extract_uuid_from_url(team2_link["href"]) if team2_link else None
-        return {
-            "uuid": match["uuid"],
-            "date": match["date"],
-            "time": match["time"],
-            "location": match["location"],
-            "matchNumber": match["matchNumber"],
-            "team1_uuid": team1_uuid,
-            "team2_uuid": team2_uuid,
-            "team1_name": match["team1Description"],
-            "team2_name": match["team2Description"],
-            "results": match["results"],
-        }
 
     def on_store_loaded(self) -> None:
         self.match_uuids_by_match_group_uuid = {}
 
-    def updateAll(self, current_season: bool | None = None) -> list[dict]:
+    def update_all(self) -> None:
         payload = fetch_endpoint_direct("/competition-matches")
         if not isinstance(payload, dict):
             raise RuntimeError("Expected /competition-matches payload to be a dict")
@@ -63,8 +44,6 @@ class CompetitionMatch(PeriodicUpdater):
         self.replace_store({
             match["uuid"]: match for match in normalized_matches
         })
-
-        return normalized_matches
 
     def get(self, match_uuid: str, current_season: bool) -> dict:
         self.wait_until_store_loaded()
@@ -120,6 +99,24 @@ class CompetitionMatch(PeriodicUpdater):
             normalized_matches[match["uuid"]] = self._normalize_match(match)
 
         return normalized_matches
+
+    def _normalize_match(self, match: dict) -> dict:
+        team1_link = match["_links"].get("team1")
+        team2_link = match["_links"].get("team2")
+        team1_uuid = extract_uuid_from_url(team1_link["href"]) if team1_link else None
+        team2_uuid = extract_uuid_from_url(team2_link["href"]) if team2_link else None
+        return {
+            "uuid": match["uuid"],
+            "date": match["date"],
+            "time": match["time"],
+            "location": match["location"],
+            "matchNumber": match["matchNumber"],
+            "team1_uuid": team1_uuid,
+            "team2_uuid": team2_uuid,
+            "team1_name": match["team1Description"],
+            "team2_name": match["team2Description"],
+            "results": match["results"],
+        }
 
 
 COMPETITION_MATCH = CompetitionMatch()

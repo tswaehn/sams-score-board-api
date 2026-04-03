@@ -18,23 +18,12 @@ class MatchGroup(PeriodicUpdater):
             thread_name="match-group-updater",
             store_file_name="match-group-store.json",
             ttl_seconds=STORE_TTL_SECONDS,
-            update_callback=self.updateAll,
         )
-
-    def _normalize_match_group(self, match_group: dict, current_season: bool) -> dict:
-        matches_uuid = extract_uuid_from_url(match_group["_links"]["matches"]["href"])
-        return {
-            "uuid": match_group["uuid"],
-            "name": match_group["name"],
-            "tourneyLevel": match_group["tourneyLevel"],
-            "matches_uuid": matches_uuid,
-            "matches": COMPETITION_MATCH.get_by_match_group_uuid(matches_uuid, current_season),
-        }
 
     def on_store_loaded(self) -> None:
         self.match_group_uuids_by_competition_uuid = {}
 
-    def updateAll(self, current_season: bool | None = None) -> list[dict]:
+    def update_all(self) -> None:
         payload = fetch_endpoint_direct("/match-groups")
         if not isinstance(payload, dict):
             raise RuntimeError("Expected /match-groups payload to be a dict")
@@ -56,8 +45,6 @@ class MatchGroup(PeriodicUpdater):
         self.replace_store({
             match_group["uuid"]: match_group for match_group in normalized_match_groups
         })
-
-        return normalized_match_groups
 
     def get(self, match_group_uuid: str, current_season: bool) -> dict:
         self.wait_until_store_loaded()
@@ -112,6 +99,16 @@ class MatchGroup(PeriodicUpdater):
             )
 
         return normalized_match_groups
+
+    def _normalize_match_group(self, match_group: dict, current_season: bool) -> dict:
+        matches_uuid = extract_uuid_from_url(match_group["_links"]["matches"]["href"])
+        return {
+            "uuid": match_group["uuid"],
+            "name": match_group["name"],
+            "tourneyLevel": match_group["tourneyLevel"],
+            "matches_uuid": matches_uuid,
+            "matches": COMPETITION_MATCH.get_by_match_group_uuid(matches_uuid, current_season),
+        }
 
 
 MATCH_GROUP = MatchGroup()

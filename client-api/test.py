@@ -1,8 +1,8 @@
 import json
 from pathlib import Path
 
-from fetch_competition import get_competition
-from fetch_competition_list import update_competition_list
+from fetch_competition import COMPETITION
+from fetch_competition_list import get_competition_list, update_all
 from warm_cache import warm_cache
 
 
@@ -16,7 +16,8 @@ def build_output_path(endpoint: str) -> Path:
 
 
 def store_competition_list() -> None:
-    competition_list = update_competition_list()
+    update_all()
+    competition_list = get_competition_list()
     output_path = build_output_path("competition-list")
     with open(output_path, "w", encoding="utf-8") as output_file:
         json.dump(competition_list, output_file, indent=2)
@@ -29,7 +30,7 @@ def test_competition():
     competition_id = "d2f619a3-7fea-4b1e-9d86-a300e335e2ec"
     competition_id = "d2818335-7d46-4053-bdad-9a57a98d2c05"
 
-    payload, was_cached = get_competition(competition_id)
+    payload, was_cached = COMPETITION.get(competition_id)
 
     output_path = build_output_path("competition")
     with open(output_path, "w", encoding="utf-8") as output_file:

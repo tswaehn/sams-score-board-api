@@ -11,8 +11,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from requests import RequestException
 
-from fetch_competition import get_competition
-from fetch_competition_list import get_competition_list, update_competition_list
+from fetch_competition import COMPETITION
+from fetch_competition_list import get_competition_list, update_all
 from live_endpoint import get_live_payload
 
 
@@ -111,7 +111,7 @@ async def health(request: Request) -> dict:
 @app.get("/api/competition/{competition_id}")
 async def competition(competition_id: UUID, request: Request) -> dict:
     try:
-        payload, was_cached = get_competition(str(competition_id))
+        payload, was_cached = COMPETITION.get(str(competition_id))
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail="Failed to fetch competition data") from exc
 
@@ -121,7 +121,7 @@ async def competition(competition_id: UUID, request: Request) -> dict:
 @app.get("/api/competition-list")
 async def competition_list(request: Request) -> dict:
     try:
-        update_competition_list()
+        update_all()
         payload = get_competition_list()
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail="Failed to fetch competition list") from exc

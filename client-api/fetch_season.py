@@ -14,10 +14,9 @@ class Season(PeriodicUpdater):
             thread_name="season-updater",
             store_file_name="season-store.json",
             ttl_seconds=STORE_TTL_SECONDS,
-            update_callback=self.updateAll,
         )
 
-    def updateAll(self, current_season: bool | None = None) -> list[dict]:
+    def update_all(self) -> None:
         payload = fetch_endpoint_direct("/seasons")
 
         if isinstance(payload, dict):
@@ -44,9 +43,13 @@ class Season(PeriodicUpdater):
             season["uuid"]: season for season in normalized_seasons
         })
 
-        return normalized_seasons
+    def get_all(self) -> list[dict]:
+        self.wait_until_store_loaded()
 
-    def get(self, season_uuid: str, current_season: bool | None = None) -> dict:
+        with self.lock:
+            return list(self.store.values())
+
+    def get(self, season_uuid: str) -> dict:
         self.wait_until_store_loaded()
 
         season = self.get_store_item(season_uuid)
