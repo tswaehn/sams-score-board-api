@@ -16,35 +16,19 @@ class Association(PeriodicUpdater):
             ttl_seconds=STORE_TTL_SECONDS,
         )
 
-    def update_all(self) -> None:
-        payload = fetch_endpoint_direct("/associations")
+    def update_store(self, uuid: str | None = None) -> None:
+        if uuid is None:
+            return
 
-        if isinstance(payload, dict):
-            associations = payload.get("content", [])
-        else:
-            associations = payload
+        payload = fetch_endpoint_direct(f"/associations/{uuid}")
+        if not isinstance(payload, dict):
+            raise RuntimeError(f"Expected association payload to be a dict for {uuid!r}")
 
-        if not isinstance(associations, list):
-            raise RuntimeError("Expected /associations to return a list payload")
-
-        normalized_associations = []
-        for association in associations:
-            if not isinstance(association, dict):
-                continue
-
-            association_uuid = association.get("uuid")
-            if not isinstance(association_uuid, str):
-                continue
-
-            normalized_associations.append(association)
-
-        self.dump_raw_json("association-store-raw.json", payload)
-        self.replace_store({
-            association["uuid"]: association for association in normalized_associations
-        })
+        self.dump_raw_json("association-store-raw.json", uuid, payload)
+        self.set_store_item(uuid, payload)
 
     def get(self, association_uuid: str) -> dict:
-        self.wait_until_store_loaded()
+        self.wait_for_uuid(association_uuid)
 
         association = self.get_store_item(association_uuid)
         if association is not None:

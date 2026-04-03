@@ -21,46 +21,38 @@ class MatchGroup(PeriodicUpdater):
     def on_store_loaded(self) -> None:
         pass
 
-    def update_all(self) -> None:
-        competitions = COMPETITION_LIST_STORE.get()
+    def update_store(self, uuid: str | None = None) -> None:
+        if uuid is None:
+            return
 
-        normalized_competition_match_groups: dict[str, dict] = {}
-        raw_competition_match_groups: dict[str, dict] = {}
-        for competition in competitions:
-            competition_uuid = competition.get("uuid")
-            if not isinstance(competition_uuid, str):
+        competition_entry = COMPETITION_LIST_STORE.get_store_item(uuid)
+        current_season = bool(competition_entry.get("currentSeason")) if isinstance(competition_entry, dict) else False
+        payload = fetch_endpoint_direct(f"/competitions/{uuid}/match-groups")
+        if not isinstance(payload, dict):
+            raise RuntimeError(
+                f"Expected match-group list payload to be a dict for {uuid!r}"
+            )
+
+        match_groups = payload.get("content", [])
+        if not isinstance(match_groups, list):
+            raise RuntimeError(
+                f"Expected match-group list content to be a list for {uuid!r}"
+            )
+
+        normalized_match_groups: dict[str, dict] = {}
+        for match_group in match_groups:
+            if not isinstance(match_group, dict):
                 continue
+            normalized_match_groups[match_group["name"]] = self._normalize_match_group(
+                match_group,
+                current_season,
+            )
 
-            current_season = bool(competition.get("currentSeason"))
-            payload = fetch_endpoint_direct(f"/competitions/{competition_uuid}/match-groups")
-            if not isinstance(payload, dict):
-                raise RuntimeError(
-                    f"Expected match-group list payload to be a dict for {competition_uuid!r}"
-                )
-
-            match_groups = payload.get("content", [])
-            if not isinstance(match_groups, list):
-                raise RuntimeError(
-                    f"Expected match-group list content to be a list for {competition_uuid!r}"
-                )
-
-            normalized_match_groups: dict[str, dict] = {}
-            for match_group in match_groups:
-                if not isinstance(match_group, dict):
-                    continue
-                normalized_match_groups[match_group["name"]] = self._normalize_match_group(
-                    match_group,
-                    current_season,
-                )
-
-            normalized_competition_match_groups[competition_uuid] = normalized_match_groups
-            raw_competition_match_groups[competition_uuid] = payload
-
-        self.dump_raw_json("match-group-store-raw.json", raw_competition_match_groups)
-        self.replace_store(normalized_competition_match_groups)
+        self.dump_raw_json("match-group-store-raw.json", uuid, payload)
+        self.set_store_item(uuid, normalized_match_groups)
 
     def get(self, competition_uuid: str, current_season: bool) -> dict:
-        self.wait_until_store_loaded()
+        self.wait_for_uuid(competition_uuid)
 
         normalized_match_groups = self.get_store_item(competition_uuid)
         if normalized_match_groups is None:

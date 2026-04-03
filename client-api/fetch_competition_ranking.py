@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import copy
 
-from fetch_competition_list import COMPETITION_LIST_STORE
 from periodic_updater import PeriodicUpdater
-from sams_api_client import fetch_endpoint
+from sams_api_client import fetch_endpoint_direct
 
 
 STORE_TTL_SECONDS = 24 * 60 * 60
@@ -19,36 +18,28 @@ class CompetitionRanking(PeriodicUpdater):
             ttl_seconds=STORE_TTL_SECONDS,
         )
 
-    def update_all(self) -> None:
-        COMPETITION_LIST_STORE.wait_until_store_loaded()
+    def update_store(self, uuid: str | None = None) -> None:
+        if uuid is None:
+            return
 
-        next_store: dict[str, dict] = {}
-        for competition in COMPETITION_LIST_STORE.get():
-            competition_uuid = competition.get("uuid")
-            if not isinstance(competition_uuid, str):
-                continue
-            rankings_payload = fetch_endpoint(
-                f"/competitions/{competition_uuid}/rankings",
-                current_season=bool(competition.get("currentSeason")),
-            )
-            if not isinstance(rankings_payload, dict):
-                raise RuntimeError(f"Expected rankings payload to be a dict for {competition_uuid!r}")
+        rankings_payload = fetch_endpoint_direct(f"/competitions/{uuid}/rankings")
+        if not isinstance(rankings_payload, dict):
+            raise RuntimeError(f"Expected rankings payload to be a dict for {uuid!r}")
 
-            rankings = rankings_payload.get("content", [])
-            if not isinstance(rankings, list):
-                raise RuntimeError(f"Expected rankings content to be a list for {competition_uuid!r}")
+        rankings = rankings_payload.get("content", [])
+        if not isinstance(rankings, list):
+            raise RuntimeError(f"Expected rankings content to be a list for {uuid!r}")
 
-            normalized_rankings = self._normalize_rankings(rankings)
-            self.dump_raw_json(
-                f"competition-ranking-store-raw-competition-{competition_uuid}.json",
-                rankings_payload,
-            )
-            next_store[competition_uuid] = normalized_rankings
-
-        self.replace_store(next_store)
+        normalized_rankings = self._normalize_rankings(rankings)
+        self.dump_raw_json(
+            f"competition-ranking-store-raw-competition-{uuid}.json",
+            uuid,
+            rankings_payload,
+        )
+        self.set_store_item(uuid, normalized_rankings)
 
     def get(self, competition_uuid: str, current_season: bool) -> dict:
-        self.wait_until_store_loaded()
+        self.wait_for_uuid(competition_uuid)
 
         rankings = self.get_store_item(competition_uuid)
         if rankings is None:

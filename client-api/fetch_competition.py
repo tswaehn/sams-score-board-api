@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from fetch_association import ASSOCIATION
-from fetch_competition_list import COMPETITION_LIST_STORE
 from fetch_competition_ranking import COMPETITION_RANKING
 from fetch_competition_team import COMPETITION_TEAMS
 from fetch_competition_match_group import MATCH_GROUP
@@ -22,33 +21,19 @@ class Competition(PeriodicUpdater):
             ttl_seconds=STORE_TTL_SECONDS,
         )
 
-    def update_all(self) -> None:
-        competition_list = COMPETITION_LIST_STORE.get()
+    def update_store(self, uuid: str | None = None) -> None:
+        if uuid is None:
+            return
 
-        normalized_competitions: dict[str, dict] = {}
-        raw_competitions: dict[str, dict] = {}
-        for competition_list_entry in competition_list:
-            if not isinstance(competition_list_entry, dict):
-                continue
+        competition = fetch_endpoint_direct(f"/competitions/{uuid}")
+        if not isinstance(competition, dict):
+            raise RuntimeError(f"Expected competition payload to be a dict for {uuid!r}")
 
-            competition_uuid = competition_list_entry.get("uuid")
-            if not isinstance(competition_uuid, str):
-                continue
-
-            competition = fetch_endpoint_direct(f"/competitions/{competition_uuid}")
-            if not isinstance(competition, dict):
-                raise RuntimeError(
-                    f"Expected competition payload to be a dict for {competition_uuid!r}"
-                )
-
-            raw_competitions[competition_uuid] = competition
-            normalized_competitions[competition_uuid] = self.normalize_competition(competition)
-
-        self.dump_raw_json("competition-store-raw.json", raw_competitions)
-        self.replace_store(normalized_competitions)
+        self.dump_raw_json("competition-store-raw.json", uuid, competition)
+        self.set_store_item(uuid, self.normalize_competition(competition))
 
     def get(self, competition_uuid: str) -> tuple[dict, bool]:
-        self.wait_until_store_loaded()
+        self.wait_for_uuid(competition_uuid)
 
         was_cached = self.get_store_item(competition_uuid) is not None
         competition = self.get_store_item(competition_uuid)

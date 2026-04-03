@@ -16,41 +16,45 @@ class Season(PeriodicUpdater):
             ttl_seconds=STORE_TTL_SECONDS,
         )
 
-    def update_all(self) -> None:
-        payload = fetch_endpoint_direct("/seasons")
+    def update_store(self, uuid: str | None = None) -> None:
+        if uuid is None:
+            payload = fetch_endpoint_direct("/seasons")
 
-        if isinstance(payload, dict):
-            seasons = payload.get("content", [])
-        else:
-            seasons = payload
+            if isinstance(payload, dict):
+                seasons = payload.get("content", [])
+            else:
+                seasons = payload
 
-        if not isinstance(seasons, list):
-            raise RuntimeError("Expected /seasons to return a list payload")
+            if not isinstance(seasons, list):
+                raise RuntimeError("Expected /seasons to return a list payload")
 
-        normalized_seasons = []
-        for season in seasons:
-            if not isinstance(season, dict):
-                continue
+            for season in seasons:
+                if not isinstance(season, dict):
+                    continue
 
-            season_uuid = season.get("uuid")
-            if not isinstance(season_uuid, str):
-                continue
+                season_uuid = season.get("uuid")
+                if not isinstance(season_uuid, str):
+                    continue
 
-            normalized_seasons.append(season)
+                self.dump_raw_json("season-store-raw.json", season_uuid, season)
+                self.set_store_item(season_uuid, season)
+            return
 
-        self.dump_raw_json("season-store-raw.json", payload)
-        self.replace_store({
-            season["uuid"]: season for season in normalized_seasons
-        })
+        payload = fetch_endpoint_direct(f"/seasons/{uuid}")
+        if not isinstance(payload, dict):
+            raise RuntimeError(f"Expected season payload to be a dict for {uuid!r}")
+
+        self.dump_raw_json("season-store-raw.json", uuid, payload)
+        self.set_store_item(uuid, payload)
 
     def get_all(self) -> list[dict]:
-        self.wait_until_store_loaded()
+        self.wait_for_uuid()
 
         with self.lock:
             return list(self.store.values())
 
     def get(self, season_uuid: str) -> dict:
-        self.wait_until_store_loaded()
+        self.wait_for_uuid(season_uuid)
 
         season = self.get_store_item(season_uuid)
         if season is not None:

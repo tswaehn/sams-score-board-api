@@ -18,18 +18,20 @@ class Teams(PeriodicUpdater):
             ttl_seconds=STORE_TTL_SECONDS,
         )
 
-    def update_all(self) -> None:
-        payload = fetch_endpoint_direct("/teams")
+    def update_store(self, uuid: str | None = None) -> None:
+        if uuid is None:
+            return
+
+        payload = fetch_endpoint_direct(f"/teams/{uuid}")
         if not isinstance(payload, dict):
-            raise RuntimeError("Expected /teams payload to be a dict")
+            raise RuntimeError(f"Expected team payload to be a dict for {uuid!r}")
 
-        normalized_teams = self._extract_normalized_teams(payload, "/teams")
-
-        self.dump_raw_json("teams-store-raw.json", payload)
-        self.replace_store({team["uuid"]: team for team in normalized_teams})
+        team = self._normalize_team(payload)
+        self.dump_raw_json("teams-store-raw.json", uuid, team)
+        self.set_store_item(uuid, team)
 
     def get(self, team_uuid: str) -> dict:
-        self.wait_until_store_loaded()
+        self.wait_for_uuid(team_uuid)
 
         team = self.get_store_item(team_uuid)
         if team is not None:
