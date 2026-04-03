@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 from requests import RequestException
 
 from fetch_competition import get_competition
-from fetch_competition_list import update_competition_list
+from fetch_competition_list import get_competition_list, update_competition_list
 from live_endpoint import get_live_payload
 
 
@@ -121,7 +121,8 @@ async def competition(competition_id: UUID, request: Request) -> dict:
 @app.get("/api/competition-list")
 async def competition_list(request: Request) -> dict:
     try:
-        payload = update_competition_list()
+        update_competition_list()
+        payload = get_competition_list()
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail="Failed to fetch competition list") from exc
 

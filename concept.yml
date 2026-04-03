@@ -1,5 +1,5 @@
 document:
-  name: conecept.yml
+  name: concept.yml
   purpose:
     - canonical machine-readable concept/context file for the client-api subproject
     - warm-up context for new Codex sessions before making changes in client-api
@@ -47,13 +47,25 @@ files:
     - path: client-api/server.py
       role: FastAPI application, routing, middleware, exception shaping, uvicorn bootstrap
     - path: client-api/endpoint_cache.py
-      role: standalone endpoint cache with in-memory dict, persisted JSON storage, fetch queue, worker thread, in-flight deduplication, and support for dict/list payloads plus query-keyed collections
+      role: standalone endpoint cache with a CachedObject base class plus derived cache-object types, in-memory dict, persisted JSON storage with metadata, fetch queue, worker thread, and in-flight deduplication
     - path: client-api/sams_api_client.py
-      role: upstream SSVB API client, pagination, rate limiting, cache-facing fetch wrappers, support for dict/list payloads, optional warm-cache thread
+      role: upstream SSVB API client, pagination, rate limiting, cache-facing fetch wrappers, a direct upstream fetch helper that bypasses the cache, support for dict/list payloads, optional warm-cache thread
+    - path: client-api/fetch_association.py
+      role: Association class with in-process association store, updateAll() preload, get(uuid) lookup using direct upstream fetches, and a background updater thread
+    - path: client-api/fetch_season.py
+      role: Season class with in-process season store, updateAll() preload, get(uuid) lookup using direct upstream fetches, and a background updater thread
+    - path: client-api/fetch_teams.py
+      role: Teams class with in-process global and per-competition team stores, updateAll() via /teams, get(competition_uuid) via the competition-scoped teams endpoint, and a background updater thread
+    - path: client-api/fetch_match_group.py
+      role: MatchGroup class using the shared updater/store base with persisted raw match-group storage, get(uuid), and get_by_competition_uuid() returning the normalized competition match-group shape including normalized matches
+    - path: client-api/fetch_competition_match.py
+      role: CompetitionMatch class using the shared updater/store base with persisted raw competition-match storage, get(uuid), and get_by_match_group_uuid() returning normalized competition matches
+    - path: client-api/periodic_updater.py
+      role: shared base class for daemon updater threads that run on startup only when the persisted store TTL has expired and then nightly at local time 01:00, for the primary in-memory store plus lock used by derived store classes, and for pretty-printed persisted JSON snapshots plus raw reference dumps with timestamps
     - path: client-api/fetch_competition.py
       role: composition layer building full competition payload from multiple upstream endpoints
     - path: client-api/fetch_competition_list.py
-      role: maintains a global aggregated competition list, updates it per season, and derives currentSeason mutability from the loaded season
+      role: CompetitionListStore class maintains the aggregated competition list and lock, updates it per season using direct upstream fetches, exposes get() for copied reads, derives currentSeason mutability from the loaded season, and runs a background updater thread
     - path: client-api/live_endpoint.py
       role: live snapshot fetch plus websocket update loop for /api/live
     - path: client-api/warm_cache.py
@@ -194,6 +206,9 @@ upstream_integrations:
       pacing:
         min_delay_seconds_between_requests: 0.3
       timeout_seconds: 30
+      direct_fetch_helper:
+        function: fetch_endpoint_direct(endpoint)
+        behavior: bypasses endpoint_cache and fetches upstream data immediately
   live_api:
     transport:
       snapshot: HTTP GET
@@ -206,13 +221,41 @@ upstream_integrations:
 
 caching:
   primary_module: client-api/endpoint_cache.py
+  cache_object_model:
+    base_class: CachedObject
+    derived_classes:
+      - CompetitionListCachedObject
+      - CompetitionCachedObject
+      - SeasonCachedObject
+      - AssociationCachedObject
+      - TeamsCachedObject
+      - RankingsCachedObject
+      - MatchGroupsCachedObject
+      - CompetitionMatchesCachedObject
+    ttl_policy:
+      current_season_ttl_seconds: 60
+      non_current_season_ttl_seconds: 2419200
+      rule: cache freshness is decided only from the effective currentSeason flag of the cached object
   cache_storage:
     type:
       - in-memory dictionary
-      - on-disk JSON files
+      - on-disk JSON files with cache metadata wrapper
+      - on-disk JSON store snapshots for updater-backed stores
     directory: client-api/cache
-    in_memory_shape: CACHE[endpoint_key][uuid_key] = {payload, fetched_at}
+    in_memory_shape: CACHE[endpoint_key][uuid_key] = {payload, fetched_at, cached_object}
     disk_layout: cache/<endpoint_key>/<uuid_key>.json
+    updater_store_snapshot_shape:
+      file_pattern: cache/*-store.json
+      top_level_keys:
+        - storedAt
+        - store
+      formatting: pretty-printed JSON
+      freshness_rule:
+        ttl_seconds: 86400
+        startup_behavior: run the initial scheduled update only when the persisted snapshot is missing or older than the TTL
+    updater_raw_dump_shape:
+      file_pattern: cache/*-raw*.json
+      contents: original raw upstream payload as pretty-printed JSON without the updater snapshot wrapper
     collection_uuid_key: _collection
     payload_types:
       - dict
@@ -231,18 +274,10 @@ caching:
     function: _load_persisted_cache()
     side_effects:
       - creates cache directory if missing
-      - loads persisted endpoint folders into memory
+      - loads persisted endpoint folders into memory and restores cached-object metadata when available
+      - falls back to inferring season metadata from payloads for older cache files that only stored raw payloads
       - starts cache worker thread lazily on first cache miss
       - may start background season-fetch thread when WARM_CACHE_ENABLED is truthy
-  freshness_defaults:
-    default_endpoint_ttl_seconds: 86400
-    custom_ttls:
-      associations: 1814400
-      seasons: 2419200
-      competition_match_groups: 300
-      competition_rankings: 60
-      match_group_competition_matches: 60
-      competition_teams: 604800
   concurrency:
     global_cache_lock: RLock
     fetch_queue: queue.Queue
@@ -291,6 +326,41 @@ payload_shapes:
     - match_groups_uuid
     - teams_uuid
     - rankings_uuid
+  association_access:
+    - Association.updateAll(current_season=None) loads and stores all associations by uuid using direct upstream fetches
+    - Association.get(uuid, current_season=None) returns a cached in-process association or fetches a single association directly from upstream on demand
+    - Association starts a daemon thread during construction, runs updateAll() once on startup, and refreshes again daily at local time 01:00
+    - Association uses the base-class store as its uuid-keyed in-memory association map
+    - Association persists its store snapshot to cache/association-store.json with a storedAt timestamp
+    - Association dumps the raw /associations payload to cache/association-store-raw.json when refreshing the store
+    - Association startup refresh is skipped when the persisted store snapshot is newer than the base TTL
+  season_access:
+    - Season.updateAll(current_season=None) loads and stores all seasons by uuid using direct upstream fetches
+    - Season.get(uuid, current_season=None) returns a cached in-process season or fetches a single season directly from upstream on demand
+    - Season starts a daemon thread during construction, runs updateAll() once on startup, and refreshes again daily at local time 01:00
+    - Season uses the base-class store as its uuid-keyed in-memory season map
+    - Season persists its store snapshot to cache/season-store.json with a storedAt timestamp
+    - Season dumps the raw /seasons payload to cache/season-store-raw.json when refreshing the store
+    - Season startup refresh is skipped when the persisted store snapshot is newer than the base TTL
+  teams_access:
+    - Teams.get_by_competition_uuid(competition_uuid, current_season=None) returns stored teams for a competition or fetches them directly from upstream on demand
+    - Teams.updateAll(current_season=None) refreshes the global team list using /teams
+    - Teams starts a daemon thread during construction, runs updateAll() once on startup, and refreshes again daily at local time 01:00
+    - Teams uses the base-class store as its uuid-keyed global team map and keeps a secondary competition-to-team-list index locally
+    - Teams persists its global team store snapshot to cache/teams-store.json with a storedAt timestamp
+    - Teams dumps raw /teams and /competitions/{uuid}/teams payloads to cache for reference when replacing the store
+    - Teams startup refresh is skipped when the persisted store snapshot is newer than the base TTL
+  match_group_access:
+    - MatchGroup.get(uuid, current_season) returns a normalized single match-group object while storing the raw upstream match-group payload internally
+    - MatchGroup.get_by_competition_uuid(competition_uuid, current_season) returns the normalized competition match-group map keyed by match-group name while storing raw upstream match-group payloads internally
+    - match data inside the normalized return value is loaded through CompetitionMatch.get_by_match_group_uuid()
+    - MatchGroup uses the same base-class store pattern as Season, including persisted raw store snapshots and TTL-aware startup refresh behavior
+    - MatchGroup dumps raw /match-groups and /competitions/{uuid}/match-groups payloads to cache for reference when replacing the store
+  competition_match_access:
+    - CompetitionMatch.get(uuid, current_season) returns a normalized single competition match while storing the raw upstream competition-match payload internally
+    - CompetitionMatch.get_by_match_group_uuid(match_group_uuid, current_season) returns normalized competition matches keyed by match uuid while storing raw upstream competition-match payloads internally
+    - CompetitionMatch uses the same base-class store pattern as Season, including persisted raw store snapshots and TTL-aware startup refresh behavior
+    - CompetitionMatch dumps raw /competition-matches and /match-groups/{uuid}/competition-matches payloads to cache for reference when replacing the store
   competition_list_item_fields:
     - uuid
     - name
@@ -302,12 +372,21 @@ payload_shapes:
     - association
     - season
   competition_list_update_flow:
-    - update_competition_list() fetches /seasons and iterates all seasons
-    - update_competition_list_by_season(season_uuid) fetches /seasons/{uuid}
-    - update_competition_list_by_season(season_uuid) fetches /competitions?season=<uuid>
+    - CompetitionListStore inherits the daemon updater thread behavior from PeriodicUpdater
+    - CompetitionListStore uses the base-class store as its primary competition-by-uuid map and keeps the season-to-competition index locally
+    - the background thread calls update_competition_list() once on startup
+    - the startup refresh runs only when the persisted store snapshot is missing or older than the base TTL
+    - after the startup refresh, the thread schedules the next refresh for local time 01:00 and repeats daily
+    - CompetitionListStore.update_competition_list() uses Season.updateAll() and iterates all seasons
+    - CompetitionListStore.update_competition_list_by_season(season_uuid) uses Season.get(uuid)
+    - CompetitionListStore.update_competition_list_by_season(season_uuid) fetches /competitions?season=<uuid>
     - loaded season currentSeason value is copied to each competition entry of that season
-    - the module keeps a global aggregated competition list keyed by competition uuid
-    - rerunning a season update replaces that season slice in the global aggregated list
+    - a process-global CompetitionListStore instance keeps the aggregated competition list keyed by competition uuid
+    - rerunning a season update replaces that season slice in the store state
+    - CompetitionListStore fetches seasons and competitions directly from upstream and does not read them through endpoint_cache
+    - CompetitionListStore.get() returns a deep-copied list of all stored competitions
+    - CompetitionListStore persists its primary store snapshot to cache/competition-list-store.json with a storedAt timestamp and rebuilds the season index from the persisted store on load
+    - CompetitionListStore dumps the raw /competitions?season=<uuid> payload for each refreshed season to cache for reference when replacing the store
 
 operational_notes:
   strengths:
@@ -318,12 +397,15 @@ operational_notes:
   constraints:
     - import-time side effects exist in sams_api_client.py
     - cache directory is large and should be treated as normal runtime state, not noise
+    - cache TTL no longer varies by endpoint type; it only distinguishes currentSeason=true vs currentSeason=false
+    - some cached objects such as associations depend on the caller to pass the relevant season flag because upstream payloads do not carry currentSeason directly
     - test.py is a manual utility script, not an automated test suite
     - project uses plain module imports rather than a packaged Python module structure
     - collection endpoints are stored with uuid key _collection because they do not have a real UUID in the path
     - season payloads expose startDate and endDate and should be used when deriving season-specific TTL rules
     - warm_cache.py can use /seasons directly because the cache now supports top-level list payloads
-    - update_competition_list_by_season() is the entry point for season mutability classification and applies the loaded season currentSeason value to all competitions in that season
+    - CompetitionListStore.update_competition_list_by_season() is the entry point for season mutability classification and applies the loaded season currentSeason value to all competitions in that season
+    - the global /teams endpoint does not expose competition UUIDs in TeamDto, so Teams.get_by_competition_uuid(competition_uuid) still needs /competitions/{uuid}/teams for competition-scoped lookups
   verified_in_current_context:
     - python3 -m py_compile client-api/*.py succeeded on 2026-04-03
   local_environment_note:
@@ -331,7 +413,7 @@ operational_notes:
 
 codex_warmup_guidance:
   read_order:
-    - conecept.yml
+    - concept.yml
     - client-api/server.py
     - client-api/endpoint_cache.py
     - client-api/sams_api_client.py

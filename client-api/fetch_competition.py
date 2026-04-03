@@ -1,73 +1,15 @@
+from fetch_association import ASSOCIATION
+from fetch_match_group import MATCH_GROUP
+from fetch_season import SEASON
+from fetch_teams import TEAMS
 from sams_api_client import extract_uuid_from_url, fetch_endpoint, fetch_endpoint_with_cache_status
 
 
-ONE_WEEK_SECONDS = 7 * 24 * 60 * 60
-THREE_WEEKS_SECONDS = 3 * ONE_WEEK_SECONDS
-FOUR_WEEKS_SECONDS = 4 * ONE_WEEK_SECONDS
-
-
-def get_association(association_uuid: str) -> dict:
-    association = fetch_endpoint(
-        f"/associations/{association_uuid}",
-        cache_duration_seconds=THREE_WEEKS_SECONDS,
-    )
-    return {
-        "uuid": association["uuid"],
-        "name": association["name"],
-        "shortname": association["shortname"],
-    }
-
-
-def get_season(season_uuid: str) -> dict:
-    season = fetch_endpoint(
-        f"/seasons/{season_uuid}",
-        cache_duration_seconds=FOUR_WEEKS_SECONDS,
-    )
-    return {
-        "uuid": season["uuid"],
-        "name": season["name"],
-        "currentSeason": season["currentSeason"],
-    }
-
-
-def get_match_groups(competition_uuid: str) -> dict:
-    match_groups = fetch_endpoint(f"/competitions/{competition_uuid}/match-groups", cache_duration_seconds=5*60)["content"]
-    result = {}
-
-    for match_group in match_groups:
-        matches_uuid = extract_uuid_from_url(match_group["_links"]["matches"]["href"])
-        result[match_group["name"]] = {
-            "uuid": match_group["uuid"],
-            "name": match_group["name"],
-            "tourneyLevel": match_group["tourneyLevel"],
-            "matches_uuid": matches_uuid,
-        }
-        t = get_competition_matches(matches_uuid)
-        result[match_group["name"]]["matches"] = t
-
-    return result
-
-
-def get_teams(competition_uuid: str) -> list[dict]:
-    teams = fetch_endpoint(
-        f"/competitions/{competition_uuid}/teams",
-        cache_duration_seconds=ONE_WEEK_SECONDS,
+def get_rankings(competition_uuid: str, current_season: bool) -> dict:
+    rankings = fetch_endpoint(
+        f"/competitions/{competition_uuid}/rankings",
+        current_season=current_season,
     )["content"]
-    result = []
-
-    for team in teams:
-        result.append({
-            "uuid": team["uuid"],
-            "name": team["name"],
-            "shortName": team["shortName"],
-            "logoImageLink": team["logoImageLink"],
-        })
-
-    return result
-
-
-def get_rankings(competition_uuid: str) -> dict:
-    rankings = fetch_endpoint(f"/competitions/{competition_uuid}/rankings", cache_duration_seconds=60)["content"]
     result = {}
 
     for ranking in rankings:
@@ -88,34 +30,13 @@ def get_rankings(competition_uuid: str) -> dict:
             }
 
     return result
-
-def get_competition_matches(competition_uuid: str) -> dict:
-    matches = fetch_endpoint(f"/match-groups/{competition_uuid}/competition-matches", cache_duration_seconds=60)["content"]
-    result = {}
-    for match in matches:
-        team1_link = match["_links"].get("team1")
-        team2_link = match["_links"].get("team2")
-        team1_uuid = extract_uuid_from_url(team1_link["href"]) if team1_link else None
-        team2_uuid = extract_uuid_from_url(team2_link["href"]) if team2_link else None
-        result[match["uuid"]] = {
-            "uuid": match["uuid"],
-            "date": match["date"],
-            "time": match["time"],
-            "location": match["location"],
-            "matchNumber": match["matchNumber"],
-            "team1_uuid": team1_uuid,
-            "team2_uuid": team2_uuid,
-            "team1_name": match["team1Description"],
-            "team2_name": match["team2Description"],
-            "results": match["results"],
-        }
-    return result
-
 def get_competition(competition_id: str) -> tuple[dict, bool]:
     competition, was_cached = fetch_endpoint_with_cache_status(f"/competitions/{competition_id}")
 
     association_uuid = extract_uuid_from_url(competition["_links"]["association"]["href"])
     season_uuid = extract_uuid_from_url(competition["_links"]["season"]["href"])
+    season = SEASON.get(season_uuid)
+    current_season = bool(season["currentSeason"])
 
     result = {
         "competition": {
@@ -128,11 +49,11 @@ def get_competition(competition_id: str) -> tuple[dict, bool]:
             "teams_uuid": competition_id,
             "rankings_uuid": competition_id,
         },
-        "association": get_association(association_uuid),
-        "season": get_season(season_uuid),
-        "match-groups": get_match_groups(competition_id),
-        "teams": get_teams(competition_id),
-        "rankings": get_rankings(competition_id),
+        "association": ASSOCIATION.get(association_uuid, current_season=current_season),
+        "season": season,
+        "match-groups": MATCH_GROUP.get_by_competition_uuid(competition_id, current_season),
+        "teams": TEAMS.get_by_competition_uuid(competition_id, current_season=current_season),
+        "rankings": get_rankings(competition_id, current_season),
     }
 
     return result, was_cached
