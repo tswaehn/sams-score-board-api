@@ -1,0 +1,304 @@
+document:
+  name: conecept.yml
+  purpose:
+    - canonical machine-readable concept/context file for the client-api subproject
+    - warm-up context for new Codex sessions before making changes in client-api
+    - continuously maintained summary that must be updated when client-api behavior, structure, or constraints change
+  scope:
+    primary_subproject: client-api
+    repository_root: /home/tswaehn/src/metagons-software.de/sams-scoreboard-api
+  maintenance_policy:
+    update_required_when:
+      - API routes change
+      - environment variables change
+      - runtime behavior changes
+      - caching behavior changes
+      - websocket/live behavior changes
+      - file structure or ownership in client-api changes
+      - operational constraints or known risks change
+    intended_usage:
+      - read first when starting a fresh Codex context
+      - treat as the latest high-level concept source for client-api
+      - reconcile with source files if implementation and this document diverge
+  last_updated:
+    date: 2026-04-03
+    author: Codex
+
+subproject:
+  name: client-api
+  type: python-service
+  runtime:
+    language: Python
+    container_base: python:3.13-slim
+    entrypoint_file: client-api/server.py
+    container_command:
+      - python
+      - server.py
+  dependencies:
+    file: client-api/requirements.txt
+    packages:
+      - requests
+      - fastapi
+      - uvicorn
+      - websocket-client
+
+files:
+  root:
+    - path: client-api/server.py
+      role: FastAPI application, routing, middleware, exception shaping, uvicorn bootstrap
+    - path: client-api/sams_api_client.py
+      role: upstream SSVB API client, pagination, rate limiting, disk-backed cache, cache preloading, optional warm-cache thread
+    - path: client-api/fetch_competition.py
+      role: composition layer building full competition payload from multiple upstream endpoints
+    - path: client-api/fetch_competition_list.py
+      role: fetches and enriches competition list with association and season data
+    - path: client-api/live_endpoint.py
+      role: live snapshot fetch plus websocket update loop for /api/live
+    - path: client-api/warm_cache.py
+      role: preloads competition list and competition payloads into cache
+    - path: client-api/test.py
+      role: ad hoc manual script for dumping cached payloads and warming cache
+    - path: client-api/Dockerfile
+      role: container build definition
+    - path: client-api/cache/
+      role: persistent on-disk cache directory; large and expected as part of runtime behavior
+
+api_surface:
+  framework: FastAPI
+  routes:
+    - method: GET
+      path: /api/health
+      purpose: health check
+      response_shape:
+        status: ok
+        requestId: string
+    - method: GET
+      path: /api/healthz
+      purpose: alias for health check
+      response_shape:
+        status: ok
+        requestId: string
+    - method: GET
+      path: /api/competition/{competition_id}
+      params:
+        competition_id:
+          type: UUID
+      purpose: return assembled competition payload
+      data_source:
+        - competitions/{competition_id}
+        - associations/{association_uuid}
+        - seasons/{season_uuid}
+        - competitions/{competition_id}/match-groups
+        - match-groups/{match_group_uuid}/competition-matches
+        - competitions/{competition_id}/teams
+        - competitions/{competition_id}/rankings
+    - method: GET
+      path: /api/competition-list
+      purpose: return enriched competition list
+      response_wrapper:
+        data: list
+        requestId: string
+    - method: GET
+      path: /api/live
+      purpose: return current live payload from snapshot plus websocket updates
+
+http_behavior:
+  middleware:
+    - name: request-id
+      details:
+        request_header: X-Request-Id
+        generated_when_missing: true
+        response_header: X-Request-Id
+    - name: response-hardening
+      details:
+        cache_control: no-store
+        x_content_type_options: nosniff
+    - name: cors
+      details:
+        allow_origins:
+          - "*"
+        allow_credentials: false
+        allow_methods:
+          - "*"
+        allow_headers:
+          - "*"
+  exception_contract:
+    validation_error:
+      status: 422
+      body_keys:
+        - error.code
+        - error.message
+        - error.details
+        - requestId
+    http_exception:
+      status: passthrough
+      body_keys:
+        - error.code
+        - error.message
+        - requestId
+    unhandled_exception:
+      status: 502
+      default_message: Failed to fetch competition data
+
+environment:
+  variables:
+    - name: HOST
+      required: false
+      default: 0.0.0.0
+      used_by:
+        - client-api/server.py
+    - name: PORT
+      required: false
+      default: "8000"
+      used_by:
+        - client-api/server.py
+    - name: LOG_LEVEL
+      required: false
+      default: info
+      used_by:
+        - client-api/server.py
+    - name: SSVB_API_KEY
+      required: true
+      used_by:
+        - client-api/sams_api_client.py
+      purpose: authenticate requests against https://www.ssvb.org/api/v2
+    - name: WARM_CACHE_ENABLED
+      required: false
+      default: disabled
+      accepted_truthy_values:
+        - "1"
+        - "true"
+        - "yes"
+        - "on"
+      used_by:
+        - client-api/sams_api_client.py
+      purpose: start background warm-cache thread during module import
+    - name: LIVE_API_URL
+      required: true_for_live_route
+      used_by:
+        - client-api/live_endpoint.py
+      expected_path_pattern: /live/<ticker_type>/tickers/<ticker_id>
+
+upstream_integrations:
+  ssvb_rest_api:
+    base_url: https://www.ssvb.org/api/v2
+    auth:
+      header: X-Api-Key
+      source_env: SSVB_API_KEY
+    request_characteristics:
+      pagination:
+        size: 9999
+        page_param: true
+      pacing:
+        min_delay_seconds_between_requests: 0.3
+      timeout_seconds: 30
+  live_api:
+    transport:
+      snapshot: HTTP GET
+      updates: WebSocket
+    source_env: LIVE_API_URL
+    websocket_url_derivation: replace /live/<ticker_type>/tickers/<ticker_id> with wss://<host>/<ticker_type>/<ticker_id>
+    http_timeout_seconds: 30
+    websocket_timeout_seconds: 55
+    reconnect_delay_seconds: 3
+
+caching:
+  primary_module: client-api/sams_api_client.py
+  cache_storage:
+    type:
+      - in-memory dictionary
+      - on-disk JSON files
+    directory: client-api/cache
+    filename_pattern: endpoint_cache_<sha256(endpoint)>.json
+  initialization:
+    trigger: module import
+    function: load_cache()
+    side_effects:
+      - creates cache directory if missing
+      - loads endpoint cache files into memory
+      - may start warm-cache background thread when WARM_CACHE_ENABLED is truthy
+  freshness_defaults:
+    default_endpoint_ttl_seconds: 86400
+    custom_ttls:
+      associations: 1814400
+      seasons: 2419200
+      competition_match_groups: 300
+      competition_rankings: 60
+      match_group_competition_matches: 60
+      competition_teams: 604800
+  concurrency:
+    global_cache_lock: RLock
+    per_endpoint_fetch_lock: true
+    goal: prevent duplicate concurrent fetches for the same endpoint
+
+live_state_model:
+  module: client-api/live_endpoint.py
+  state:
+    payload: process-global dict or null
+    error: process-global string or null
+    websocket_thread: process-global daemon thread or null
+  startup_sequence:
+    - validate LIVE_API_URL
+    - ensure websocket worker thread exists
+    - if no payload available, fetch HTTP snapshot synchronously
+  websocket_merge_rules:
+    - FETCH_DATA_RESPONSE_ERROR sets error state
+    - MATCH_UPDATE merges payload into matchStates[matchUuid]
+    - MATCH_STATS_UPDATE merges payload into matchStats[matchUuid]
+  fallback_behavior:
+    - if worker has not produced payload yet, /api/live fetches snapshot directly
+
+payload_shapes:
+  competition_endpoint_top_level_keys:
+    - competition
+    - association
+    - season
+    - match-groups
+    - teams
+    - rankings
+  competition_summary_fields:
+    - uuid
+    - name
+    - gender
+    - association_uuid
+    - season_uuid
+    - match_groups_uuid
+    - teams_uuid
+    - rankings_uuid
+  competition_list_item_fields:
+    - uuid
+    - name
+    - gender
+    - shortname
+    - association_url
+    - season_url
+    - association
+    - season
+
+operational_notes:
+  strengths:
+    - small codebase with clear module split
+    - cache files allow warm startup behavior without immediate upstream refetch
+    - endpoint-level locking reduces duplicate fetches
+    - live route can recover from websocket disconnects by reconnect loop
+  constraints:
+    - import-time side effects exist in sams_api_client.py
+    - cache directory is large and should be treated as normal runtime state, not noise
+    - test.py is a manual utility script, not an automated test suite
+    - project uses plain module imports rather than a packaged Python module structure
+  verified_in_current_context:
+    - python3 -m py_compile client-api/*.py succeeded on 2026-04-03
+  local_environment_note:
+    - shell environment had python3 available, but not python on PATH during verification
+
+codex_warmup_guidance:
+  read_order:
+    - conecept.yml
+    - client-api/server.py
+    - client-api/sams_api_client.py
+    - client-api/fetch_competition.py
+    - client-api/live_endpoint.py
+  focus_assumption:
+    - unless stated otherwise, ongoing work should prioritize the client-api subproject
+  update_instruction:
+    - whenever client-api changes materially, update this document in the same workstream
