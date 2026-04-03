@@ -8,12 +8,14 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
+from urllib.parse import parse_qsl, urlparse
 from uuid import UUID
 
 
 LOGGER = logging.getLogger("competition-api.cache")
 COLLECTION_CACHE_KEY = "_collection"
 CACHE_DIR = Path(__file__).with_name("cache")
+JsonPayload = dict | list
 
 
 @dataclass(frozen=True)
@@ -24,14 +26,14 @@ class CacheKey:
 
 @dataclass
 class CacheEntry:
-    payload: dict
+    payload: JsonPayload
     fetched_at: float
 
 
 @dataclass
 class CacheRequest:
     key: CacheKey
-    fetcher: Callable[[], dict]
+    fetcher: Callable[[], JsonPayload]
     event: threading.Event = field(default_factory=threading.Event)
     error: Exception | None = None
 
@@ -59,18 +61,31 @@ def _sanitize_segment(segment: str) -> str:
 
 
 def build_cache_key(endpoint: str) -> CacheKey:
-    normalized = endpoint.strip("/")
+    parsed_endpoint = urlparse(endpoint.strip())
+    normalized = parsed_endpoint.path.strip("/")
     if not normalized:
         raise RuntimeError("Endpoint must not be empty")
 
     segments = [segment for segment in normalized.split("/") if segment]
+    query_items = parse_qsl(parsed_endpoint.query, keep_blank_values=True)
+    query_key = None
+    if query_items:
+        query_key = "__".join(
+            f"{_sanitize_segment(key)}={_sanitize_segment(value)}"
+            for key, value in sorted(query_items)
+        )
+
     if len(segments) == 1:
-        return CacheKey(endpoint=_sanitize_segment(segments[0]), uuid=COLLECTION_CACHE_KEY)
+        return CacheKey(
+            endpoint=_sanitize_segment(segments[0]),
+            uuid=COLLECTION_CACHE_KEY if query_key is None else query_key,
+        )
 
     if len(segments) >= 2 and _is_uuid(segments[1]):
         endpoint_segments = [segments[0], *segments[2:]]
         endpoint_name = "__".join(_sanitize_segment(segment) for segment in endpoint_segments)
-        return CacheKey(endpoint=endpoint_name, uuid=segments[1])
+        uuid_key = segments[1] if query_key is None else f"{segments[1]}__{query_key}"
+        return CacheKey(endpoint=endpoint_name, uuid=uuid_key)
 
     raise RuntimeError(f"Endpoint does not match the supported cache key pattern: {endpoint!r}")
 
@@ -94,8 +109,8 @@ def _load_persisted_cache() -> None:
                 LOGGER.warning("Skipping invalid cache file: %s", cache_file)
                 continue
 
-            if not isinstance(payload, dict):
-                LOGGER.warning("Skipping non-dict cache file: %s", cache_file)
+            if not isinstance(payload, (dict, list)):
+                LOGGER.warning("Skipping non-JSON cache file: %s", cache_file)
                 continue
 
             cache_key = cache_file.stem
@@ -108,13 +123,13 @@ def _load_persisted_cache() -> None:
     LOGGER.info("Loaded cache index with %s endpoint groups", len(CACHE))
 
 
-def _persist_entry(key: CacheKey, payload: dict) -> None:
+def _persist_entry(key: CacheKey, payload: JsonPayload) -> None:
     cache_file = _cache_file_path(key)
     cache_file.parent.mkdir(parents=True, exist_ok=True)
     cache_file.write_text(json.dumps(payload), encoding="utf-8")
 
 
-def _store_entry(key: CacheKey, payload: dict) -> dict:
+def _store_entry(key: CacheKey, payload: JsonPayload) -> JsonPayload:
     now = time.time()
     _persist_entry(key, payload)
 
@@ -156,9 +171,9 @@ def _cache_worker() -> None:
                 request.key.uuid,
             )
             payload = request.fetcher()
-            if not isinstance(payload, dict):
+            if not isinstance(payload, (dict, list)):
                 raise RuntimeError(
-                    f"Expected a dict payload for endpoint={request.key.endpoint} uuid={request.key.uuid}"
+                    f"Expected a JSON object or list payload for endpoint={request.key.endpoint} uuid={request.key.uuid}"
                 )
             _store_entry(request.key, payload)
         except Exception as exc:
@@ -193,9 +208,9 @@ def _ensure_worker_thread() -> None:
 
 def get_cached_json(
     endpoint: str,
-    fetcher: Callable[[], dict],
+    fetcher: Callable[[], JsonPayload],
     cache_duration_seconds: float,
-) -> tuple[dict, bool]:
+) -> tuple[JsonPayload, bool]:
     key = build_cache_key(endpoint)
     cached_entry = _get_cached_entry(key, cache_duration_seconds)
     if cached_entry is not None:

@@ -83,7 +83,7 @@ def wait_for_request_slot(min_delay_seconds: float = PAGE_DELAY_SECONDS) -> None
         time.sleep(remaining_delay)
 
 
-def fetch_page(url: str, api_key: str, page: int, size: int = PAGE_SIZE) -> dict:
+def fetch_page(url: str, api_key: str, page: int, size: int = PAGE_SIZE) -> dict | list:
     try:
         wait_for_request_slot()
         headers = {
@@ -100,8 +100,8 @@ def fetch_page(url: str, api_key: str, page: int, size: int = PAGE_SIZE) -> dict
         )
         response.raise_for_status()
         payload = response.json()
-        if not isinstance(payload, dict):
-            raise RuntimeError(f"Expected a dict payload for page {page}, got {type(payload).__name__}")
+        if not isinstance(payload, (dict, list)):
+            raise RuntimeError(f"Expected a JSON payload for page {page}, got {type(payload).__name__}")
 
         LOGGER.info("Fetched upstream page url=%s page=%s status=%s", url, page, response.status_code)
         return payload
@@ -111,13 +111,15 @@ def fetch_page(url: str, api_key: str, page: int, size: int = PAGE_SIZE) -> dict
         raise RuntimeError(f"Failed to decode JSON from {url!r} on page {page}: {exc}") from exc
 
 
-def _fetch_endpoint_from_upstream(endpoint: str) -> dict:
+def _fetch_endpoint_from_upstream(endpoint: str) -> dict | list:
     api_key = os.getenv("SSVB_API_KEY")
     if not api_key:
         raise RuntimeError("Missing environment variable: SSVB_API_KEY")
 
     url = build_url(endpoint)
     first_page = fetch_page(url, api_key, page=0)
+    if isinstance(first_page, list):
+        return first_page
 
     if "content" not in first_page:
         return first_page
@@ -147,7 +149,7 @@ def _fetch_endpoint_from_upstream(endpoint: str) -> dict:
 def fetch_endpoint_with_cache_status(
     endpoint: str,
     cache_duration_seconds: float = DEFAULT_CACHE_DURATION_SECONDS,
-) -> tuple[dict, bool]:
+) -> tuple[dict | list, bool]:
     normalized_endpoint = endpoint.strip("/")
     return get_cached_json(
         endpoint=normalized_endpoint,
@@ -159,7 +161,7 @@ def fetch_endpoint_with_cache_status(
 def fetch_endpoint(
     endpoint: str,
     cache_duration_seconds: float = DEFAULT_CACHE_DURATION_SECONDS,
-) -> dict:
+) -> dict | list:
     payload, _ = fetch_endpoint_with_cache_status(
         endpoint,
         cache_duration_seconds=cache_duration_seconds,
@@ -187,7 +189,7 @@ def _start_warm_cache_thread() -> None:
         daemon=True,
     )
     WARM_CACHE_THREAD.start()
-    LOGGER.info("Started warm-cache background thread")
+    LOGGER.info("Started season cache analysis background thread")
 
 
 _start_warm_cache_thread()
