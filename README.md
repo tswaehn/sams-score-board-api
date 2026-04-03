@@ -52,6 +52,36 @@ curl http://127.0.0.1:8000/api/healthz
 curl http://127.0.0.1:8000/docs
 ```
 
+Load test with `k6`:
+
+```bash
+k6 run load-tests/simple.js
+./load-tests/run-simple.sh
+```
+
+Useful environment variables:
+
+* `BASE_URL` defaults to `http://127.0.0.1:8000`
+* `COMPETITION_ID` optionally adds `GET /api/competition/<uuid>` to each iteration
+* `SLEEP_SECONDS` defaults to `1`
+
+Each test iteration requests:
+
+* `GET /api/healthz`
+* `GET /api/live`
+* `GET /api/competition-list`
+* optionally `GET /api/competition/<uuid>` when `COMPETITION_ID` is set
+
+Examples:
+
+```bash
+k6 run load-tests/simple.js
+./load-tests/run-simple.sh
+BASE_URL=http://127.0.0.1:8000 COMPETITION_ID=<uuid> k6 run load-tests/simple.js
+BASE_URL=http://127.0.0.1:8000 COMPETITION_ID=<uuid> SLEEP_SECONDS=0.2 k6 run load-tests/simple.js
+./load-tests/run-simple.sh --vus 20 --duration 30s
+```
+
 # web
 
 The `web` directory contains the Vite frontend.
