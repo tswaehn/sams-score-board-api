@@ -6,7 +6,7 @@ from periodic_updater import PeriodicUpdater
 from sams_api_client import extract_uuid_from_url, fetch_endpoint_direct
 
 
-STORE_TTL_SECONDS = 24 * 60 * 60
+STORE_TTL_SECONDS = 60
 
 
 class CompetitionMatches(PeriodicUpdater):

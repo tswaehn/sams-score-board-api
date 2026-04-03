@@ -6,7 +6,7 @@ from periodic_updater import PeriodicUpdater
 from sams_api_client import fetch_endpoint_direct
 
 
-STORE_TTL_SECONDS = 24 * 60 * 60
+STORE_TTL_SECONDS = 60
 
 
 class CompetitionRanking(PeriodicUpdater):
@@ -32,7 +32,7 @@ class CompetitionRanking(PeriodicUpdater):
 
         normalized_rankings = self._normalize_rankings(rankings)
         self.dump_raw_json(
-            f"competition-ranking-store-raw-competition-{uuid}.json",
+            "competition-ranking-store-raw.json",
             uuid,
             rankings_payload,
         )
