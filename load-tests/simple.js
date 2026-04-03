@@ -41,17 +41,17 @@ export default function () {
     "healthz returns 200": (response) => response.status === 200,
   });
 
-  const liveResponse = get("/live");
-  check(liveResponse, {
-    "live returns 200": (response) => response.status === 200,
-  });
-
   const listResponse = get("/competition-list");
   check(listResponse, {
     "competition-list returns 200": (response) => response.status === 200,
   });
 
   if (competitionId) {
+    const liveResponse = get(`/live/${competitionId}`);
+    check(liveResponse, {
+      "live returns 200": (response) => response.status === 200,
+    });
+
     const competitionResponse = get(`/competition/${competitionId}`);
     check(competitionResponse, {
       "competition returns 200": (response) => response.status === 200,

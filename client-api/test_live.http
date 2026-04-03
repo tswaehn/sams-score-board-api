@@ -2,5 +2,5 @@
 @competitionUuid = 0003162d-e89a-4dc1-9a41-90c1e4eadc55
 
 ### Competition
-GET {{baseUrl}}/api/live/
+GET {{baseUrl}}/api/live/{{competitionUuid}}
 Accept: application/json

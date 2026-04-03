@@ -143,10 +143,10 @@ async def competition_list(request: Request) -> dict:
     }
 
 
-@app.get("/api/live")
-async def live(request: Request) -> dict:
+@app.get("/api/live/{competition_id}")
+async def live_by_competition(competition_id: UUID, request: Request) -> dict:
     try:
-        payload = get_live_payload()
+        payload = get_live_payload(str(competition_id))
     except RequestException as exc:
         raise HTTPException(status_code=502, detail="Failed to fetch live data") from exc
     except RuntimeError as exc:

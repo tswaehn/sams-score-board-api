@@ -29,7 +29,7 @@ Optional environment variables:
 * `HOST` defaults to `0.0.0.0`
 * `PORT` defaults to `8000`
 * `LOG_LEVEL` defaults to `info`
-* `LIVE_API_URL` sets the upstream JSON endpoint for `GET /api/live`
+* `LIVE_API_URL` sets the upstream JSON endpoint for the live endpoint
 * `WARM_CACHE_ENABLED` enables background cache warm-up when set to `1`, `true`, `yes`, or `on`; disabled by default
 
 Endpoints:
@@ -38,7 +38,7 @@ Endpoints:
 * `GET /api/healthz` returns `{ "status": "ok", "requestId": ... }`
 * `GET /api/competition/<uuid>` returns the competition payload as JSON
 * `GET /api/competition-list` returns `{ "data": [...], "requestId": ... }`
-* `GET /api/live` fetches `LIVE_API_URL` once, then keeps the payload updated through the ticker websocket and returns the raw live JSON payload
+* `GET /api/live/<uuid>` returns the same payload shape, filtered server-side to one competition
 * `GET /docs` serves the Swagger UI
 * `GET /redoc` serves the ReDoc UI
 
@@ -47,7 +47,7 @@ Example:
 ```bash
 curl http://127.0.0.1:8000/api/competition/<uuid>
 curl http://127.0.0.1:8000/api/competition-list
-curl http://127.0.0.1:8000/api/live
+curl "http://127.0.0.1:8000/api/live/<uuid>"
 curl http://127.0.0.1:8000/api/healthz
 curl http://127.0.0.1:8000/docs
 ```
@@ -62,15 +62,14 @@ k6 run load-tests/simple.js
 Useful environment variables:
 
 * `BASE_URL` defaults to `http://127.0.0.1:8000`
-* `COMPETITION_ID` optionally adds `GET /api/competition/<uuid>` to each iteration
+* `COMPETITION_ID` enables `GET /api/competition/<uuid>` and `GET /api/live/<uuid>` in each iteration
 * `SLEEP_SECONDS` defaults to `1`
 
 Each test iteration requests:
 
 * `GET /api/healthz`
-* `GET /api/live`
 * `GET /api/competition-list`
-* optionally `GET /api/competition/<uuid>` when `COMPETITION_ID` is set
+* optionally `GET /api/competition/<uuid>` and `GET /api/live/<uuid>` when `COMPETITION_ID` is set
 
 Examples:
 

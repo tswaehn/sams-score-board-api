@@ -5,6 +5,7 @@ import logging
 import os
 import threading
 import time
+from copy import deepcopy
 from urllib.parse import urlparse
 
 import requests
@@ -18,6 +19,7 @@ LIVE_API_URL = os.getenv("LIVE_API_URL")
 LIVE_API_TIMEOUT_SECONDS = 30
 LIVE_API_WS_TIMEOUT_SECONDS = 55
 LIVE_API_WS_RECONNECT_SECONDS = 3
+LIVE_API_FILTER_CACHE_TTL_SECONDS = 2
 LIVE_API_HEADERS = {
     "Accept": "application/json, text/plain, */*",
     "Accept-Language": "en-US,en;q=0.9",
@@ -37,6 +39,7 @@ LIVE_API_STATE_LOCK = threading.RLock()
 LIVE_API_STATE_PAYLOAD: dict | None = None
 LIVE_API_STATE_ERROR: str | None = None
 LIVE_API_WS_THREAD: threading.Thread | None = None
+LIVE_API_FILTER_CACHE: dict[str, tuple[float, dict]] = {}
 
 
 def parse_live_api_config() -> tuple[str, str]:
@@ -86,12 +89,90 @@ def fetch_live_snapshot() -> dict:
     return payload
 
 
+def filter_live_payload(payload: dict, competition_uuid: str | None = None) -> dict:
+    if competition_uuid is None:
+        return payload
+
+    now = time.monotonic()
+    with LIVE_API_STATE_LOCK:
+        cached_entry = LIVE_API_FILTER_CACHE.get(competition_uuid)
+        if cached_entry is not None:
+            expires_at, cached_payload = cached_entry
+            if expires_at > now:
+                return cached_payload
+
+    match_days = payload.get("matchDays")
+    if not isinstance(match_days, list):
+        raise RuntimeError("Live payload is missing a valid matchDays list")
+
+    filtered_match_days = []
+    included_match_ids: set[str] = set()
+
+    for match_day in match_days:
+        if not isinstance(match_day, dict):
+            continue
+
+        matches = match_day.get("matches")
+        if not isinstance(matches, list):
+            continue
+
+        filtered_matches = []
+        for match in matches:
+            if not isinstance(match, dict):
+                continue
+            if match.get("matchSeries") != competition_uuid:
+                continue
+
+            filtered_match = deepcopy(match)
+            filtered_matches.append(filtered_match)
+
+            match_id = filtered_match.get("id")
+            if isinstance(match_id, str):
+                included_match_ids.add(match_id)
+
+        if not filtered_matches:
+            continue
+
+        filtered_match_day = deepcopy(match_day)
+        filtered_match_day["matches"] = filtered_matches
+        filtered_match_days.append(filtered_match_day)
+
+    filtered_payload = dict(payload)
+    filtered_payload["matchDays"] = filtered_match_days
+
+    match_series = payload.get("matchSeries")
+    if isinstance(match_series, dict):
+        filtered_payload["matchSeries"] = (
+            {competition_uuid: deepcopy(match_series[competition_uuid])}
+            if competition_uuid in match_series
+            else {}
+        )
+
+    for key in ("matchStates", "matchStats"):
+        value = payload.get(key)
+        if isinstance(value, dict):
+            filtered_payload[key] = {
+                match_id: deepcopy(match_value)
+                for match_id, match_value in value.items()
+                if match_id in included_match_ids
+            }
+
+    with LIVE_API_STATE_LOCK:
+        LIVE_API_FILTER_CACHE[competition_uuid] = (
+            now + LIVE_API_FILTER_CACHE_TTL_SECONDS,
+            filtered_payload,
+        )
+
+    return filtered_payload
+
+
 def store_live_payload(payload: dict) -> None:
-    global LIVE_API_STATE_PAYLOAD, LIVE_API_STATE_ERROR
+    global LIVE_API_STATE_PAYLOAD, LIVE_API_STATE_ERROR, LIVE_API_FILTER_CACHE
 
     with LIVE_API_STATE_LOCK:
         LIVE_API_STATE_PAYLOAD = payload
         LIVE_API_STATE_ERROR = None
+        LIVE_API_FILTER_CACHE = {}
 
 
 def merge_live_message(message: dict) -> None:
@@ -197,7 +278,7 @@ def startup_live_endpoint() -> None:
     ensure_live_ws_worker()
 
 
-def get_live_payload() -> dict:
+def get_live_payload(competition_uuid: str | None = None) -> dict:
     parse_live_api_config()
     ensure_live_ws_worker()
 
@@ -208,4 +289,4 @@ def get_live_payload() -> dict:
         payload = fetch_live_snapshot()
         store_live_payload(payload)
 
-    return payload
+    return filter_live_payload(payload, competition_uuid)

@@ -71,7 +71,7 @@ files:
     - path: client-api/fetch_competition_list.py
       role: CompetitionListStore class maintains the aggregated competition list and lock, updates it per season using direct upstream fetches, exposes get() for copied reads, derives currentSeason mutability from the loaded season, and runs a background updater thread
     - path: client-api/live_endpoint.py
-      role: live snapshot fetch plus websocket update loop for /api/live
+      role: live snapshot fetch plus websocket update loop for /api/live/{competition_id}
     - path: client-api/warm_cache.py
       role: fetches unique season records via competition season links and reports season date ranges for cache TTL analysis
     - path: client-api/test.py
@@ -117,7 +117,7 @@ api_surface:
         data: list
         requestId: string
     - method: GET
-      path: /api/live
+      path: /api/live/{competition_id}
       purpose: return current live payload from snapshot plus websocket updates
 
 http_behavior:
@@ -311,7 +311,10 @@ live_state_model:
     - MATCH_UPDATE merges payload into matchStates[matchUuid]
     - MATCH_STATS_UPDATE merges payload into matchStats[matchUuid]
   fallback_behavior:
-    - if worker has not produced payload yet, /api/live fetches snapshot directly
+    - if worker has not produced payload yet, /api/live/{competition_id} fetches a snapshot directly before filtering
+  live_endpoint_behavior:
+    - GET /api/live/{competition_id} filters matchDays, matchStates, matchStats, and matchSeries server-side to the requested competition while preserving the live payload shape
+    - competition-scoped filtered live payloads are cached in-process per competition_uuid for 5 seconds
 
 payload_shapes:
   competition_endpoint_top_level_keys:

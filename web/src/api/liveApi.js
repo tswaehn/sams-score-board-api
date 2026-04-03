@@ -36,9 +36,13 @@ async function fetchWithTimeout(url) {
   }
 }
 
-export async function fetchLiveJson(path = "") {
+export async function fetchLiveJson({ competitionUuid, path = "" } = {}) {
   const liveApiUrl = `${getApiBaseUrl()}/live`;
-  const url = path ? `${liveApiUrl}${path}` : liveApiUrl;
+  const scopedLiveApiUrl = competitionUuid
+    ? `${liveApiUrl}/${competitionUuid}`
+    : liveApiUrl;
+  const url = new URL(path ? `${scopedLiveApiUrl}${path}` : scopedLiveApiUrl, window.location.origin);
+
   const response = await fetchWithTimeout(url);
 
   if (!response.ok) {
@@ -53,38 +57,14 @@ export async function fetchUpcomingMatchUuids(competitionUuid) {
     throw new Error("Missing competition uuid");
   }
 
-  const payload = await fetchLiveJson();
+  const payload = await fetchLiveJson({ competitionUuid });
   const now = Date.now();
 
   return payload.matchDays
     .flatMap((matchDay) => matchDay.matches ?? [])
-    .filter(
-      (match) => match.matchSeries === competitionUuid && Number(match.date) >= now
-    )
+    .filter((match) => Number(match.date) >= now)
     .sort((left, right) => left.date - right.date)
     .map((match) => match.id);
-}
-
-export async function fetchMatchByUuid(matchUuid) {
-  if (!matchUuid) {
-    throw new Error("Missing match uuid");
-  }
-
-  const payload = await fetchLiveJson();
-  const match = payload.matchDays
-    .flatMap((matchDay) => matchDay.matches ?? [])
-    .find((entry) => entry.id === matchUuid);
-
-  if (!match) {
-    throw new Error(`Match not found: ${matchUuid}`);
-  }
-
-  return {
-    ...match,
-    matchState: payload.matchStates?.[matchUuid] ?? null,
-    matchStats: payload.matchStats?.[matchUuid] ?? null,
-    matchSeriesData: payload.matchSeries?.[match.matchSeries] ?? null
-  };
 }
 
 export async function fetchMatchesByCompetitionUuid(competitionUuid) {
@@ -92,11 +72,10 @@ export async function fetchMatchesByCompetitionUuid(competitionUuid) {
     throw new Error("Missing competition uuid");
   }
 
-  const payload = await fetchLiveJson();
+  const payload = await fetchLiveJson({ competitionUuid });
 
   return payload.matchDays
     .flatMap((matchDay) => matchDay.matches ?? [])
-    .filter((match) => match.matchSeries === competitionUuid)
     .sort((left, right) => left.date - right.date)
     .map((match) => ({
       ...match,
