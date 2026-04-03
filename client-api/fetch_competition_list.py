@@ -53,39 +53,22 @@ class CompetitionListStore(PeriodicUpdater):
         self._update_store(uuid)
 
     def update_all(self) -> None:
-        seasons = SEASON.get_all()
+        competitions_payload = fetch_endpoint_direct("/competitions")
+        if not isinstance(competitions_payload, dict):
+            raise RuntimeError("Expected competition list payload to be a dict")
 
-        for season in seasons:
-            if not isinstance(season, dict):
+        competitions = competitions_payload.get("content", [])
+        if not isinstance(competitions, list):
+            raise RuntimeError("Expected competition list content to be a list")
+
+        for competition in competitions:
+            if not isinstance(competition, dict):
                 continue
 
-            season_uuid = season.get("uuid")
-            if not isinstance(season_uuid, str):
+            competition_uuid = competition.get("uuid")
+            if not isinstance(competition_uuid, str):
                 continue
-
-            # if not season.get("currentSeason"):
-            #    continue
-
-            competitions_payload = fetch_endpoint_direct(f"/competitions?season={season_uuid}")
-            if not isinstance(competitions_payload, dict):
-                raise RuntimeError(
-                    f"Expected competition list payload to be a dict for season {season_uuid!r}"
-                )
-
-            competitions = competitions_payload.get("content", [])
-            if not isinstance(competitions, list):
-                raise RuntimeError(
-                    f"Expected competition list content to be a list for season {season_uuid!r}"
-                )
-
-            for competition in competitions:
-                if not isinstance(competition, dict):
-                    continue
-
-                competition_uuid = competition.get("uuid")
-                if not isinstance(competition_uuid, str):
-                    continue
-                self._update_store(competition_uuid, competition)
+            self._update_store(competition_uuid, competition)
 
     def seconds_until_next_update_all(self) -> float:
         now = datetime.now()
