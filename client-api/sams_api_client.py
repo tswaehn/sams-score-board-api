@@ -85,9 +85,17 @@ def wait_for_request_slot(min_delay_seconds: float = PAGE_DELAY_SECONDS) -> None
         time.sleep(remaining_delay)
 
 
-def fetch_page(url: str, api_key: str, page: int, size: int = PAGE_SIZE) -> dict | list:
+def fetch_page(
+    url: str,
+    api_key: str,
+    page: int,
+    size: int = PAGE_SIZE,
+    *,
+    total_pages: int | None = None,
+) -> dict | list:
     try:
         wait_for_request_slot()
+        started_at = time.monotonic()
         headers = {
             **DEFAULT_HEADERS,
             "X-Api-Key": api_key,
@@ -102,10 +110,35 @@ def fetch_page(url: str, api_key: str, page: int, size: int = PAGE_SIZE) -> dict
         )
         response.raise_for_status()
         payload = response.json()
+        duration_ms = (time.monotonic() - started_at) * 1000.0
         if not isinstance(payload, (dict, list)):
             raise RuntimeError(f"Expected a JSON payload for page {page}, got {type(payload).__name__}")
 
-        LOGGER.info("Fetched upstream page url=%s page=%s status=%s", url, page, response.status_code)
+        progress_percent = None
+        if isinstance(payload, dict):
+            content = payload.get("content")
+            if isinstance(content, list):
+                if total_pages is None:
+                    payload_total_pages = payload.get("totalPages")
+                    if isinstance(payload_total_pages, int):
+                        total_pages = max(payload_total_pages, 1)
+
+        if total_pages is not None:
+            if total_pages <= 0:
+                progress_percent = 100.0
+            else:
+                progress_percent = min(page + 1, total_pages) / total_pages * 100.0
+
+        progress_label = f"{progress_percent:.1f}%" if progress_percent is not None else "n/a"
+        LOGGER.info(
+            "Fetched upstream page url=%s page=%s status=%s totalPages=%s progress=%s durationMs=%.1f",
+            url,
+            page,
+            response.status_code,
+            total_pages,
+            progress_label,
+            duration_ms,
+        )
         return payload
     except RequestException as exc:
         raise RuntimeError(f"Request to {url!r} failed on page {page}: {exc}") from exc
@@ -128,11 +161,19 @@ def _fetch_endpoint_from_upstream(endpoint: str) -> dict | list:
 
     all_items = list(first_page.get("content", []))
     total_elements = first_page.get("totalElements", len(all_items))
+    total_pages = first_page.get("totalPages")
+    if not isinstance(total_pages, int):
+        total_pages = None
     pages_fetched = 1
     page = 1
 
     while len(all_items) < total_elements:
-        page_data = fetch_page(url, api_key, page=page)
+        page_data = fetch_page(
+            url,
+            api_key,
+            page=page,
+            total_pages=total_pages,
+        )
         page_items = page_data.get("content", [])
         if not page_items:
             break

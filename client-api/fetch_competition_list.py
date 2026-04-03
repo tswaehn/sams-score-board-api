@@ -62,8 +62,9 @@ class CompetitionListStore(PeriodicUpdater):
             season_uuid = season.get("uuid")
             if not isinstance(season_uuid, str):
                 continue
-            if not season.get("currentSeason"):
-                continue
+
+            # if not season.get("currentSeason"):
+            #    continue
 
             competitions_payload = fetch_endpoint_direct(f"/competitions?season={season_uuid}")
             if not isinstance(competitions_payload, dict):
@@ -93,11 +94,18 @@ class CompetitionListStore(PeriodicUpdater):
             next_update = next_update + timedelta(days=1)
         return max((next_update - now).total_seconds(), 0.0)
 
+    def should_update_all_on_startup(self) -> bool:
+        with self.lock:
+            if not self.store:
+                return True
+            return self.is_store_expired()
+
     def run_update_all_loop(self) -> None:
-        try:
-            self.update_all()
-        except Exception:
-            self.logger.exception("Competition list startup update_all failed")
+        if self.should_update_all_on_startup():
+            try:
+                self.update_all()
+            except Exception:
+                self.logger.exception("Competition list startup update_all failed")
 
         while True:
             sleep_seconds = self.seconds_until_next_update_all()
