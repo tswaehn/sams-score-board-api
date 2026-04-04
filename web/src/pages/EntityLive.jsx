@@ -10,8 +10,8 @@ import {
   Stack,
   Typography
 } from "@mui/material";
-import { useParams } from "react-router-dom";
-import { fetchMatchesByCompetitionUuid } from "../api/api.js";
+import { useLocation, useParams } from "react-router-dom";
+import { fetchJson, fetchMatchesByCompetitionUuid } from "../api/api.js";
 import { layout } from "../components/layout.js";
 
 function formatMatchDate(timestamp) {
@@ -19,6 +19,20 @@ function formatMatchDate(timestamp) {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(new Date(timestamp));
+}
+
+function formatLeagueMatchDate(date, time) {
+  const raw = `${date ?? ""}${time ? `T${time}` : ""}`;
+  const parsed = new Date(raw);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return [date, time].filter(Boolean).join(" · ") || "Unknown time";
+  }
+
+  return new Intl.DateTimeFormat("de-DE", {
+    dateStyle: "medium",
+    timeStyle: time ? "short" : undefined
+  }).format(parsed);
 }
 
 function getSetPointStyles(leftPoints, rightPoints, side) {
@@ -96,7 +110,7 @@ function getWinnerSide(matchState) {
   return leftPoints > rightPoints ? "team1" : "team2";
 }
 
-function getStatusChip(matchState) {
+function getCompetitionStatusChip(matchState) {
   if (!matchState?.started) {
     return {
       label: "SCHEDULED",
@@ -126,12 +140,46 @@ function getStatusChip(matchState) {
   };
 }
 
-function MatchRow({ match }) {
+function getLeagueStatusChip(match) {
+  const hasWinner = Boolean(match.results?.winner);
+  const now = Date.now();
+  const matchTimestamp = new Date(`${match.date ?? ""}${match.time ? `T${match.time}` : ""}`).getTime();
+
+  if (hasWinner) {
+    return {
+      label: "FINISHED",
+      sx: {
+        bgcolor: "#e5e7eb",
+        color: "#4b5563"
+      }
+    };
+  }
+
+  if (!Number.isNaN(matchTimestamp) && matchTimestamp > now) {
+    return {
+      label: "UPCOMING",
+      sx: {
+        bgcolor: "#fef3c7",
+        color: "#c2410c"
+      }
+    };
+  }
+
+  return {
+    label: "SCHEDULED",
+    sx: {
+      bgcolor: "#e5e7eb",
+      color: "#4b5563"
+    }
+  };
+}
+
+function CompetitionMatchRow({ match }) {
   const team1SetPoints = getTeamSetPoints(match.matchState, "left");
   const team2SetPoints = getTeamSetPoints(match.matchState, "right");
   const totalSetPoints = getTotalSetPoints(match.matchState);
   const winnerSide = getWinnerSide(match.matchState);
-  const statusChip = getStatusChip(match.matchState);
+  const statusChip = getCompetitionStatusChip(match.matchState);
   const isInProgress = match.matchState?.started && !match.matchState?.finished;
   const servingTeam = isInProgress ? match.matchState?.serving : null;
 
@@ -155,21 +203,19 @@ function MatchRow({ match }) {
           <Typography sx={{ fontWeight: 600, color: "rgba(26, 21, 18, 0.45)" }}>
             {formatMatchDate(match.date)}
           </Typography>
-          {statusChip && (
-            <Chip
-              label={statusChip.label}
-              size="small"
-              sx={{
-                height: 20,
-                fontSize: "0.6875rem",
-                fontWeight: 700,
-                "& .MuiChip-label": {
-                  px: 0.75
-                },
-                ...statusChip.sx
-              }}
-            />
-          )}
+          <Chip
+            label={statusChip.label}
+            size="small"
+            sx={{
+              height: 20,
+              fontSize: "0.6875rem",
+              fontWeight: 700,
+              "& .MuiChip-label": {
+                px: 0.75
+              },
+              ...statusChip.sx
+            }}
+          />
         </Stack>
         <Typography sx={{ color: "rgba(26, 21, 18, 0.45)" }}>
           {match.matchSeriesData?.name ?? "Unknown competition"}
@@ -325,7 +371,85 @@ function MatchRow({ match }) {
   );
 }
 
-function MatchSection({ title, matches, emptyText }) {
+function LeagueMatchRow({ match }) {
+  const statusChip = getLeagueStatusChip(match);
+  const [leftPoints = "-", rightPoints = "-"] = (match.results?.setPoints ?? "").split(":");
+
+  return (
+    <Box
+      sx={{
+        p: layout.padding.card,
+        borderRadius: layout.radius.surface,
+        bgcolor: "background.paper",
+        display: "grid",
+        gap: layout.gap.surface
+      }}
+    >
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        justifyContent="space-between"
+        alignItems={{ xs: "flex-start", sm: "center" }}
+        spacing={0.5}
+      >
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+          <Typography sx={{ fontWeight: 600, color: "rgba(26, 21, 18, 0.45)" }}>
+            {formatLeagueMatchDate(match.date, match.time)}
+          </Typography>
+          <Chip
+            label={statusChip.label}
+            size="small"
+            sx={{
+              height: 20,
+              fontSize: "0.6875rem",
+              fontWeight: 700,
+              "& .MuiChip-label": {
+                px: 0.75
+              },
+              ...statusChip.sx
+            }}
+          />
+        </Stack>
+        <Typography sx={{ color: "rgba(26, 21, 18, 0.45)" }}>
+          {match.location?.name ?? "Unknown location"}
+        </Typography>
+      </Stack>
+
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 2fr) 32px",
+          alignItems: "center",
+          columnGap: 1.5
+        }}
+      >
+        <Typography sx={{ fontWeight: match.results?.winner === match.team1_uuid ? 700 : 500 }}>
+          {match.team1_name}
+        </Typography>
+        <Typography variant="body2" sx={{ textAlign: "center", fontWeight: 700 }}>
+          {leftPoints}
+        </Typography>
+      </Box>
+
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 2fr) 32px",
+          alignItems: "center",
+          columnGap: 1.5
+        }}
+      >
+        <Typography sx={{ fontWeight: match.results?.winner === match.team2_uuid ? 700 : 500 }}>
+          {match.team2_name}
+        </Typography>
+        <Typography variant="body2" sx={{ textAlign: "center", fontWeight: 700 }}>
+          {rightPoints}
+        </Typography>
+      </Box>
+    </Box>
+  );
+}
+
+function MatchSection({ title, matches, emptyText, renderMatch }) {
   return (
     <Paper
       elevation={0}
@@ -346,17 +470,34 @@ function MatchSection({ title, matches, emptyText }) {
         <Typography color="text.secondary">{emptyText}</Typography>
       ) : (
         <Stack spacing={layout.gap.cardList}>
-          {matches.map((match) => (
-            <MatchRow key={match.id} match={match} />
-          ))}
+          {matches.map((match) => renderMatch(match))}
         </Stack>
       )}
     </Paper>
   );
 }
 
-export default function Live() {
-  const { competitionUuid } = useParams();
+function getLeagueMatchesFromPlanPayload(data) {
+  return (data.matchDays ?? [])
+    .flatMap((matchDay) =>
+      Object.values(matchDay.matches ?? {}).map((match) => ({
+        ...match,
+        matchDayName: matchDay.name,
+        matchDayDate: matchDay.matchdate
+      }))
+    )
+    .sort((left, right) => {
+      const leftDateTime = `${left.date ?? ""}T${left.time ?? "00:00"}`;
+      const rightDateTime = `${right.date ?? ""}T${right.time ?? "00:00"}`;
+
+      return leftDateTime.localeCompare(rightDateTime);
+    });
+}
+
+export default function EntityLive({ expectedEntityType }) {
+  const location = useLocation();
+  const { competitionUuid, leagueUuid } = useParams();
+  const [entityType, setEntityType] = useState(expectedEntityType ?? "competition");
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -367,25 +508,41 @@ export default function Live() {
     let isInitialLoad = true;
 
     async function loadMatches() {
-      if (!competitionUuid) {
-        if (isMounted) {
-          setMatches([]);
-          setError("Missing competition uuid");
-          setLoading(false);
-        }
-        return;
-      }
-
       if (isInitialLoad) {
         setLoading(true);
         setError("");
       }
 
       try {
-        const nextMatches = await fetchMatchesByCompetitionUuid(competitionUuid);
+        if (expectedEntityType === "competition") {
+          if (!competitionUuid) {
+            throw new Error("Missing competition uuid");
+          }
+
+          const nextMatches = await fetchMatchesByCompetitionUuid(competitionUuid);
+
+          if (isMounted) {
+            setEntityType("competition");
+            setMatches(nextMatches);
+            setError("");
+            setLoading(false);
+          }
+          return;
+        }
+
+        if (!leagueUuid) {
+          throw new Error("Missing league uuid");
+        }
+
+        const data = await fetchJson("/api/plan");
+
+        if (data.entityType !== "league") {
+          throw new Error(`Unexpected entity type: ${data.entityType}`);
+        }
 
         if (isMounted) {
-          setMatches(nextMatches);
+          setEntityType("league");
+          setMatches(getLeagueMatchesFromPlanPayload(data));
           setError("");
           setLoading(false);
         }
@@ -400,61 +557,112 @@ export default function Live() {
     }
 
     loadMatches();
-    const intervalId = window.setInterval(loadMatches, 1000);
+    const intervalId = window.setInterval(
+      loadMatches,
+      expectedEntityType === "competition" ? 1000 : 20000
+    );
 
     return () => {
       isMounted = false;
       window.clearInterval(intervalId);
     };
-  }, [competitionUuid]);
+  }, [competitionUuid, expectedEntityType, leagueUuid, location.pathname]);
 
-  const liveMatches = useMemo(
-    () => matches.filter((match) => match.matchState?.started && !match.matchState?.finished),
-    [matches]
-  );
-  const upcomingMatches = useMemo(
-    () => matches.filter((match) => !match.matchState?.started),
-    [matches]
-  );
-  const finishedMatches = useMemo(
-    () => matches.filter((match) => match.matchState?.finished),
-    [matches]
-  );
   const teams = useMemo(() => {
     const teamMap = new Map();
 
     matches.forEach((match) => {
-      if (match.team1 && match.teamDescription1) {
-        teamMap.set(match.team1, {
-          id: match.team1,
-          name: match.teamDescription1
+      if (entityType === "competition") {
+        if (match.team1 && match.teamDescription1) {
+          teamMap.set(match.team1, {
+            id: match.team1,
+            name: match.teamDescription1
+          });
+        }
+
+        if (match.team2 && match.teamDescription2) {
+          teamMap.set(match.team2, {
+            id: match.team2,
+            name: match.teamDescription2
+          });
+        }
+        return;
+      }
+
+      if (match.team1_uuid && match.team1_name) {
+        teamMap.set(match.team1_uuid, {
+          id: match.team1_uuid,
+          name: match.team1_name
         });
       }
 
-      if (match.team2 && match.teamDescription2) {
-        teamMap.set(match.team2, {
-          id: match.team2,
-          name: match.teamDescription2
+      if (match.team2_uuid && match.team2_name) {
+        teamMap.set(match.team2_uuid, {
+          id: match.team2_uuid,
+          name: match.team2_name
         });
       }
     });
 
     return Array.from(teamMap.values()).sort((left, right) => left.name.localeCompare(right.name));
-  }, [matches]);
+  }, [entityType, matches]);
 
   const filterMatchesByTeam = (matchList) => {
     if (selectedTeamId === "all") {
       return matchList;
     }
 
-    return matchList.filter(
-      (match) => match.team1 === selectedTeamId || match.team2 === selectedTeamId
+    return matchList.filter((match) =>
+      entityType === "competition"
+        ? match.team1 === selectedTeamId || match.team2 === selectedTeamId
+        : match.team1_uuid === selectedTeamId || match.team2_uuid === selectedTeamId
     );
   };
+
+  const liveMatches = useMemo(() => {
+    if (entityType === "competition") {
+      return matches.filter((match) => match.matchState?.started && !match.matchState?.finished);
+    }
+
+    return [];
+  }, [entityType, matches]);
+
+  const upcomingMatches = useMemo(() => {
+    if (entityType === "competition") {
+      return matches.filter((match) => !match.matchState?.started);
+    }
+
+    const now = Date.now();
+    return matches.filter((match) => {
+      const timestamp = new Date(`${match.date ?? ""}${match.time ? `T${match.time}` : ""}`).getTime();
+      return !match.results?.winner && !Number.isNaN(timestamp) && timestamp > now;
+    });
+  }, [entityType, matches]);
+
+  const finishedMatches = useMemo(() => {
+    if (entityType === "competition") {
+      return matches.filter((match) => match.matchState?.finished);
+    }
+
+    return matches.filter((match) => Boolean(match.results?.winner));
+  }, [entityType, matches]);
+
+  const scheduledMatches = useMemo(() => {
+    if (entityType !== "league") {
+      return [];
+    }
+
+    const now = Date.now();
+    return matches.filter((match) => {
+      const timestamp = new Date(`${match.date ?? ""}${match.time ? `T${match.time}` : ""}`).getTime();
+      return !match.results?.winner && (Number.isNaN(timestamp) || timestamp <= now);
+    });
+  }, [entityType, matches]);
 
   const filteredLiveMatches = filterMatchesByTeam(liveMatches);
   const filteredUpcomingMatches = filterMatchesByTeam(upcomingMatches);
   const filteredFinishedMatches = filterMatchesByTeam(finishedMatches);
+  const filteredScheduledMatches = filterMatchesByTeam(scheduledMatches);
 
   return (
     <Box sx={{ display: "grid", gap: layout.gap.page }}>
@@ -480,6 +688,12 @@ export default function Live() {
               <Typography variant="h6" sx={{ fontWeight: 700 }}>
                 Wähle dein Team
               </Typography>
+              {entityType === "league" && (
+                <Typography color="text.secondary" textAlign="center">
+                  League live uses the cached league schedule and results. The external live feed is
+                  still competition-based.
+                </Typography>
+              )}
               <FormControl size="small" sx={{ minWidth: 240, width: "100%", maxWidth: 360 }}>
                 <InputLabel id="live-team-filter-label">Team</InputLabel>
                 <Select
@@ -499,23 +713,53 @@ export default function Live() {
               </FormControl>
             </Stack>
           </Paper>
-          <MatchSection
-            title="Live"
-            matches={filteredLiveMatches}
-            emptyText="No matches are currently in progress."
-          />
+
+          {entityType === "competition" && (
+            <MatchSection
+              title="Live"
+              matches={filteredLiveMatches}
+              emptyText="No matches are currently in progress."
+              renderMatch={(match) => <CompetitionMatchRow key={match.id} match={match} />}
+            />
+          )}
+
+          {entityType === "league" && (
+            <MatchSection
+              title="Scheduled"
+              matches={filteredScheduledMatches}
+              emptyText="No scheduled matches found."
+              renderMatch={(match) => <LeagueMatchRow key={match.uuid} match={match} />}
+            />
+          )}
+
           <MatchSection
             title="Upcoming Matches"
             matches={filteredUpcomingMatches}
             emptyText="No upcoming matches found."
+            renderMatch={(match) =>
+              entityType === "competition" ? (
+                <CompetitionMatchRow key={match.id} match={match} />
+              ) : (
+                <LeagueMatchRow key={match.uuid} match={match} />
+              )
+            }
           />
+
           <MatchSection
             title="Finished Matches"
             matches={filteredFinishedMatches}
             emptyText="No finished matches found."
+            renderMatch={(match) =>
+              entityType === "competition" ? (
+                <CompetitionMatchRow key={match.id} match={match} />
+              ) : (
+                <LeagueMatchRow key={match.uuid} match={match} />
+              )
+            }
           />
         </Box>
       )}
     </Box>
   );
 }
+

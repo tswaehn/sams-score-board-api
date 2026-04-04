@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { Avatar, Box, Paper, Stack, Typography } from "@mui/material";
+import { useLocation } from "react-router-dom";
 import { fetchJson, getTeamShortName } from "../api/api.js";
 import { layout } from "../components/layout.js";
 
-export default function Teams() {
+export default function EntityTeams({ expectedEntityType }) {
+  const location = useLocation();
   const [teams, setTeams] = useState([]);
   const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -15,9 +17,16 @@ export default function Teams() {
     fetchJson("/api/teams")
       .then((data) => {
         if (isMounted) {
+          if (expectedEntityType && data.entityType !== expectedEntityType) {
+            setError(`Unexpected entity type: ${data.entityType}`);
+            setLoading(false);
+            return;
+          }
+
           setTeams(data.teams);
           setMeta({
-            competition: data.competition,
+            entityType: data.entityType,
+            entity: data.entity,
             association: data.association,
             season: data.season
           });
@@ -34,11 +43,10 @@ export default function Teams() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [expectedEntityType, location.pathname]);
 
   return (
     <Box sx={{ display: "grid", gap: layout.gap.page }}>
-
       {loading && (
         <Typography color="text.secondary">Loading teams...</Typography>
       )}
@@ -60,11 +68,11 @@ export default function Teams() {
           }}
         >
           <Typography variant="h5" sx={{ fontWeight: 700 }}>
-            Setzliste
+            Teams
           </Typography>
           {meta && (
             <Typography color="text.secondary">
-              {meta.competition.name} · {meta.association.name} · {meta.season.name}
+              {meta.entity?.name} · {meta.association?.name} · {meta.season?.name}
             </Typography>
           )}
 
@@ -104,3 +112,4 @@ export default function Teams() {
     </Box>
   );
 }
+

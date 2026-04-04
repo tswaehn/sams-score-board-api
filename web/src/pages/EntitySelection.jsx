@@ -13,35 +13,37 @@ import {
 } from "@mui/material";
 import { fetchJson } from "../api/api.js";
 import { layout } from "../components/layout.js";
-
-const competitionListFiltersStorageKey = "competition-list-filters";
-const selectedCompetitionUuidStorageKey = "competition-uuid";
+import {
+  getEntityConfig,
+  getEntityFromPath,
+  setSelectedEntity
+} from "../entities/entity.js";
 
 const filterSteps = [
   {
     key: "association",
     label: "Association",
-    getValue: (competition) => competition.association?.shortname ?? ""
+    getValue: (entry) => entry.association?.shortname ?? ""
   },
   {
     key: "season",
     label: "Season",
-    getValue: (competition) => competition.season?.name ?? ""
+    getValue: (entry) => entry.season?.name ?? ""
   },
   {
     key: "name",
-    label: "Competition Name",
-    getValue: (competition) => competition.name ?? ""
+    label: "Name",
+    getValue: (entry) => entry.name ?? ""
   },
   {
     key: "gender",
     label: "Gender",
-    getValue: (competition) => competition.gender ?? ""
+    getValue: (entry) => entry.gender ?? ""
   },
   {
     key: "shortname",
     label: "Short Name",
-    getValue: (competition) => competition.shortname ?? ""
+    getValue: (entry) => entry.shortname ?? ""
   }
 ];
 
@@ -59,11 +61,11 @@ function formatGender(value) {
   return `${value.slice(0, 1)}${value.slice(1).toLowerCase()}`;
 }
 
-function getStepOptions(competitions, step) {
+function getStepOptions(entries, step) {
   const values = new Set();
 
-  competitions.forEach((competition) => {
-    const value = step.getValue(competition);
+  entries.forEach((entry) => {
+    const value = step.getValue(entry);
 
     if (value) {
       values.add(value);
@@ -73,8 +75,8 @@ function getStepOptions(competitions, step) {
   return sortOptions([...values]);
 }
 
-function getFilteredCompetitions(competitions, selections, maxStepIndex) {
-  return competitions.filter((competition) =>
+function getFilteredEntries(entries, selections, maxStepIndex) {
+  return entries.filter((entry) =>
     filterSteps.slice(0, maxStepIndex + 1).every((step) => {
       const selectedValue = selections[step.key];
 
@@ -82,7 +84,7 @@ function getFilteredCompetitions(competitions, selections, maxStepIndex) {
         return true;
       }
 
-      return step.getValue(competition) === selectedValue;
+      return step.getValue(entry) === selectedValue;
     })
   );
 }
@@ -97,11 +99,6 @@ const selectSx = {
   }
 };
 
-function getCompetitionUuidFromPath(pathname) {
-  const match = pathname.match(/^\/competition\/([^/]+)(?:\/|$)/);
-  return match?.[1] ?? "";
-}
-
 function getDefaultSelectedFilters() {
   return {
     association: "",
@@ -113,9 +110,9 @@ function getDefaultSelectedFilters() {
   };
 }
 
-function readStoredSelectedFilters() {
+function readStoredSelectedFilters(storageKey) {
   try {
-    const rawValue = window.localStorage.getItem(competitionListFiltersStorageKey);
+    const rawValue = window.localStorage.getItem(storageKey);
 
     if (!rawValue) {
       return getDefaultSelectedFilters();
@@ -130,22 +127,24 @@ function readStoredSelectedFilters() {
   }
 }
 
-export default function CompetitionList() {
+export default function EntitySelection({ entityType }) {
+  const entityConfig = getEntityConfig(entityType);
+  const storageKey = `${entityType}-list-filters`;
   const navigate = useNavigate();
   const location = useLocation();
-  const [competitions, setCompetitions] = useState([]);
-  const [selectedFilters, setSelectedFilters] = useState(readStoredSelectedFilters);
+  const [entries, setEntries] = useState([]);
+  const [selectedFilters, setSelectedFilters] = useState(() => readStoredSelectedFilters(storageKey));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const appliedUuid = getCompetitionUuidFromPath(location.pathname);
+  const appliedEntity = getEntityFromPath(location.pathname);
 
   useEffect(() => {
     let isMounted = true;
 
-    fetchJson("/api/competition-list")
+    fetchJson(`/api/${entityType}-list`)
       .then((data) => {
         if (isMounted) {
-          setCompetitions(data);
+          setEntries(data);
           setLoading(false);
         }
       })
@@ -159,17 +158,14 @@ export default function CompetitionList() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [entityType]);
 
   useEffect(() => {
-    window.localStorage.setItem(
-      competitionListFiltersStorageKey,
-      JSON.stringify(selectedFilters)
-    );
-  }, [selectedFilters]);
+    window.localStorage.setItem(storageKey, JSON.stringify(selectedFilters));
+  }, [selectedFilters, storageKey]);
 
   useEffect(() => {
-    if (competitions.length === 0) {
+    if (entries.length === 0) {
       return;
     }
 
@@ -177,17 +173,10 @@ export default function CompetitionList() {
       const nextSelections = { ...getDefaultSelectedFilters(), ...current };
 
       filterSteps.forEach((step, index) => {
-        const availableCompetitions = getFilteredCompetitions(
-          competitions,
-          nextSelections,
-          index - 1
-        );
-        const options = getStepOptions(availableCompetitions, step);
+        const availableEntries = getFilteredEntries(entries, nextSelections, index - 1);
+        const options = getStepOptions(availableEntries, step);
 
-        if (
-          nextSelections[step.key] &&
-          !options.includes(nextSelections[step.key])
-        ) {
+        if (nextSelections[step.key] && !options.includes(nextSelections[step.key])) {
           nextSelections[step.key] = "";
 
           filterSteps.slice(index + 1).forEach((followingStep) => {
@@ -198,56 +187,42 @@ export default function CompetitionList() {
         }
       });
 
-      const fullyFiltered = getFilteredCompetitions(
-        competitions,
-        nextSelections,
-        filterSteps.length - 1
-      );
-      const availableUuids = new Set(fullyFiltered.map((competition) => competition.uuid));
+      const fullyFiltered = getFilteredEntries(entries, nextSelections, filterSteps.length - 1);
+      const availableUuids = new Set(fullyFiltered.map((entry) => entry.uuid));
 
       if (nextSelections.uuid && !availableUuids.has(nextSelections.uuid)) {
         nextSelections.uuid = "";
       }
 
-      const changed =
-        JSON.stringify(current) !== JSON.stringify(nextSelections);
-
-      return changed ? nextSelections : current;
+      return JSON.stringify(current) !== JSON.stringify(nextSelections)
+        ? nextSelections
+        : current;
     });
-  }, [competitions]);
+  }, [entries]);
 
   const selections = filterSteps.map((step, index) => {
-    const filteredCompetitions = getFilteredCompetitions(
-      competitions,
-      selectedFilters,
-      index - 1
-    );
+    const filteredEntries = getFilteredEntries(entries, selectedFilters, index - 1);
 
     return {
       ...step,
-      filteredCompetitions,
-      options: getStepOptions(filteredCompetitions, step),
+      filteredEntries,
+      options: getStepOptions(filteredEntries, step),
       selectedValue: selectedFilters[step.key],
       visible: index === 0 || Boolean(selectedFilters[filterSteps[index - 1].key])
     };
   });
 
-  const fullyFilteredCompetitions = getFilteredCompetitions(
-    competitions,
-    selectedFilters,
-    filterSteps.length - 1
-  );
+  const fullyFilteredEntries = getFilteredEntries(entries, selectedFilters, filterSteps.length - 1);
   const uuidOptions = sortOptions([
-    ...new Set(fullyFilteredCompetitions.map((competition) => competition.uuid))
+    ...new Set(fullyFilteredEntries.map((entry) => entry.uuid))
   ]);
   const showUuidCards =
     Boolean(selectedFilters.shortname) &&
-    fullyFilteredCompetitions.length > 1 &&
-    fullyFilteredCompetitions.length < 5;
-  const resolvedCompetition =
-    fullyFilteredCompetitions.find(
-      (competition) => competition.uuid === selectedFilters.uuid
-    ) ?? (fullyFilteredCompetitions.length === 1 ? fullyFilteredCompetitions[0] : null);
+    fullyFilteredEntries.length > 1 &&
+    fullyFilteredEntries.length < 5;
+  const resolvedEntry =
+    fullyFilteredEntries.find((entry) => entry.uuid === selectedFilters.uuid) ??
+    (fullyFilteredEntries.length === 1 ? fullyFilteredEntries[0] : null);
 
   const handleFilterChange = (key, value) => {
     const stepIndex = filterSteps.findIndex((step) => step.key === key);
@@ -265,7 +240,7 @@ export default function CompetitionList() {
     <Box sx={{ display: "grid", gap: layout.gap.page }}>
       {loading && (
         <Typography color="text.secondary">
-          Loading competition list...
+          Loading {entityConfig.singularLabel.toLowerCase()} list...
         </Typography>
       )}
       {error && (
@@ -288,11 +263,11 @@ export default function CompetitionList() {
           <Stack spacing={layout.gap.section}>
             <Box>
               <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                Competition List
+                {entityConfig.singularLabel} List
               </Typography>
               <Typography color="text.secondary">
                 Filters are ordered by how strongly they reduce the dataset:
-                association, season, competition name, gender, then short name.
+                association, season, name, gender, then short name.
               </Typography>
             </Box>
 
@@ -325,9 +300,7 @@ export default function CompetitionList() {
                   </FormControl>
                 ))}
 
-              {Boolean(selectedFilters.shortname) &&
-                uuidOptions.length > 1 &&
-                !showUuidCards && (
+              {Boolean(selectedFilters.shortname) && uuidOptions.length > 1 && !showUuidCards && (
                 <FormControl fullWidth>
                   <InputLabel id="uuid-label">UUID</InputLabel>
                   <Select
@@ -356,14 +329,14 @@ export default function CompetitionList() {
             </Stack>
 
             <Typography color="text.secondary" variant="body2">
-              Matching entries: {fullyFilteredCompetitions.length}
+              Matching entries: {fullyFilteredEntries.length}
             </Typography>
 
             {showUuidCards && (
               <Stack spacing={layout.gap.cardList}>
-                {fullyFilteredCompetitions.map((competition) => (
+                {fullyFilteredEntries.map((entry) => (
                   <Paper
-                    key={competition.uuid}
+                    key={entry.uuid}
                     elevation={0}
                     sx={{
                       p: layout.padding.card,
@@ -378,13 +351,13 @@ export default function CompetitionList() {
                         color="text.secondary"
                         sx={{ wordBreak: "break-all" }}
                       >
-                        {competition.uuid}
+                        {entry.uuid}
                       </Typography>
                       <Typography sx={{ fontWeight: 600 }}>
-                        {competition.name}
+                        {entry.name}
                       </Typography>
                       <Typography color="text.secondary">
-                        {competition.shortname}
+                        {entry.shortname}
                       </Typography>
                       <Box sx={{ pt: 1 }}>
                         <Button
@@ -392,7 +365,7 @@ export default function CompetitionList() {
                           onClick={() =>
                             setSelectedFilters((current) => ({
                               ...current,
-                              uuid: competition.uuid
+                              uuid: entry.uuid
                             }))
                           }
                         >
@@ -405,7 +378,7 @@ export default function CompetitionList() {
               </Stack>
             )}
 
-            {resolvedCompetition && (
+            {resolvedEntry && (
               <Paper
                 elevation={0}
                 sx={{
@@ -420,34 +393,32 @@ export default function CompetitionList() {
                     Selected UUID
                   </Typography>
                   <Typography variant="h6" sx={{ fontWeight: 700, wordBreak: "break-all" }}>
-                    {resolvedCompetition.uuid}
+                    {resolvedEntry.uuid}
                   </Typography>
                   <Typography color="text.secondary">
-                    {resolvedCompetition.association?.name} · {resolvedCompetition.season?.name} ·{" "}
-                    {formatGender(resolvedCompetition.gender)}
+                    {resolvedEntry.association?.name} · {resolvedEntry.season?.name} ·{" "}
+                    {formatGender(resolvedEntry.gender)}
                   </Typography>
                   <Typography sx={{ fontWeight: 600 }}>
-                    {resolvedCompetition.name}
+                    {resolvedEntry.name}
                   </Typography>
                   <Typography color="text.secondary">
-                    {resolvedCompetition.shortname}
+                    {resolvedEntry.shortname}
                   </Typography>
                   <Box sx={{ pt: 1, display: "flex", alignItems: "center", gap: 1.5 }}>
                     <Button
                       variant="contained"
                       onClick={() => {
-                        window.localStorage.setItem(
-                          selectedCompetitionUuidStorageKey,
-                          resolvedCompetition.uuid
-                        );
-                        navigate(`/competition/${resolvedCompetition.uuid}/teams`);
+                        setSelectedEntity(entityType, resolvedEntry.uuid);
+                        navigate(`${entityConfig.routeBase}/${resolvedEntry.uuid}/teams`);
                       }}
                     >
                       Apply
                     </Button>
-                    {appliedUuid === resolvedCompetition.uuid && (
+                    {appliedEntity.entityType === entityType &&
+                      appliedEntity.entityUuid === resolvedEntry.uuid && (
                       <Typography color="text.secondary" variant="body2">
-                        Saved to local storage as `competition-uuid`
+                        Saved as the selected {entityConfig.singularLabel.toLowerCase()}
                       </Typography>
                     )}
                   </Box>
@@ -460,3 +431,4 @@ export default function CompetitionList() {
     </Box>
   );
 }
+

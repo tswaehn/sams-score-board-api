@@ -1,29 +1,34 @@
 import { useEffect, useState } from "react";
 import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { Box, Container, Typography } from "@mui/material";
-import Teams from "./pages/Teams.jsx";
-import Plan from "./pages/Plan.jsx";
-import Live from "./pages/Live.jsx";
-import CompetitionList from "./pages/CompetitionList.jsx";
+import CompetitionSelection from "./pages/CompetitionSelection.jsx";
+import LeagueSelection from "./pages/LeagueSelection.jsx";
+import CompetitionTeams from "./pages/CompetitionTeams.jsx";
+import LeagueTeams from "./pages/LeagueTeams.jsx";
+import CompetitionPlan from "./pages/CompetitionPlan.jsx";
+import LeaguePlan from "./pages/LeaguePlan.jsx";
+import CompetitionLive from "./pages/CompetitionLive.jsx";
+import LeagueLive from "./pages/LeagueLive.jsx";
 import Header from "./components/header.jsx";
 import Footer from "./components/footer.jsx";
 import { fetchJson } from "./api/api.js";
+import {
+  clearSelectedEntity,
+  getEntityConfig,
+  getSelectedEntity
+} from "./entities/entity.js";
 
-const selectedCompetitionUuidStorageKey = "competition-uuid";
-
-function SavedCompetitionRedirect() {
+function SavedEntityRedirect() {
   const navigate = useNavigate();
   const [status, setStatus] = useState("checking");
 
   useEffect(() => {
     let isMounted = true;
 
-    const redirectToSavedCompetition = async () => {
-      const savedCompetitionUuid = window.localStorage.getItem(
-        selectedCompetitionUuidStorageKey
-      );
+    const redirectToSavedEntity = async () => {
+      const { entityType, entityUuid } = getSelectedEntity();
 
-      if (!savedCompetitionUuid) {
+      if (!entityType || !entityUuid) {
         if (isMounted) {
           setStatus("missing");
           navigate("/competitions", { replace: true });
@@ -32,14 +37,15 @@ function SavedCompetitionRedirect() {
       }
 
       try {
-        await fetchJson(`/api/competition/${savedCompetitionUuid}`);
+        await fetchJson(`/api/${entityType}/${entityUuid}`);
+        const entityConfig = getEntityConfig(entityType);
 
         if (isMounted) {
           setStatus("ready");
-          navigate(`/competition/${savedCompetitionUuid}/teams`, { replace: true });
+          navigate(`${entityConfig.routeBase}/${entityUuid}/teams`, { replace: true });
         }
       } catch {
-        window.localStorage.removeItem(selectedCompetitionUuidStorageKey);
+        clearSelectedEntity();
 
         if (isMounted) {
           setStatus("invalid");
@@ -48,7 +54,7 @@ function SavedCompetitionRedirect() {
       }
     };
 
-    redirectToSavedCompetition();
+    redirectToSavedEntity();
 
     return () => {
       isMounted = false;
@@ -56,7 +62,7 @@ function SavedCompetitionRedirect() {
   }, [navigate]);
 
   if (status === "checking") {
-    return <Typography color="text.secondary">Loading saved competition...</Typography>;
+    return <Typography color="text.secondary">Loading saved selection...</Typography>;
   }
 
   return null;
@@ -74,18 +80,21 @@ export default function App() {
 
       <Container sx={{ py: 4 }}>
         <Routes>
-          <Route path="/" element={<SavedCompetitionRedirect />} />
-          <Route path="/competitions" element={<CompetitionList />} />
-          <Route path="/competition" element={<SavedCompetitionRedirect />} />
-          <Route path="/competition/" element={<SavedCompetitionRedirect />} />
-          <Route
-            path="/competition/:competitionUuid"
-            element={<Navigate to="teams" replace />}
-          />
-          <Route path="/competition/:competitionUuid/teams" element={<Teams />} />
-          <Route path="/competition/:competitionUuid/plan" element={<Plan />} />
-          <Route path="/competition/:competitionUuid/live" element={<Live />} />
+          <Route path="/" element={<SavedEntityRedirect />} />
+          <Route path="/competitions" element={<CompetitionSelection />} />
+          <Route path="/leagues" element={<LeagueSelection />} />
+          <Route path="/competition" element={<SavedEntityRedirect />} />
+          <Route path="/competition/" element={<SavedEntityRedirect />} />
+          <Route path="/competition/:competitionUuid" element={<Navigate to="teams" replace />} />
+          <Route path="/competition/:competitionUuid/teams" element={<CompetitionTeams />} />
+          <Route path="/competition/:competitionUuid/plan" element={<CompetitionPlan />} />
+          <Route path="/competition/:competitionUuid/live" element={<CompetitionLive />} />
           <Route path="/competition/*" element={<Navigate to="/competitions" replace />} />
+          <Route path="/league/:leagueUuid" element={<Navigate to="teams" replace />} />
+          <Route path="/league/:leagueUuid/teams" element={<LeagueTeams />} />
+          <Route path="/league/:leagueUuid/plan" element={<LeaguePlan />} />
+          <Route path="/league/:leagueUuid/live" element={<LeagueLive />} />
+          <Route path="/league/*" element={<Navigate to="/leagues" replace />} />
         </Routes>
       </Container>
 

@@ -1,4 +1,5 @@
 import { getApiBaseUrl, getTeamShortName } from "./api.js";
+import { getEntityFromPath } from "../entities/entity.js";
 
 const fetchTimeoutMs = 60000;
 
@@ -37,9 +38,10 @@ function getSortedMatchGroups(data) {
   );
 }
 
-function getCompetitionUuidFromPath() {
-  const match = window.location.pathname.match(/^\/competition\/([^/]+)(?:\/|$)/);
-  return match?.[1] ?? "";
+function getSortedMatchDays(data) {
+  return Object.values(data["match-days"] ?? {}).sort((left, right) =>
+    `${left.matchdate ?? ""}`.localeCompare(`${right.matchdate ?? ""}`)
+  );
 }
 
 async function fetchWithTimeout(url) {
@@ -63,67 +65,76 @@ async function fetchWithTimeout(url) {
   }
 }
 
-async function fetchCompetitionByUuid(uuid) {
+async function fetchEntityByTypeAndUuid(entityType, uuid) {
   const apiBaseUrl = getApiBaseUrl();
-  const response = await fetchWithTimeout(`${apiBaseUrl}/competition/${uuid}`);
+  const response = await fetchWithTimeout(`${apiBaseUrl}/${entityType}/${uuid}`);
 
   if (!response.ok) {
     throw new Error(
-      `Failed to load ${apiBaseUrl}/competition/${uuid}: ${response.status}`
+      `Failed to load ${apiBaseUrl}/${entityType}/${uuid}: ${response.status}`
     );
   }
 
   return unwrapResponseData(await response.json());
 }
 
-async function fetchCompetitionList() {
+async function fetchEntityList(entityType) {
   const apiBaseUrl = getApiBaseUrl();
-  const response = await fetchWithTimeout(`${apiBaseUrl}/competition-list`);
+  const response = await fetchWithTimeout(`${apiBaseUrl}/${entityType}-list`);
 
   if (!response.ok) {
     throw new Error(
-      `Failed to load ${apiBaseUrl}/competition-list: ${response.status}`
+      `Failed to load ${apiBaseUrl}/${entityType}-list: ${response.status}`
     );
   }
 
   return unwrapResponseData(await response.json());
 }
 
-async function fetchCurrentCompetitionData() {
-  const uuid = getCompetitionUuidFromPath();
+async function fetchCurrentEntityData() {
+  const { entityType, entityUuid } = getEntityFromPath(window.location.pathname);
 
-  if (!uuid) {
-    throw new Error("Missing competition uuid");
+  if (!entityType || !entityUuid) {
+    throw new Error("Missing entity route context");
   }
 
-  const payload = await fetchCompetitionByUuid(uuid);
-  return payload;
+  return fetchEntityByTypeAndUuid(entityType, entityUuid);
 }
 
 const handlers = {
   "/api/teams": async () => {
-    const data = await fetchCurrentCompetitionData();
+    const data = await fetchCurrentEntityData();
+    const entity = data.competition ?? data.league ?? null;
 
     return {
+      entityType: data.entityType ?? (data.competition ? "competition" : "league"),
+      entity,
       competition: data.competition,
+      league: data.league,
       association: data.association,
       season: data.season,
       teams: (data.teams ?? []).map(normalizeTeam)
     };
   },
   "/api/plan": async () => {
-    const data = await fetchCurrentCompetitionData();
+    const data = await fetchCurrentEntityData();
+    const entity = data.competition ?? data.league ?? null;
 
     return {
+      entityType: data.entityType ?? (data.competition ? "competition" : "league"),
+      entity,
       competition: data.competition,
+      league: data.league,
       association: data.association,
       season: data.season,
       teams: (data.teams ?? []).map(normalizeTeam),
       matchGroups: getSortedMatchGroups(data),
+      matchDays: getSortedMatchDays(data),
       rankings: data.rankings ?? {}
     };
   },
-  "/api/competition-list": fetchCompetitionList
+  "/api/competition-list": () => fetchEntityList("competition"),
+  "/api/league-list": () => fetchEntityList("league")
 };
 
 export async function fetchJson(endpoint) {
@@ -134,7 +145,17 @@ export async function fetchJson(endpoint) {
       throw new Error("Missing competition uuid");
     }
 
-    return deepCopy(await fetchCompetitionByUuid(uuid));
+    return deepCopy(await fetchEntityByTypeAndUuid("competition", uuid));
+  }
+
+  if (endpoint.startsWith("/api/league/")) {
+    const uuid = endpoint.slice("/api/league/".length);
+
+    if (!uuid) {
+      throw new Error("Missing league uuid");
+    }
+
+    return deepCopy(await fetchEntityByTypeAndUuid("league", uuid));
   }
 
   const handler = handlers[endpoint];

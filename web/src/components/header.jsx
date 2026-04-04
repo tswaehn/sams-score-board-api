@@ -12,31 +12,31 @@ import {
   Typography
 } from "@mui/material";
 import { fetchJson, useIsMobile } from "../api/api.js";
+import { getEntityConfig, getEntityFromPath } from "../entities/entity.js";
 
-const navItems = [
-  { section: "teams", label: "Teams" },
-  { section: "plan", label: "Plan" },
-  { section: "live", label: "Live" }
-];
-
-function getCompetitionUuidFromPath(pathname) {
-  const match = pathname.match(/^\/competition\/([^/]+)(?:\/|$)/);
-  return match?.[1] ?? "";
+function getNavItems(entityType) {
+  return [
+    { section: "teams", label: "Teams" },
+    { section: "plan", label: "Plan" },
+    { section: "live", label: "Live" }
+  ];
 }
 
-function NavTabs() {
+function NavTabs({ entityType }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const competitionUuid = getCompetitionUuidFromPath(location.pathname);
+  const { entityUuid } = getEntityFromPath(location.pathname);
+  const entityConfig = getEntityConfig(entityType);
+  const navItems = getNavItems(entityType);
   const current =
     navItems.find((item) =>
-      location.pathname.startsWith(`/competition/${competitionUuid}/${item.section}`)
+      location.pathname.startsWith(`${entityConfig.routeBase}/${entityUuid}/${item.section}`)
     )?.section ?? false;
 
   return (
     <Tabs
       value={current}
-      onChange={(_, value) => navigate(`/competition/${competitionUuid}/${value}`)}
+      onChange={(_, value) => navigate(`${entityConfig.routeBase}/${entityUuid}/${value}`)}
       textColor="inherit"
       indicatorColor="secondary"
       aria-label="Main navigation"
@@ -46,26 +46,28 @@ function NavTabs() {
           key={item.section}
           label={item.label}
           value={item.section}
-          disabled={!competitionUuid}
+          disabled={!entityUuid}
         />
       ))}
     </Tabs>
   );
 }
 
-function MobileNavMenu() {
+function MobileNavMenu({ entityType }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const competitionUuid = getCompetitionUuidFromPath(location.pathname);
+  const { entityUuid } = getEntityFromPath(location.pathname);
+  const entityConfig = getEntityConfig(entityType);
+  const navItems = getNavItems(entityType);
   const [anchorEl, setAnchorEl] = useState(null);
   const current =
     navItems.find((item) =>
-      location.pathname.startsWith(`/competition/${competitionUuid}/${item.section}`)
+      location.pathname.startsWith(`${entityConfig.routeBase}/${entityUuid}/${item.section}`)
     )?.section ?? "";
 
   const handleNavigate = (section) => {
     setAnchorEl(null);
-    navigate(`/competition/${competitionUuid}/${section}`);
+    navigate(`${entityConfig.routeBase}/${entityUuid}/${section}`);
   };
 
   return (
@@ -76,7 +78,7 @@ function MobileNavMenu() {
         aria-haspopup="true"
         aria-expanded={anchorEl ? "true" : undefined}
         onClick={(event) => setAnchorEl(event.currentTarget)}
-        disabled={!competitionUuid}
+        disabled={!entityUuid}
         sx={{
           width: 48,
           height: 48,
@@ -134,8 +136,11 @@ function MobileNavMenu() {
 export default function Header() {
   const location = useLocation();
   const isMobile = useIsMobile();
+  const { entityType, entityUuid } = getEntityFromPath(location.pathname);
+  const resolvedEntityType = entityType || "competition";
+  const entityConfig = getEntityConfig(resolvedEntityType);
   const [headerTitle, setHeaderTitle] = useState({
-    name: "Competition",
+    name: entityConfig.singularLabel,
     shortname: ""
   });
 
@@ -143,35 +148,30 @@ export default function Header() {
     let isMounted = true;
 
     const readHeaderTitle = async () => {
-      const competitionUuid = getCompetitionUuidFromPath(location.pathname);
-
-      if (!competitionUuid) {
+      if (!entityType || !entityUuid) {
         if (isMounted) {
-          setHeaderTitle({ name: "Competition", shortname: "" });
+          setHeaderTitle({ name: entityConfig.singularLabel, shortname: "" });
         }
         return;
       }
 
       try {
-        const selectedCompetition = await fetchJson(
-          `/api/competition/${competitionUuid}`
-        );
-        const competition =
-          selectedCompetition?.competition ?? selectedCompetition ?? null;
+        const selectedEntity = await fetchJson(`/api/${entityType}/${entityUuid}`);
+        const entity = selectedEntity?.competition ?? selectedEntity?.league ?? selectedEntity ?? null;
 
         if (isMounted) {
           setHeaderTitle(
-            competition
+            entity
               ? {
-                  name: competition.name ?? "Competition",
-                  shortname: competition.shortname ?? ""
+                  name: entity.name ?? entityConfig.singularLabel,
+                  shortname: entity.shortname ?? ""
                 }
-              : { name: "Competition", shortname: "" }
+              : { name: entityConfig.singularLabel, shortname: "" }
           );
         }
       } catch {
         if (isMounted) {
-          setHeaderTitle({ name: "Competition", shortname: "" });
+          setHeaderTitle({ name: entityConfig.singularLabel, shortname: "" });
         }
       }
     };
@@ -181,11 +181,11 @@ export default function Header() {
     return () => {
       isMounted = false;
     };
-  }, [location.pathname]);
+  }, [entityConfig.singularLabel, entityType, entityUuid]);
 
   useEffect(() => {
-    document.title = headerTitle.name || "Competition";
-  }, [headerTitle]);
+    document.title = headerTitle.name || entityConfig.singularLabel;
+  }, [entityConfig.singularLabel, headerTitle]);
 
   return (
     <AppBar
@@ -234,7 +234,11 @@ export default function Header() {
             alignSelf: isMobile ? "flex-start" : "center"
           }}
         >
-          {isMobile ? <MobileNavMenu /> : <NavTabs />}
+          {isMobile ? (
+            <MobileNavMenu entityType={resolvedEntityType} />
+          ) : (
+            <NavTabs entityType={resolvedEntityType} />
+          )}
         </Box>
       </Toolbar>
     </AppBar>

@@ -1,14 +1,10 @@
 import { useLocation } from "react-router-dom";
 import { Box, Container, Link, Typography } from "@mui/material";
-
-function getCompetitionUuidFromPath(pathname) {
-  const match = pathname.match(/^\/competition\/([^/]+)(?:\/|$)/);
-  return match?.[1] ?? "";
-}
+import { getEntityFromPath } from "../entities/entity.js";
 
 export default function Footer() {
   const location = useLocation();
-  const competitionUuid = getCompetitionUuidFromPath(location.pathname);
+  const { entityUuid } = getEntityFromPath(location.pathname);
 
   return (
     <Box
@@ -22,20 +18,30 @@ export default function Footer() {
     >
       <Container sx={{ display: "flex", justifyContent: "center" }}>
         <Box sx={{ display: "grid", justifyItems: "center", gap: 0.5 }}>
-          <Link
-            href="/competitions"
-            color="text.secondary"
-            underline="hover"
-            sx={{ fontWeight: 500 }}
-          >
-            Competition List
-          </Link>
-          {competitionUuid && (
+          <Box sx={{ display: "flex", gap: 2 }}>
+            <Link
+              href="/competitions"
+              color="text.secondary"
+              underline="hover"
+              sx={{ fontWeight: 500 }}
+            >
+              Competition List
+            </Link>
+            <Link
+              href="/leagues"
+              color="text.secondary"
+              underline="hover"
+              sx={{ fontWeight: 500 }}
+            >
+              League List
+            </Link>
+          </Box>
+          {entityUuid && (
             <Typography
               variant="body2"
               sx={{ color: "rgba(20, 17, 15, 0.45)", fontWeight: 300 }}
             >
-              {competitionUuid}
+              {entityUuid}
             </Typography>
           )}
         </Box>

@@ -11,8 +11,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from requests import RequestException
 
-from fetch_competition import COMPETITION
-from fetch_competition_list import COMPETITION_LIST_STORE
+from competition.fetch_competition import COMPETITION
+from competition.fetch_competition_list import COMPETITION_LIST_STORE
+from league.fetch_league import LEAGUE
+from league.fetch_league_list import LEAGUE_LIST_STORE
 from live_endpoint import LIVE_API_URL, get_live_payload, startup_live_endpoint
 
 
@@ -27,7 +29,7 @@ logging.basicConfig(
 LOGGER = logging.getLogger("competition-api")
 
 app = FastAPI(
-    title="Competition API",
+    title="Competition and League API",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
@@ -136,6 +138,29 @@ async def competition_list(request: Request) -> dict:
         payload = COMPETITION_LIST_STORE.get()
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail="Failed to fetch competition list") from exc
+
+    return {
+        "data": payload,
+        "requestId": request.state.request_id,
+    }
+
+
+@app.get("/api/league/{league_id}")
+async def league(league_id: UUID, request: Request) -> dict:
+    try:
+        payload, was_cached = LEAGUE.get(str(league_id))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail="Failed to fetch league data") from exc
+
+    return payload
+
+
+@app.get("/api/league-list")
+async def league_list(request: Request) -> dict:
+    try:
+        payload = LEAGUE_LIST_STORE.get()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail="Failed to fetch league list") from exc
 
     return {
         "data": payload,

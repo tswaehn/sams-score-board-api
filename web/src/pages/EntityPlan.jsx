@@ -17,6 +17,7 @@ import {
   TableRow,
   Typography
 } from "@mui/material";
+import { useLocation } from "react-router-dom";
 import {
   fetchJson,
   getTeamShortName,
@@ -24,8 +25,8 @@ import {
 } from "../api/api.js";
 import { layout } from "../components/layout.js";
 
-function getRankingRows(rankings, matchGroupName) {
-  const groupRankings = rankings[matchGroupName] ?? {};
+function getRankingRows(rankings, rankingName) {
+  const groupRankings = rankings[rankingName] ?? {};
 
   return Object.entries(groupRankings)
     .sort(([left], [right]) => Number(left) - Number(right))
@@ -35,8 +36,8 @@ function getRankingRows(rankings, matchGroupName) {
     }));
 }
 
-function getSortedMatches(matchGroup) {
-  return Object.values(matchGroup?.matches ?? {}).sort((left, right) => {
+function getSortedMatches(group) {
+  return Object.values(group?.matches ?? {}).sort((left, right) => {
     const leftDateTime = `${left.date ?? ""}T${left.time ?? "00:00"}`;
     const rightDateTime = `${right.date ?? ""}T${right.time ?? "00:00"}`;
 
@@ -84,20 +85,20 @@ function getMatchSetPoints(match) {
   return { leftPoints, rightPoints };
 }
 
-function MatchGroupDropdown({ activeMatchGroupId, matchGroups, onChange }) {
+function GroupDropdown({ activeGroupId, groups, label, onChange }) {
   return (
     <Box sx={{ display: "flex", justifyContent: "center" }}>
       <FormControl size="small" sx={{ minWidth: 220, maxWidth: 360 }}>
-        <InputLabel id="plan-match-group-label">Match group</InputLabel>
+        <InputLabel id="plan-group-label">{label}</InputLabel>
         <Select
-          labelId="plan-match-group-label"
-          value={activeMatchGroupId ?? ""}
-          label="Match group"
+          labelId="plan-group-label"
+          value={activeGroupId ?? ""}
+          label={label}
           onChange={(event) => onChange(event.target.value)}
         >
-          {matchGroups.map((matchGroup) => (
-            <MenuItem key={matchGroup.uuid} value={matchGroup.uuid}>
-              {matchGroup.name}
+          {groups.map((group) => (
+            <MenuItem key={group.uuid} value={group.uuid}>
+              {group.name}
             </MenuItem>
           ))}
         </Select>
@@ -106,24 +107,24 @@ function MatchGroupDropdown({ activeMatchGroupId, matchGroups, onChange }) {
   );
 }
 
-function MatchGroupTabs({ activeMatchGroupId, matchGroups, onChange }) {
+function GroupTabs({ activeGroupId, groups, onChange }) {
   return (
     <Tabs
-      value={activeMatchGroupId}
+      value={activeGroupId}
       onChange={(_, value) => onChange(value)}
       variant="scrollable"
       allowScrollButtonsMobile
       textColor="inherit"
       indicatorColor="secondary"
     >
-      {matchGroups.map((matchGroup) => (
-        <Tab key={matchGroup.uuid} value={matchGroup.uuid} label={matchGroup.name} />
+      {groups.map((group) => (
+        <Tab key={group.uuid} value={group.uuid} label={group.name} />
       ))}
     </Tabs>
   );
 }
 
-function RankingTable({ activeMatchGroup, rankingRows, teamByName }) {
+function RankingTable({ activeGroup, rankingRows, teamByName }) {
   return (
     <Paper
       elevation={0}
@@ -151,7 +152,7 @@ function RankingTable({ activeMatchGroup, rankingRows, teamByName }) {
             const team = teamByName.get(row.teamName);
 
             return (
-              <TableRow key={`${activeMatchGroup.uuid}-${row.rank}`} hover>
+              <TableRow key={`${activeGroup.uuid}-${row.rank}`} hover>
                 <TableCell>{row.rank}</TableCell>
                 <TableCell>
                   <Stack direction="row" spacing={1.5} alignItems="center">
@@ -185,7 +186,7 @@ function RankingTable({ activeMatchGroup, rankingRows, teamByName }) {
   );
 }
 
-function MobileRankingTable({ activeMatchGroup, rankingRows, teamByName }) {
+function MobileRankingTable({ activeGroup, rankingRows, teamByName }) {
   return (
     <Paper
       elevation={0}
@@ -210,7 +211,7 @@ function MobileRankingTable({ activeMatchGroup, rankingRows, teamByName }) {
             const team = teamByName.get(row.teamName);
 
             return (
-              <TableRow key={`${activeMatchGroup.uuid}-${row.rank}`} hover>
+              <TableRow key={`${activeGroup.uuid}-${row.rank}`} hover>
                 <TableCell>
                   <Stack direction="row" spacing={1.5} alignItems="center">
                     <Avatar
@@ -302,12 +303,7 @@ function MatchCard({ match, teamByUuid }) {
         >
           {totalSetPoints.leftPoints}
         </Typography>
-        <Stack
-          direction="row"
-          spacing={1}
-          justifyContent="flex-end"
-          sx={{ justifySelf: "end" }}
-        >
+        <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ justifySelf: "end" }}>
           {team1SetPoints.map((points, index) => {
             const opposingPoints = team2SetPoints[index] ?? "-";
 
@@ -369,12 +365,7 @@ function MatchCard({ match, teamByUuid }) {
         >
           {totalSetPoints.rightPoints}
         </Typography>
-        <Stack
-          direction="row"
-          spacing={1}
-          justifyContent="flex-end"
-          sx={{ justifySelf: "end" }}
-        >
+        <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ justifySelf: "end" }}>
           {team2SetPoints.map((points, index) => {
             const opposingPoints = team1SetPoints[index] ?? "-";
 
@@ -551,17 +542,20 @@ function MobileMatchCard({ match, teamByUuid }) {
   );
 }
 
-export default function Plan() {
+export default function EntityPlan({ expectedEntityType }) {
+  const location = useLocation();
   const isMobile = useIsMobile();
-  const [competition, setCompetition] = useState(null);
+  const [entityType, setEntityType] = useState(expectedEntityType ?? "competition");
+  const [entity, setEntity] = useState(null);
   const [association, setAssociation] = useState(null);
   const [season, setSeason] = useState(null);
   const [matchGroups, setMatchGroups] = useState([]);
+  const [matchDays, setMatchDays] = useState([]);
   const [rankings, setRankings] = useState({});
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [activeMatchGroupId, setActiveMatchGroupId] = useState(null);
+  const [activeGroupId, setActiveGroupId] = useState(null);
   const [selectedTeamUuid, setSelectedTeamUuid] = useState("all");
 
   useEffect(() => {
@@ -578,13 +572,29 @@ export default function Plan() {
         const data = await fetchJson("/api/plan");
 
         if (isMounted) {
-          setCompetition(data.competition);
+          const nextEntityType = data.entityType ?? expectedEntityType ?? "competition";
+
+          if (expectedEntityType && nextEntityType !== expectedEntityType) {
+            setError(`Unexpected entity type: ${nextEntityType}`);
+            setLoading(false);
+            return;
+          }
+
+          const nextGroups =
+            nextEntityType === "league" ? data.matchDays ?? [] : data.matchGroups ?? [];
+          setEntityType(nextEntityType);
+          setEntity(data.entity);
           setAssociation(data.association);
           setSeason(data.season);
-          setMatchGroups(data.matchGroups);
+          setMatchGroups(data.matchGroups ?? []);
+          setMatchDays(data.matchDays ?? []);
           setRankings(data.rankings);
           setTeams(data.teams);
-          setActiveMatchGroupId((current) => current ?? data.matchGroups[0]?.uuid ?? null);
+          setActiveGroupId((current) =>
+            nextGroups.some((group) => group.uuid === current)
+              ? current
+              : nextGroups[0]?.uuid ?? null
+          );
           setLoading(false);
           setError("");
         }
@@ -605,7 +615,9 @@ export default function Plan() {
       isMounted = false;
       window.clearInterval(intervalId);
     };
-  }, []);
+  }, [expectedEntityType, location.pathname]);
+
+  const groups = entityType === "league" ? matchDays : matchGroups;
 
   const teamByName = useMemo(() => {
     const map = new Map();
@@ -627,12 +639,11 @@ export default function Plan() {
     return map;
   }, [teams]);
 
-  const activeMatchGroup =
-    matchGroups.find((matchGroup) => matchGroup.uuid === activeMatchGroupId) ?? null;
-  const rankingRows = activeMatchGroup
-    ? getRankingRows(rankings, activeMatchGroup.name)
-    : [];
-  const matchRows = activeMatchGroup ? getSortedMatches(activeMatchGroup) : [];
+  const activeGroup = groups.find((group) => group.uuid === activeGroupId) ?? null;
+  const rankingKey =
+    entityType === "league" ? Object.keys(rankings)[0] ?? "" : activeGroup?.name ?? "";
+  const rankingRows = rankingKey ? getRankingRows(rankings, rankingKey) : [];
+  const matchRows = activeGroup ? getSortedMatches(activeGroup) : [];
   const filteredMatchRows = matchRows.filter((match) => {
     if (selectedTeamUuid === "all") {
       return true;
@@ -640,6 +651,7 @@ export default function Plan() {
 
     return match.team1_uuid === selectedTeamUuid || match.team2_uuid === selectedTeamUuid;
   });
+
   const selectableTeams = useMemo(() => {
     const uuids = new Set();
 
@@ -661,7 +673,7 @@ export default function Plan() {
 
   useEffect(() => {
     setSelectedTeamUuid("all");
-  }, [activeMatchGroupId]);
+  }, [activeGroupId]);
 
   return (
     <Box sx={{ display: "grid", gap: layout.gap.page }}>
@@ -684,28 +696,31 @@ export default function Plan() {
             }}
           >
             <Typography variant="h5" sx={{ fontWeight: 700 }}>
-              {competition?.name}
+              {entity?.name}
             </Typography>
             <Typography color="text.secondary">
               {association?.name} · {season?.name}
             </Typography>
           </Paper>
 
-          {isMobile ? (
-            <MatchGroupDropdown
-              activeMatchGroupId={activeMatchGroupId}
-              matchGroups={matchGroups}
-              onChange={setActiveMatchGroupId}
-            />
-          ) : (
-            <MatchGroupTabs
-              activeMatchGroupId={activeMatchGroupId}
-              matchGroups={matchGroups}
-              onChange={setActiveMatchGroupId}
-            />
+          {groups.length > 0 && (
+            isMobile ? (
+              <GroupDropdown
+                activeGroupId={activeGroupId}
+                groups={groups}
+                label={entityType === "league" ? "Match day" : "Match group"}
+                onChange={setActiveGroupId}
+              />
+            ) : (
+              <GroupTabs
+                activeGroupId={activeGroupId}
+                groups={groups}
+                onChange={setActiveGroupId}
+              />
+            )
           )}
 
-          {activeMatchGroup && (
+          {activeGroup && (
             <Paper
               elevation={0}
               sx={{
@@ -719,22 +734,24 @@ export default function Plan() {
             >
               <Box>
                 <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                  {activeMatchGroup.name}
+                  {activeGroup.name}
                 </Typography>
                 <Typography color="text.secondary">
-                  Tourney level {activeMatchGroup.tourneyLevel}
+                  {entityType === "league"
+                    ? activeGroup.matchdate?.split("T", 1)[0] ?? ""
+                    : `Tourney level ${activeGroup.tourneyLevel}`}
                 </Typography>
               </Box>
 
               {isMobile ? (
                 <MobileRankingTable
-                  activeMatchGroup={activeMatchGroup}
+                  activeGroup={activeGroup}
                   rankingRows={rankingRows}
                   teamByName={teamByName}
                 />
               ) : (
                 <RankingTable
-                  activeMatchGroup={activeMatchGroup}
+                  activeGroup={activeGroup}
                   rankingRows={rankingRows}
                   teamByName={teamByName}
                 />
@@ -774,7 +791,7 @@ export default function Plan() {
 
                 {matchRows.length === 0 && (
                   <Typography color="text.secondary">
-                    No matches available for this group.
+                    No matches available for this section.
                   </Typography>
                 )}
 
@@ -799,3 +816,4 @@ export default function Plan() {
     </Box>
   );
 }
+
