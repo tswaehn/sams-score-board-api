@@ -11,8 +11,9 @@ import {
   Typography
 } from "@mui/material";
 import { useLocation, useParams } from "react-router-dom";
-import { fetchJson, fetchMatchesByCompetitionUuid } from "../api/api.js";
+import { fetchJson, fetchMatchesByCompetitionUuid, useIsMobile } from "../api/api.js";
 import { layout } from "../components/layout.js";
+import { MatchResultCard } from "../components/matchResultCard.jsx";
 
 function formatMatchDate(timestamp) {
   return new Intl.DateTimeFormat("de-DE", {
@@ -172,6 +173,45 @@ function getLeagueStatusChip(match) {
       color: "#4b5563"
     }
   };
+}
+
+function getLeagueSetBallPoints(match, side) {
+  const sets = match?.results?.sets ?? [];
+
+  return sets.map((set) => {
+    const [leftPoints = "-", rightPoints = "-"] = (set.ballPoints ?? "").split(":");
+    return side === "left" ? leftPoints : rightPoints;
+  });
+}
+
+function getLeagueResultRows(match) {
+  const [leftSetPoints = "-", rightSetPoints = "-"] = (match.results?.setPoints ?? "").split(":");
+  const [leftBallPoints = "-", rightBallPoints = "-"] = (match.results?.ballPoints ?? "").split(":");
+  const team1SetPoints = getLeagueSetBallPoints(match, "left");
+  const team2SetPoints = getLeagueSetBallPoints(match, "right");
+
+  return [
+    {
+      key: `${match.uuid}-team1`,
+      label: match.team1_name,
+      isWinner: match.results?.winner === match.team1_uuid,
+      totalSetPoints: leftSetPoints,
+      setPoints: team1SetPoints,
+      opponentSetPoints: team2SetPoints,
+      ballPoints: leftBallPoints,
+      side: "left"
+    },
+    {
+      key: `${match.uuid}-team2`,
+      label: match.team2_name,
+      isWinner: match.results?.winner === match.team2_uuid,
+      totalSetPoints: rightSetPoints,
+      setPoints: team2SetPoints,
+      opponentSetPoints: team1SetPoints,
+      ballPoints: rightBallPoints,
+      side: "right"
+    }
+  ];
 }
 
 function CompetitionMatchRow({ match }) {
@@ -371,9 +411,22 @@ function CompetitionMatchRow({ match }) {
   );
 }
 
-function LeagueMatchRow({ match }) {
+function LeagueMatchRow({ match, isMobile }) {
   const statusChip = getLeagueStatusChip(match);
-  const [leftPoints = "-", rightPoints = "-"] = (match.results?.setPoints ?? "").split(":");
+  const isFinished = Boolean(match.results?.winner);
+
+  if (isFinished) {
+    return (
+      <MatchResultCard
+        dateLabel={formatLeagueMatchDate(match.date, match.time)}
+        locationLabel={match.location?.name ?? "Unknown location"}
+        statusChip={statusChip}
+        rows={getLeagueResultRows(match)}
+        compact={isMobile}
+        showBallPoints={!isMobile}
+      />
+    );
+  }
 
   return (
     <Box
@@ -426,7 +479,7 @@ function LeagueMatchRow({ match }) {
           {match.team1_name}
         </Typography>
         <Typography variant="body2" sx={{ textAlign: "center", fontWeight: 700 }}>
-          {leftPoints}
+          -
         </Typography>
       </Box>
 
@@ -442,7 +495,7 @@ function LeagueMatchRow({ match }) {
           {match.team2_name}
         </Typography>
         <Typography variant="body2" sx={{ textAlign: "center", fontWeight: 700 }}>
-          {rightPoints}
+          -
         </Typography>
       </Box>
     </Box>
@@ -497,6 +550,7 @@ function getLeagueMatchesFromPlanPayload(data) {
 export default function EntityLive({ expectedEntityType }) {
   const location = useLocation();
   const { competitionUuid, leagueUuid } = useParams();
+  const isMobile = useIsMobile();
   const [entityType, setEntityType] = useState(expectedEntityType ?? "competition");
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -728,7 +782,7 @@ export default function EntityLive({ expectedEntityType }) {
               title="Scheduled"
               matches={filteredScheduledMatches}
               emptyText="No scheduled matches found."
-              renderMatch={(match) => <LeagueMatchRow key={match.uuid} match={match} />}
+              renderMatch={(match) => <LeagueMatchRow key={match.uuid} match={match} isMobile={isMobile} />}
             />
           )}
 
@@ -740,7 +794,7 @@ export default function EntityLive({ expectedEntityType }) {
               entityType === "competition" ? (
                 <CompetitionMatchRow key={match.id} match={match} />
               ) : (
-                <LeagueMatchRow key={match.uuid} match={match} />
+                <LeagueMatchRow key={match.uuid} match={match} isMobile={isMobile} />
               )
             }
           />
@@ -753,7 +807,7 @@ export default function EntityLive({ expectedEntityType }) {
               entityType === "competition" ? (
                 <CompetitionMatchRow key={match.id} match={match} />
               ) : (
-                <LeagueMatchRow key={match.uuid} match={match} />
+                <LeagueMatchRow key={match.uuid} match={match} isMobile={isMobile} />
               )
             }
           />
@@ -762,4 +816,3 @@ export default function EntityLive({ expectedEntityType }) {
     </Box>
   );
 }
-
