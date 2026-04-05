@@ -10,10 +10,9 @@ STORE_TTL_SECONDS = 24 * 60 * 60
 class Season(PeriodicUpdater):
     def __init__(self) -> None:
         super().__init__(
-            logger_name="competition-api.season",
+            logger_name="api.season",
             thread_name="season-updater",
             store_file_name="season-store.json",
-            ttl_seconds=STORE_TTL_SECONDS,
         )
 
     def update_store(self, uuid: str | None = None) -> None:
@@ -37,7 +36,7 @@ class Season(PeriodicUpdater):
                     continue
 
                 self.dump_raw_json("season-store-raw.json", season_uuid, season)
-                self.set_store_item(season_uuid, self._normalize_season(season))
+                self.set_store_item(season_uuid, self._normalize_season(season), STORE_TTL_SECONDS)
             return
 
         payload = fetch_endpoint_direct(f"/seasons/{uuid}")
@@ -45,7 +44,7 @@ class Season(PeriodicUpdater):
             raise RuntimeError(f"Expected season payload to be a dict for {uuid!r}")
 
         self.dump_raw_json("season-store-raw.json", uuid, payload)
-        self.set_store_item(uuid, self._normalize_season(payload))
+        self.set_store_item(uuid, self._normalize_season(payload), STORE_TTL_SECONDS)
 
     def get(self, season_uuid: str) -> dict:
         self.wait_for_uuid(season_uuid)
@@ -59,7 +58,7 @@ class Season(PeriodicUpdater):
             raise RuntimeError(f"Expected season payload to be a dict for {season_uuid!r}")
 
         payload = self._normalize_season(payload)
-        self.set_store_item(season_uuid, payload)
+        self.set_store_item(season_uuid, payload, STORE_TTL_SECONDS)
 
         return payload
 

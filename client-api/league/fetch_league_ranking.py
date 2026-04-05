@@ -2,21 +2,22 @@ from __future__ import annotations
 
 import copy
 
+from league.fetch_league_match_day import LEAGUE_MATCH_DAY_STORE
 from periodic_updater import PeriodicUpdater
 from sams_api_client import fetch_endpoint_direct
 from shared.entity_utils import normalize_ranking_entry
 
 
 STORE_TTL_SECONDS = 60
+FINISHED_STORE_TTL_SECONDS = 24 * 60 * 60
 
 
 class LeagueRanking(PeriodicUpdater):
     def __init__(self) -> None:
         super().__init__(
-            logger_name="competition-api.league-ranking",
+            logger_name="api.league-ranking",
             thread_name="league-ranking-updater",
             store_file_name="league-ranking-store.json",
-            ttl_seconds=STORE_TTL_SECONDS,
         )
 
     def update_store(self, uuid: str | None = None) -> None:
@@ -33,7 +34,11 @@ class LeagueRanking(PeriodicUpdater):
 
         normalized_rankings = self._normalize_rankings(rankings)
         self.dump_raw_json("league-ranking-store-raw.json", uuid, rankings_payload)
-        self.set_store_item(uuid, normalized_rankings)
+        self.set_store_item(
+            uuid,
+            normalized_rankings,
+            self._get_ttl_seconds(uuid, normalized_rankings),
+        )
 
     def get(self, league_uuid: str) -> dict:
         self.wait_for_uuid(league_uuid)
@@ -53,6 +58,18 @@ class LeagueRanking(PeriodicUpdater):
             normalized_ranking[rank] = normalize_ranking_entry(entry, include_points=True)
 
         return {"Table": normalized_ranking}
+
+    def _get_ttl_seconds(self, league_uuid: str, rankings: dict[str, dict]) -> float:
+        if not rankings:
+            return STORE_TTL_SECONDS
+
+        match_days = LEAGUE_MATCH_DAY_STORE.get_store_item(league_uuid)
+        if isinstance(match_days, dict) and match_days and all(
+            isinstance(match_day, dict) and bool(match_day.get("finished"))
+            for match_day in match_days.values()
+        ):
+            return FINISHED_STORE_TTL_SECONDS
+        return STORE_TTL_SECONDS
 
 
 LEAGUE_RANKING = LeagueRanking()

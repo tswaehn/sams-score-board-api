@@ -19,10 +19,9 @@ STORE_TTL_SECONDS = 24 * 60 * 60
 class LeagueListStore(PeriodicUpdater):
     def __init__(self) -> None:
         super().__init__(
-            logger_name="competition-api.league-list",
+            logger_name="api.league-list",
             thread_name="league-list-updater",
             store_file_name="league-list-store.json",
-            ttl_seconds=STORE_TTL_SECONDS,
         )
         self.update_all_thread = threading.Thread(
             target=self.run_update_all_loop,
@@ -62,7 +61,7 @@ class LeagueListStore(PeriodicUpdater):
 
         raw_file_path = self.store_file_path.parent / "league-list-store-raw.json"
         self._write_json_file(raw_file_path, raw_payload)
-        self.replace_store(next_store)
+        self.replace_store(next_store, STORE_TTL_SECONDS)
 
     def seconds_until_next_update_all(self) -> float:
         return seconds_until_daily_update(1, 15)
@@ -115,7 +114,7 @@ class LeagueListStore(PeriodicUpdater):
 
         league_entry = self.build_league_entry(league_payload)
         self.dump_raw_json("league-list-store-raw.json", uuid, league_payload)
-        self.set_store_item(uuid, league_entry)
+        self.set_store_item(uuid, league_entry, STORE_TTL_SECONDS)
 
 
 LEAGUE_LIST_STORE = LeagueListStore()

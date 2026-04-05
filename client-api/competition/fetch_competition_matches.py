@@ -8,15 +8,15 @@ from shared.entity_utils import normalize_match
 
 
 STORE_TTL_SECONDS = 60
+FINISHED_STORE_TTL_SECONDS = 24 * 60 * 60
 
 
 class CompetitionMatches(PeriodicUpdater):
     def __init__(self) -> None:
         super().__init__(
-            logger_name="competition-api.competition-match",
+            logger_name="api.competition-match",
             thread_name="competition-match-updater",
             store_file_name="competition-match-store.json",
-            ttl_seconds=STORE_TTL_SECONDS,
         )
 
     def update_store(self, uuid: str | None = None) -> None:
@@ -45,7 +45,11 @@ class CompetitionMatches(PeriodicUpdater):
             normalized_matches[match_uuid] = self._normalize_match(match)
 
         self.dump_raw_json("competition-match-store-raw.json", uuid, payload)
-        self.set_store_item(uuid, normalized_matches)
+        self.set_store_item(
+            uuid,
+            normalized_matches,
+            self._get_ttl_seconds(normalized_matches),
+        )
 
     def get(self, match_group_uuid: str, current_season: bool) -> dict:
         self.wait_for_uuid(match_group_uuid)
@@ -62,6 +66,14 @@ class CompetitionMatches(PeriodicUpdater):
 
     def _normalize_match(self, match: dict) -> dict:
         return normalize_match(match)
+
+    def _get_ttl_seconds(self, matches: dict[str, dict]) -> float:
+        if matches and all(
+            isinstance(match, dict) and bool(match.get("finished"))
+            for match in matches.values()
+        ):
+            return FINISHED_STORE_TTL_SECONDS
+        return STORE_TTL_SECONDS
 
 
 COMPETITION_MATCHES = CompetitionMatches()

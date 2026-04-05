@@ -6,15 +6,15 @@ from sams_api_client import fetch_endpoint_direct
 
 
 STORE_TTL_SECONDS = 60
+FINISHED_STORE_TTL_SECONDS = 24 * 60 * 60
 
 
 class LeagueMatchDayStore(PeriodicUpdater):
     def __init__(self) -> None:
         super().__init__(
-            logger_name="competition-api.league-match-day",
+            logger_name="api.league-match-day",
             thread_name="league-match-day-updater",
             store_file_name="league-match-day-store.json",
-            ttl_seconds=STORE_TTL_SECONDS,
         )
 
     def update_store(self, uuid: str | None = None) -> None:
@@ -39,7 +39,11 @@ class LeagueMatchDayStore(PeriodicUpdater):
             normalized_match_days[f"{sort_key}:{normalized['uuid']}"] = normalized
 
         self.dump_raw_json("league-match-day-store-raw.json", uuid, payload)
-        self.set_store_item(uuid, normalized_match_days)
+        self.set_store_item(
+            uuid,
+            normalized_match_days,
+            self._get_ttl_seconds(normalized_match_days),
+        )
 
     def get(self, league_uuid: str) -> dict:
         self.wait_for_uuid(league_uuid)
@@ -79,6 +83,14 @@ class LeagueMatchDayStore(PeriodicUpdater):
             isinstance(match, dict) and bool(match.get("finished"))
             for match in matches.values()
         )
+
+    def _get_ttl_seconds(self, match_days: dict[str, dict]) -> float:
+        if match_days and all(
+            isinstance(match_day, dict) and bool(match_day.get("finished"))
+            for match_day in match_days.values()
+        ):
+            return FINISHED_STORE_TTL_SECONDS
+        return STORE_TTL_SECONDS
 
 
 LEAGUE_MATCH_DAY_STORE = LeagueMatchDayStore()

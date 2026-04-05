@@ -7,15 +7,15 @@ from sams_api_client import extract_uuid_from_url, fetch_endpoint_direct
 
 
 STORE_TTL_SECONDS = 60
+FINISHED_STORE_TTL_SECONDS = 24 * 60 * 60
 
 
 class MatchGroup(PeriodicUpdater):
     def __init__(self) -> None:
         super().__init__(
-            logger_name="competition-api.match-group",
+            logger_name="api.match-group",
             thread_name="match-group-updater",
             store_file_name="match-group-store.json",
-            ttl_seconds=STORE_TTL_SECONDS,
         )
 
     def update_store(self, uuid: str | None = None) -> None:
@@ -46,7 +46,11 @@ class MatchGroup(PeriodicUpdater):
             )
 
         self.dump_raw_json("match-group-store-raw.json", uuid, payload)
-        self.set_store_item(uuid, normalized_match_groups)
+        self.set_store_item(
+            uuid,
+            normalized_match_groups,
+            self._get_ttl_seconds(normalized_match_groups),
+        )
 
     def get(self, competition_uuid: str, current_season: bool) -> dict:
         self.wait_for_uuid(competition_uuid)
@@ -80,6 +84,14 @@ class MatchGroup(PeriodicUpdater):
             isinstance(match, dict) and bool(match.get("finished"))
             for match in matches.values()
         )
+
+    def _get_ttl_seconds(self, match_groups: dict[str, dict]) -> float:
+        if match_groups and all(
+            isinstance(match_group, dict) and bool(match_group.get("finished"))
+            for match_group in match_groups.values()
+        ):
+            return FINISHED_STORE_TTL_SECONDS
+        return STORE_TTL_SECONDS
 
 
 MATCH_GROUP = MatchGroup()

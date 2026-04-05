@@ -17,10 +17,9 @@ class CompetitionListStore(PeriodicUpdater):
     def __init__(self) -> None:
         self.competition_uuids_by_season: dict[str, set[str]] = {}
         super().__init__(
-            logger_name="competition-api.competition-list",
+            logger_name="api.competition-list",
             thread_name="competition-list-updater",
             store_file_name="competition-list-store.json",
-            ttl_seconds=STORE_TTL_SECONDS,
         )
         self.update_all_thread = threading.Thread(
             target=self.run_update_all_loop,
@@ -75,7 +74,7 @@ class CompetitionListStore(PeriodicUpdater):
 
         raw_file_path = self.store_file_path.parent / "competition-list-store-raw.json"
         self._write_json_file(raw_file_path, raw_payload)
-        self.replace_store(next_store)
+        self.replace_store(next_store, STORE_TTL_SECONDS)
 
     def seconds_until_next_update_all(self) -> float:
         return seconds_until_daily_update(1, 0)
@@ -135,7 +134,7 @@ class CompetitionListStore(PeriodicUpdater):
         competition_entry = self.build_competition_entry_from_payload(competition_payload)
 
         self.dump_raw_json("competition-list-store-raw.json", uuid, competition_payload)
-        self.set_store_item(uuid, competition_entry)
+        self.set_store_item(uuid, competition_entry, STORE_TTL_SECONDS)
 
 
 COMPETITION_LIST_STORE = CompetitionListStore()

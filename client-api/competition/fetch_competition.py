@@ -15,10 +15,9 @@ STORE_TTL_SECONDS = 60
 class Competition(PeriodicUpdater):
     def __init__(self) -> None:
         super().__init__(
-            logger_name="competition-api.competition",
+            logger_name="api.competition",
             thread_name="competition-updater",
             store_file_name="competition-store.json",
-            ttl_seconds=STORE_TTL_SECONDS,
         )
 
     def update_store(self, uuid: str | None = None) -> None:
@@ -30,7 +29,7 @@ class Competition(PeriodicUpdater):
             raise RuntimeError(f"Expected competition payload to be a dict for {uuid!r}")
 
         self.dump_raw_json("competition-store-raw.json", uuid, competition)
-        self.set_store_item(uuid, self.normalize_competition(competition))
+        self.set_store_item(uuid, self.normalize_competition(competition), STORE_TTL_SECONDS)
 
     def get(self, competition_uuid: str) -> tuple[dict, bool]:
         self.wait_for_uuid(competition_uuid)

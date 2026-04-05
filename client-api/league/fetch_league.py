@@ -15,10 +15,9 @@ STORE_TTL_SECONDS = 60
 class League(PeriodicUpdater):
     def __init__(self) -> None:
         super().__init__(
-            logger_name="competition-api.league",
+            logger_name="api.league",
             thread_name="league-updater",
             store_file_name="league-store.json",
-            ttl_seconds=STORE_TTL_SECONDS,
         )
 
     def update_store(self, uuid: str | None = None) -> None:
@@ -30,7 +29,7 @@ class League(PeriodicUpdater):
             raise RuntimeError(f"Expected league payload to be a dict for {uuid!r}")
 
         self.dump_raw_json("league-store-raw.json", uuid, league)
-        self.set_store_item(uuid, self.normalize_league(league))
+        self.set_store_item(uuid, self.normalize_league(league), STORE_TTL_SECONDS)
 
     def get(self, league_uuid: str) -> tuple[dict, bool]:
         self.wait_for_uuid(league_uuid)

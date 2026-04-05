@@ -10,10 +10,9 @@ STORE_TTL_SECONDS = 24 * 60 * 60
 class Association(PeriodicUpdater):
     def __init__(self) -> None:
         super().__init__(
-            logger_name="competition-api.association",
+            logger_name="api.association",
             thread_name="association-updater",
             store_file_name="association-store.json",
-            ttl_seconds=STORE_TTL_SECONDS,
         )
 
     def update_store(self, uuid: str | None = None) -> None:
@@ -25,7 +24,7 @@ class Association(PeriodicUpdater):
             raise RuntimeError(f"Expected association payload to be a dict for {uuid!r}")
 
         self.dump_raw_json("association-store-raw.json", uuid, payload)
-        self.set_store_item(uuid, self._normalize_association(payload))
+        self.set_store_item(uuid, self._normalize_association(payload), STORE_TTL_SECONDS)
 
     def get(self, association_uuid: str) -> dict:
         self.wait_for_uuid(association_uuid)
@@ -39,7 +38,7 @@ class Association(PeriodicUpdater):
             raise RuntimeError(f"Expected association payload to be a dict for {association_uuid!r}")
 
         payload = self._normalize_association(payload)
-        self.set_store_item(association_uuid, payload)
+        self.set_store_item(association_uuid, payload, STORE_TTL_SECONDS)
 
         return payload
 

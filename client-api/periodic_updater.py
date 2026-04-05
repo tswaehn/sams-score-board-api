@@ -15,13 +15,10 @@ class PeriodicUpdater:
         logger_name: str,
         thread_name: str,
         store_file_name: str,
-        ttl_seconds: float,
     ) -> None:
         self.lock = threading.RLock()
         self.store: dict[str, Any] = {}
-        self.store_item_stored_at: dict[str, float] = {}
-        self.stored_at: float | None = None
-        self.ttl_seconds = ttl_seconds
+        self.store_item_expires_at: dict[str, float] = {}
         self.logger = logging.getLogger(logger_name)
         self.store_file_path = Path(__file__).with_name("cache") / store_file_name
         self.thread_name = thread_name
@@ -43,9 +40,8 @@ class PeriodicUpdater:
 
     def _persist_store(self) -> None:
         payload = {
-            "storedAt": self.stored_at,
             "store": self.store,
-            "storeItemStoredAt": self.store_item_stored_at,
+            "storeItemExpiresAt": self.store_item_expires_at,
         }
         self._write_json_file(self.store_file_path, payload)
 
@@ -67,24 +63,21 @@ class PeriodicUpdater:
         raw_payload[uuid] = payload
         self._write_json_file(raw_file_path, raw_payload)
 
-    def replace_store(self, store: dict[str, Any]) -> None:
+    def replace_store(self, store: dict[str, Any], ttl_seconds: float) -> None:
         with self.lock:
-            stored_at = time.time()
+            expires_at = time.time() + ttl_seconds
             self.store = store
-            self.store_item_stored_at = {
-                key: stored_at
+            self.store_item_expires_at = {
+                key: expires_at
                 for key in store
             }
-            self.stored_at = stored_at
             self._persist_store()
             self.on_store_loaded()
 
-    def set_store_item(self, key: str, value: Any) -> None:
+    def set_store_item(self, key: str, value: Any, ttl_seconds: float) -> None:
         with self.lock:
-            stored_at = time.time()
             self.store[key] = value
-            self.store_item_stored_at[key] = stored_at
-            self.stored_at = stored_at
+            self.store_item_expires_at[key] = time.time() + ttl_seconds
             self._persist_store()
             self.on_store_loaded()
 
@@ -92,10 +85,10 @@ class PeriodicUpdater:
         with self.lock:
             return self.store.get(key)
 
-    def get_store_item_stored_at(self, key: str) -> float | None:
+    def get_store_item_expires_at(self, key: str) -> float | None:
         with self.lock:
-            stored_at = self.store_item_stored_at.get(key)
-            return stored_at if isinstance(stored_at, (int, float)) else None
+            expires_at = self.store_item_expires_at.get(key)
+            return expires_at if isinstance(expires_at, (int, float)) else None
 
     def _run_coalesced_update(self, uuid: str | None = None) -> bool:
         update_key = uuid if uuid is not None else "__all__"
@@ -152,31 +145,27 @@ class PeriodicUpdater:
             return
 
         self.store = payload["store"]
-        stored_at = payload.get("storedAt")
-        self.stored_at = stored_at if isinstance(stored_at, (int, float)) else None
-        item_timestamps = payload.get("storeItemStoredAt")
-        if isinstance(item_timestamps, dict):
-            self.store_item_stored_at = {
-                key: value
-                for key, value in item_timestamps.items()
-                if isinstance(key, str) and isinstance(value, (int, float))
-            }
-        elif self.stored_at is not None:
-            self.store_item_stored_at = {
-                key: self.stored_at
-                for key in self.store
-            }
-        else:
-            self.store_item_stored_at = {}
+        item_expirations = payload.get("storeItemExpiresAt")
+        self.store_item_expires_at = {
+            key: value
+            for key, value in item_expirations.items()
+            if isinstance(key, str) and isinstance(value, (int, float))
+        } if isinstance(item_expirations, dict) else {}
         self.on_store_loaded()
 
     def is_store_expired(self) -> bool:
-        if self.stored_at is None:
-            return True
-        return time.time() - self.stored_at > self.ttl_seconds
+        with self.lock:
+            if not self.store:
+                return True
+            now = time.time()
+            return any(
+                not isinstance(self.store_item_expires_at.get(key), (int, float))
+                or now > self.store_item_expires_at[key]
+                for key in self.store
+            )
 
     def is_store_item_expired(self, key: str) -> bool:
-        stored_at = self.get_store_item_stored_at(key)
-        if stored_at is None:
+        expires_at = self.get_store_item_expires_at(key)
+        if expires_at is None:
             return True
-        return time.time() - stored_at > self.ttl_seconds
+        return time.time() > expires_at

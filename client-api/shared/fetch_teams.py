@@ -13,10 +13,9 @@ STORE_TTL_SECONDS = 24 * 60 * 60
 class Teams(PeriodicUpdater):
     def __init__(self) -> None:
         super().__init__(
-            logger_name="competition-api.teams",
+            logger_name="api.teams",
             thread_name="teams-updater",
             store_file_name="teams-store.json",
-            ttl_seconds=STORE_TTL_SECONDS,
         )
 
     def update_store(self, uuid: str | None = None) -> None:
@@ -29,7 +28,7 @@ class Teams(PeriodicUpdater):
 
         team = self._normalize_team(payload)
         self.dump_raw_json("teams-store-raw.json", uuid, team)
-        self.set_store_item(uuid, team)
+        self.set_store_item(uuid, team, STORE_TTL_SECONDS)
 
     def get(self, team_uuid: str) -> dict:
         self.wait_for_uuid(team_uuid)
@@ -43,7 +42,7 @@ class Teams(PeriodicUpdater):
             raise RuntimeError(f"Expected team payload to be a dict for {team_uuid!r}")
 
         team = self._normalize_team(payload)
-        self.set_store_item(team_uuid, team)
+        self.set_store_item(team_uuid, team, STORE_TTL_SECONDS)
         return copy.deepcopy(team)
 
     def _normalize_team(self, team: dict) -> dict:

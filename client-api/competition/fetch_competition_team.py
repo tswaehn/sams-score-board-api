@@ -13,10 +13,9 @@ STORE_TTL_SECONDS = 24 * 60 * 60
 class CompetitionTeams(PeriodicUpdater):
     def __init__(self) -> None:
         super().__init__(
-            logger_name="competition-api.competition-teams",
+            logger_name="api.competition-teams",
             thread_name="competition-teams-updater",
             store_file_name="competition-teams-store.json",
-            ttl_seconds=STORE_TTL_SECONDS,
         )
 
     def update_store(self, uuid: str | None = None) -> None:
@@ -38,7 +37,7 @@ class CompetitionTeams(PeriodicUpdater):
             normalized_teams.append(self._normalize_team(team))
 
         self.dump_raw_json("competition-teams-store-raw.json", uuid, payload)
-        self.set_store_item(uuid, normalized_teams)
+        self.set_store_item(uuid, normalized_teams, STORE_TTL_SECONDS)
 
     def get(self, competition_uuid: str) -> list[dict]:
         self.wait_for_uuid(competition_uuid)

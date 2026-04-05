@@ -8,15 +8,15 @@ from shared.entity_utils import normalize_match
 
 
 STORE_TTL_SECONDS = 60
+FINISHED_STORE_TTL_SECONDS = 24 * 60 * 60
 
 
 class LeagueMatches(PeriodicUpdater):
     def __init__(self) -> None:
         super().__init__(
-            logger_name="competition-api.league-match",
+            logger_name="api.league-match",
             thread_name="league-match-updater",
             store_file_name="league-match-store.json",
-            ttl_seconds=STORE_TTL_SECONDS,
         )
 
     def update_store(self, uuid: str | None = None) -> None:
@@ -41,7 +41,11 @@ class LeagueMatches(PeriodicUpdater):
             normalized_matches[match_uuid] = self._normalize_match(match)
 
         self.dump_raw_json("league-match-store-raw.json", uuid, payload)
-        self.set_store_item(uuid, normalized_matches)
+        self.set_store_item(
+            uuid,
+            normalized_matches,
+            self._get_ttl_seconds(normalized_matches),
+        )
 
     def get(self, match_day_uuid: str) -> dict:
         self.wait_for_uuid(match_day_uuid)
@@ -55,6 +59,14 @@ class LeagueMatches(PeriodicUpdater):
 
     def _normalize_match(self, match: dict) -> dict:
         return normalize_match(match, split_date=True)
+
+    def _get_ttl_seconds(self, matches: dict[str, dict]) -> float:
+        if matches and all(
+            isinstance(match, dict) and bool(match.get("finished"))
+            for match in matches.values()
+        ):
+            return FINISHED_STORE_TTL_SECONDS
+        return STORE_TTL_SECONDS
 
 
 LEAGUE_MATCHES = LeagueMatches()

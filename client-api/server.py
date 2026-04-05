@@ -26,7 +26,7 @@ logging.basicConfig(
     level=getattr(logging, LOG_LEVEL.upper(), logging.INFO),
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
-LOGGER = logging.getLogger("competition-api")
+LOGGER = logging.getLogger("api")
 
 app = FastAPI(
     title="Competition and League API",

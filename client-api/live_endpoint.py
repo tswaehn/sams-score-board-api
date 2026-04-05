@@ -13,7 +13,7 @@ from requests import RequestException
 from websocket import WebSocketConnectionClosedException, WebSocketTimeoutException, create_connection
 
 
-LOGGER = logging.getLogger("competition-api.live")
+LOGGER = logging.getLogger("api.live")
 
 LIVE_API_URL = os.getenv("LIVE_API_URL")
 LIVE_API_TIMEOUT_SECONDS = 30
