@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Box,
-  Chip,
   FormControl,
   InputLabel,
   MenuItem,
@@ -14,6 +13,7 @@ import { useLocation, useParams } from "react-router-dom";
 import { fetchJson, fetchMatchesByCompetitionUuid, useIsMobile } from "../api/api.js";
 import { layout } from "../components/layout.js";
 import { MatchResultCard } from "../components/matchResultCard.jsx";
+import { getPlannedMatchStatusChip, StateChip } from "../components/stateChip.jsx";
 
 function formatMatchDate(timestamp) {
   return new Intl.DateTimeFormat("de-DE", {
@@ -142,37 +142,7 @@ function getCompetitionStatusChip(matchState) {
 }
 
 function getLeagueStatusChip(match) {
-  const hasWinner = Boolean(match.results?.winner);
-  const now = Date.now();
-  const matchTimestamp = new Date(`${match.date ?? ""}${match.time ? `T${match.time}` : ""}`).getTime();
-
-  if (hasWinner) {
-    return {
-      label: "FINISHED",
-      sx: {
-        bgcolor: "#e5e7eb",
-        color: "#4b5563"
-      }
-    };
-  }
-
-  if (!Number.isNaN(matchTimestamp) && matchTimestamp > now) {
-    return {
-      label: "UPCOMING",
-      sx: {
-        bgcolor: "#fef3c7",
-        color: "#c2410c"
-      }
-    };
-  }
-
-  return {
-    label: "SCHEDULED",
-    sx: {
-      bgcolor: "#e5e7eb",
-      color: "#4b5563"
-    }
-  };
+  return getPlannedMatchStatusChip(match);
 }
 
 function getLeagueSetBallPoints(match, side) {
@@ -214,21 +184,64 @@ function getLeagueResultRows(match) {
   ];
 }
 
-function CompetitionMatchRow({ match }) {
+function getCompetitionResultRows(match) {
+  const team1SetPoints = getTeamSetPoints(match.matchState, "left");
+  const team2SetPoints = getTeamSetPoints(match.matchState, "right");
+  const totalSetPoints = getTotalSetPoints(match.matchState);
+  const winnerSide = getWinnerSide(match.matchState);
+
+  return [
+    {
+      key: `${match.id}-team1`,
+      label: match.teamDescription1,
+      isWinner: winnerSide === "team1",
+      totalSetPoints: totalSetPoints.leftPoints,
+      setPoints: team1SetPoints,
+      opponentSetPoints: team2SetPoints,
+      side: "left"
+    },
+    {
+      key: `${match.id}-team2`,
+      label: match.teamDescription2,
+      isWinner: winnerSide === "team2",
+      totalSetPoints: totalSetPoints.rightPoints,
+      setPoints: team2SetPoints,
+      opponentSetPoints: team1SetPoints,
+      side: "right"
+    }
+  ];
+}
+
+function CompetitionMatchRow({ match, isMobile }) {
   const team1SetPoints = getTeamSetPoints(match.matchState, "left");
   const team2SetPoints = getTeamSetPoints(match.matchState, "right");
   const totalSetPoints = getTotalSetPoints(match.matchState);
   const winnerSide = getWinnerSide(match.matchState);
   const statusChip = getCompetitionStatusChip(match.matchState);
+  const isFinished = Boolean(match.matchState?.finished);
   const isInProgress = match.matchState?.started && !match.matchState?.finished;
   const servingTeam = isInProgress ? match.matchState?.serving : null;
+
+  if (isFinished) {
+    return (
+      <MatchResultCard
+        dateLabel={formatMatchDate(match.date)}
+        locationLabel={match.matchSeriesData?.name ?? "Unknown competition"}
+        statusChip={statusChip}
+        finished
+        rows={getCompetitionResultRows(match)}
+        compact={isMobile}
+        showBallPoints={false}
+      />
+    );
+  }
 
   return (
     <Box
       sx={{
         p: layout.padding.card,
         borderRadius: layout.radius.surface,
-        bgcolor: "background.paper",
+        bgcolor: "#ffffff",
         display: "grid",
         gap: layout.gap.surface
       }}
@@ -243,18 +256,10 @@ function CompetitionMatchRow({ match }) {
           <Typography sx={{ fontWeight: 600, color: "rgba(26, 21, 18, 0.45)" }}>
             {formatMatchDate(match.date)}
           </Typography>
-          <Chip
+          <StateChip
             label={statusChip.label}
             size="small"
-            sx={{
-              height: 20,
-              fontSize: "0.6875rem",
-              fontWeight: 700,
-              "& .MuiChip-label": {
-                px: 0.75
-              },
-              ...statusChip.sx
-            }}
+            sx={statusChip.sx}
           />
         </Stack>
         <Typography sx={{ color: "rgba(26, 21, 18, 0.45)" }}>
@@ -421,6 +426,7 @@ function LeagueMatchRow({ match, isMobile }) {
         dateLabel={formatLeagueMatchDate(match.date, match.time)}
         locationLabel={match.location?.name ?? "Unknown location"}
         statusChip={statusChip}
+        finished={match.finished}
         rows={getLeagueResultRows(match)}
         compact={isMobile}
         showBallPoints={!isMobile}
@@ -433,7 +439,7 @@ function LeagueMatchRow({ match, isMobile }) {
       sx={{
         p: layout.padding.card,
         borderRadius: layout.radius.surface,
-        bgcolor: "background.paper",
+        bgcolor: "#ffffff",
         display: "grid",
         gap: layout.gap.surface
       }}
@@ -448,18 +454,10 @@ function LeagueMatchRow({ match, isMobile }) {
           <Typography sx={{ fontWeight: 600, color: "rgba(26, 21, 18, 0.45)" }}>
             {formatLeagueMatchDate(match.date, match.time)}
           </Typography>
-          <Chip
+          <StateChip
             label={statusChip.label}
             size="small"
-            sx={{
-              height: 20,
-              fontSize: "0.6875rem",
-              fontWeight: 700,
-              "& .MuiChip-label": {
-                px: 0.75
-              },
-              ...statusChip.sx
-            }}
+            sx={statusChip.sx}
           />
         </Stack>
         <Typography sx={{ color: "rgba(26, 21, 18, 0.45)" }}>
@@ -773,7 +771,7 @@ export default function EntityLive({ expectedEntityType }) {
               title="Live"
               matches={filteredLiveMatches}
               emptyText="No matches are currently in progress."
-              renderMatch={(match) => <CompetitionMatchRow key={match.id} match={match} />}
+              renderMatch={(match) => <CompetitionMatchRow key={match.id} match={match} isMobile={isMobile} />}
             />
           )}
 
@@ -792,7 +790,7 @@ export default function EntityLive({ expectedEntityType }) {
             emptyText="No upcoming matches found."
             renderMatch={(match) =>
               entityType === "competition" ? (
-                <CompetitionMatchRow key={match.id} match={match} />
+                <CompetitionMatchRow key={match.id} match={match} isMobile={isMobile} />
               ) : (
                 <LeagueMatchRow key={match.uuid} match={match} isMobile={isMobile} />
               )
@@ -805,7 +803,7 @@ export default function EntityLive({ expectedEntityType }) {
             emptyText="No finished matches found."
             renderMatch={(match) =>
               entityType === "competition" ? (
-                <CompetitionMatchRow key={match.id} match={match} />
+                <CompetitionMatchRow key={match.id} match={match} isMobile={isMobile} />
               ) : (
                 <LeagueMatchRow key={match.uuid} match={match} isMobile={isMobile} />
               )

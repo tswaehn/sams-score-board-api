@@ -1,6 +1,6 @@
 export const layout = {
   radius: {
-    surface: { xs: 1.5, sm: 3 }
+    surface: { xs: 1, sm: 1.25 }
   },
   gap: {
     page: { xs: 1, sm: 2 },

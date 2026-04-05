@@ -25,6 +25,7 @@ import {
 } from "../api/api.js";
 import { layout } from "../components/layout.js";
 import { MatchResultCard } from "../components/matchResultCard.jsx";
+import { getPlannedGroupStatusChip, getPlannedMatchStatusChip, StateChip } from "../components/stateChip.jsx";
 
 function getRankingRows(rankings, rankingName) {
   const groupRankings = rankings[rankingName] ?? {};
@@ -109,7 +110,20 @@ function GroupDropdown({ activeGroupId, groups, label, onChange }) {
         >
           {groups.map((group) => (
             <MenuItem key={group.uuid} value={group.uuid}>
-              {group.name}
+              <Stack
+                direction="row"
+                spacing={1}
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{ width: "100%" }}
+              >
+                <Typography>{group.name}</Typography>
+                <StateChip
+                  label={getPlannedGroupStatusChip(group).label}
+                  size="small"
+                  sx={getPlannedGroupStatusChip(group).sx}
+                />
+              </Stack>
             </MenuItem>
           ))}
         </Select>
@@ -129,7 +143,21 @@ function GroupTabs({ activeGroupId, groups, onChange }) {
       indicatorColor="secondary"
     >
       {groups.map((group) => (
-        <Tab key={group.uuid} value={group.uuid} label={group.name} />
+        <Tab
+          key={group.uuid}
+          value={group.uuid}
+          label={(
+            <Stack spacing={0.5} alignItems="center">
+              <Typography sx={{ fontWeight: 600 }}>{group.name}</Typography>
+              <StateChip
+                label={getPlannedGroupStatusChip(group).label}
+                size="small"
+                sx={getPlannedGroupStatusChip(group).sx}
+              />
+            </Stack>
+          )}
+          sx={{ textTransform: "none", py: 1.25, minHeight: 72 }}
+        />
       ))}
     </Tabs>
   );
@@ -267,6 +295,7 @@ function MatchCard({ match, teamByUuid }) {
         match.matchNumber != null ? `(Spiel ${match.matchNumber})` : null
       ].filter(Boolean).join(" · ")}
       locationLabel={match.location?.name}
+      statusChip={getPlannedMatchStatusChip(match)}
       rows={getMatchResultRows(match, team1Label, team2Label)}
     />
   );
@@ -291,6 +320,7 @@ function MobileMatchCard({ match, teamByUuid }) {
         match.matchNumber != null ? `(Spiel ${match.matchNumber})` : null
       ].filter(Boolean).join(" · ")}
       locationLabel={match.location?.name}
+      statusChip={getPlannedMatchStatusChip(match)}
       rows={getMatchResultRows(match, team1Label, team2Label)}
       compact
       showBallPoints={false}
@@ -521,14 +551,23 @@ export default function EntityPlan({ expectedEntityType }) {
               }}
             >
               <Box>
-                <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                  {activeGroup.name}
-                </Typography>
-                <Typography color="text.secondary">
-                  {entityType === "league"
-                    ? activeGroup.matchdate?.split("T", 1)[0] ?? ""
-                    : `Tourney level ${activeGroup.tourneyLevel}`}
-                </Typography>
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={1.5}
+                  alignItems={{ xs: "flex-start", sm: "center" }}
+                  justifyContent="space-between"
+                >
+                  <Box>
+                    <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                      {activeGroup.name}
+                    </Typography>
+                    <Typography color="text.secondary">
+                      {entityType === "league"
+                        ? activeGroup.matchdate?.split("T", 1)[0] ?? ""
+                        : `Tourney level ${activeGroup.tourneyLevel}`}
+                    </Typography>
+                  </Box>
+                </Stack>
               </Box>
 
               {entityType !== "league" && (
@@ -547,28 +586,15 @@ export default function EntityPlan({ expectedEntityType }) {
                 )
               )}
 
-              <Paper
-                elevation={0}
-                sx={{
-                  p: layout.padding.surface,
-                  borderRadius: layout.radius.surface,
-                  border: "1px solid rgba(20, 17, 15, 0.08)",
-                  bgcolor: "teamInfo.main",
-                  display: "grid",
-                  gap: layout.gap.surface
-                }}
-              >
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  Matches
-                </Typography>
-
-                <FormControl size="small" sx={{ minWidth: 220, maxWidth: 320 }}>
+              <Box sx={{ display: "flex", justifyContent: "center" }}>
+                <FormControl size="small" sx={{ minWidth: 220, maxWidth: 320, width: "100%" }}>
                   <InputLabel id="plan-team-filter-label">Team</InputLabel>
                   <Select
                     labelId="plan-team-filter-label"
                     value={selectedTeamUuid}
                     label="Team"
                     onChange={(event) => setSelectedTeamUuid(event.target.value)}
+                    sx={{ bgcolor: "#ffffff" }}
                   >
                     <MenuItem value="all">All teams</MenuItem>
                     {selectableTeams.map((team) => (
@@ -578,27 +604,27 @@ export default function EntityPlan({ expectedEntityType }) {
                     ))}
                   </Select>
                 </FormControl>
+              </Box>
 
-                {matchRows.length === 0 && (
-                  <Typography color="text.secondary">
-                    No matches available for this section.
-                  </Typography>
-                )}
+              {matchRows.length === 0 && (
+                <Typography color="text.secondary">
+                  No matches available for this section.
+                </Typography>
+              )}
 
-                {matchRows.length > 0 && filteredMatchRows.length === 0 && (
-                  <Typography color="text.secondary">
-                    No matches found for the selected team.
-                  </Typography>
-                )}
+              {matchRows.length > 0 && filteredMatchRows.length === 0 && (
+                <Typography color="text.secondary">
+                  No matches found for the selected team.
+                </Typography>
+              )}
 
-                {filteredMatchRows.map((match) =>
-                  isMobile ? (
-                    <MobileMatchCard key={match.uuid} match={match} teamByUuid={teamByUuid} />
-                  ) : (
-                    <MatchCard key={match.uuid} match={match} teamByUuid={teamByUuid} />
-                  )
-                )}
-              </Paper>
+              {filteredMatchRows.map((match) =>
+                isMobile ? (
+                  <MobileMatchCard key={match.uuid} match={match} teamByUuid={teamByUuid} />
+                ) : (
+                  <MatchCard key={match.uuid} match={match} teamByUuid={teamByUuid} />
+                )
+              )}
             </Paper>
           )}
         </Box>

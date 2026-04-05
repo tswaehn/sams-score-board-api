@@ -1,5 +1,6 @@
-import { Box, Chip, Stack, Typography } from "@mui/material";
+import { Box, Stack, Typography } from "@mui/material";
 import { layout } from "./layout.js";
+import { FinishedStateChip, StateChip } from "./stateChip.jsx";
 
 function getSetPointStyles(leftPoints, rightPoints, side) {
   const leftValue = Number(leftPoints);
@@ -106,6 +107,7 @@ export function MatchResultCard({
   dateLabel,
   locationLabel,
   statusChip,
+  finished,
   rows,
   compact = false,
   showBallPoints = true
@@ -115,13 +117,15 @@ export function MatchResultCard({
   const setPointWidth = 32;
   const ballPointWidth = 40;
   const setSpacing = compact ? 0.5 : 1;
+  const isFinishedStatusChip = String(statusChip?.label ?? "").toUpperCase() === "FINISHED";
+  const showFinishedChip = typeof finished === "boolean" && !isFinishedStatusChip;
 
   return (
     <Box
       sx={{
         p: layout.padding.surface,
         borderRadius: layout.radius.surface,
-        bgcolor: "background.paper",
+        bgcolor: "#ffffff",
         display: "grid",
         gap: layout.gap.surface
       }}
@@ -136,21 +140,15 @@ export function MatchResultCard({
           <Typography sx={{ fontWeight: 600, color: "rgba(26, 21, 18, 0.45)" }}>
             {dateLabel}
           </Typography>
-          {statusChip && (
-            <Chip
+          {statusChip && !isFinishedStatusChip && (
+            <StateChip
               label={statusChip.label}
               size="small"
-              sx={{
-                height: 20,
-                fontSize: "0.6875rem",
-                fontWeight: 700,
-                "& .MuiChip-label": {
-                  px: 0.75
-                },
-                ...statusChip.sx
-              }}
+              sx={statusChip.sx}
             />
           )}
+          {isFinishedStatusChip && <FinishedStateChip finished compact />}
+          {showFinishedChip && <FinishedStateChip finished={finished} compact />}
         </Stack>
         {locationLabel && (
           <Typography sx={{ color: "rgba(26, 21, 18, 0.45)" }}>

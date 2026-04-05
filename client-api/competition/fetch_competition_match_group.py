@@ -62,14 +62,24 @@ class MatchGroup(PeriodicUpdater):
 
     def _normalize_match_group(self, match_group: dict, current_season: bool) -> dict:
         match_group_uuid = extract_uuid_from_url(match_group["_links"]["matches"]["href"])
+        matches = COMPETITION_MATCHES.get(match_group_uuid, current_season)
         return {
             "uuid": match_group["uuid"],
             "name": match_group["name"],
             "tourneyLevel": match_group["tourneyLevel"],
             "match_group_uuid": match_group_uuid,
-            "matches": COMPETITION_MATCHES.get(match_group_uuid, current_season),
+            "finished": self._is_finished(matches),
+            "matches": matches,
         }
+
+    def _is_finished(self, matches: dict) -> bool:
+        if not isinstance(matches, dict) or not matches:
+            return False
+
+        return all(
+            isinstance(match, dict) and bool(match.get("finished"))
+            for match in matches.values()
+        )
 
 
 MATCH_GROUP = MatchGroup()
-

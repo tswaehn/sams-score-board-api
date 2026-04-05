@@ -19,18 +19,21 @@
       "Spieltag 1": {
         "uuid": "728ecc3d-afad-4547-a5b0-c1df6538ab3c",
         "name": "Spieltag 1",
+        "finished": true,
         "tourneyLevel": 1,
         "teams": []
       },
       "Spieltag 2": {
         "uuid": "17bae327-5bb4-43fb-b011-e1233991e0a5",
         "name": "Spieltag 2",
+        "finished": false,
         "tourneyLevel": 2,
         "teams": []
       },
       "Spieltag 3": {
         "uuid": "5a083e18-6733-46ff-8d98-c8d1bbf9e16a",
         "name": "Spieltag 3",
+        "finished": false,
         "tourneyLevel": 3,
         "teams": []
       }

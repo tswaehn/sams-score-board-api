@@ -368,6 +368,7 @@ payload_shapes:
     - MatchGroup.get(uuid, current_season) returns a normalized single match-group object while storing the raw upstream match-group payload internally
     - MatchGroup.get(competition_uuid, current_season) returns the normalized competition match-group map keyed by match-group name while storing raw upstream match-group payloads internally
     - match data inside the normalized return value is loaded through CompetitionMatch.get_by_match_group_uuid()
+    - normalized match-group entries expose finished=true only when every normalized child match has verified=true; empty match sets remain finished=false
     - MatchGroup uses the same base-class store pattern as Season, including persisted raw store snapshots and TTL-aware startup refresh behavior
     - MatchGroup dumps raw /match-groups and /competitions/{uuid}/match-groups payloads to cache for reference when replacing the store
   competition_access:
@@ -388,8 +389,13 @@ payload_shapes:
   competition_match_access:
     - CompetitionMatch.get(uuid, current_season) returns a normalized single competition match while storing the raw upstream competition-match payload internally
     - CompetitionMatch.get_by_match_group_uuid(match_group_uuid, current_season) returns normalized competition matches keyed by match uuid while storing raw upstream competition-match payloads internally
+    - normalized competition matches retain the upstream verified flag so parent match-groups can derive finished state from child matches
     - CompetitionMatch uses the same base-class store pattern as Season, including persisted raw store snapshots and TTL-aware startup refresh behavior
     - CompetitionMatch dumps raw /competition-matches and /match-groups/{uuid}/competition-matches payloads to cache for reference when replacing the store
+  league_match_day_access:
+    - LeagueMatchDayStore.get(league_uuid) returns normalized match-days keyed by display name and each entry exposes finished=true only when every normalized child match has verified=true; empty match sets remain finished=false
+  league_match_access:
+    - normalized league matches retain the upstream verified flag so parent match-days can derive finished state from child matches
   competition_list_item_fields:
     - uuid
     - name

@@ -62,13 +62,23 @@ class LeagueMatchDayStore(PeriodicUpdater):
         matchdate = match_day.get("matchdate")
         matchdate_label = matchdate.split("T", 1)[0] if isinstance(matchdate, str) else "Unknown"
         name = match_day.get("name") or f"Match day {matchdate_label}"
+        matches = LEAGUE_MATCHES.get(match_day_uuid)
         return {
             "uuid": match_day_uuid,
             "name": name,
             "matchdate": matchdate,
-            "matches": LEAGUE_MATCHES.get(match_day_uuid),
+            "finished": self._is_finished(matches),
+            "matches": matches,
         }
+
+    def _is_finished(self, matches: dict) -> bool:
+        if not isinstance(matches, dict) or not matches:
+            return False
+
+        return all(
+            isinstance(match, dict) and bool(match.get("finished"))
+            for match in matches.values()
+        )
 
 
 LEAGUE_MATCH_DAY_STORE = LeagueMatchDayStore()
-

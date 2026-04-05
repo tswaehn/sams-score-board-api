@@ -98,6 +98,8 @@ def normalize_match(match: dict, *, split_date: bool = False) -> dict:
     team1_link = match.get("_links", {}).get("team1")
     team2_link = match.get("_links", {}).get("team2")
     date = match.get("date")
+    results = match.get("results")
+    finished = isinstance(results, dict) and bool(results.get("winner"))
 
     return {
         "uuid": match["uuid"],
@@ -109,7 +111,9 @@ def normalize_match(match: dict, *, split_date: bool = False) -> dict:
         "team2_uuid": extract_uuid_from_url(team2_link["href"]) if team2_link else None,
         "team1_name": match.get("team1Description"),
         "team2_name": match.get("team2Description"),
-        "results": match.get("results"),
+        "finished": finished,
+        "verified": bool(match.get("verified")),
+        "results": results,
     }
 
 
