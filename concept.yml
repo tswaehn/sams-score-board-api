@@ -294,7 +294,7 @@ caching:
       - fetched payload is persisted before the request is marked complete
   logging:
     cache_logger: competition-api.cache
-    upstream_client_logger: competition-api.client
+    upstream_client_logger: api
 
 live_state_model:
   module: client-api/live_endpoint.py

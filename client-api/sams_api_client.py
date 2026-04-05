@@ -18,7 +18,7 @@ from endpoint_cache import (
 )
 
 
-LOGGER = logging.getLogger("competition-api.client")
+LOGGER = logging.getLogger("api")
 
 API_BASE_URL = "https://www.ssvb.org/api/v2"
 DEFAULT_HEADERS = {
@@ -131,7 +131,7 @@ def fetch_page(
 
         progress_label = f"{progress_percent:.1f}%" if progress_percent is not None else "n/a"
         LOGGER.info(
-            "Fetched upstream page url=%s page=%s status=%s totalPages=%s progress=%s durationMs=%.1f",
+            "Fetched upstream url=%s page=%s status=%s totalPages=%s progress=%s durationMs=%.1f",
             url,
             page,
             response.status_code,
