@@ -5,10 +5,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm install
 
-COPY index.html ./
-COPY vite.config.js ./
-COPY public ./public
-COPY src ./src
+COPY . ./
 RUN npm run build
 
 # Serve stage
