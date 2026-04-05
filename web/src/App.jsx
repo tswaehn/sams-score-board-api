@@ -69,6 +69,32 @@ function SavedEntityRedirect() {
 }
 
 export default function App() {
+  useEffect(() => {
+    if (window.parent === window) {
+      return undefined;
+    }
+
+    const reportWindowSize = () => {
+      window.parent.postMessage(
+        {
+          type: "sams-score-board:window-size",
+          payload: {
+            width: window.innerWidth,
+            height: window.innerHeight
+          }
+        },
+        "*"
+      );
+    };
+
+    reportWindowSize();
+    window.addEventListener("resize", reportWindowSize);
+
+    return () => {
+      window.removeEventListener("resize", reportWindowSize);
+    };
+  }, []);
+
   return (
     <Box
       sx={{

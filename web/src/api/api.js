@@ -31,7 +31,7 @@ export function getTeamShortName(name, shortName, maxLength = 15) {
 export function useIsMobile() {
   const theme = useTheme();
 
-  return useMediaQuery(theme.breakpoints.down("sm"));
+  return useMediaQuery(theme.breakpoints.down("md"));
 }
 
 export { fetchJson } from "./realApi.js";

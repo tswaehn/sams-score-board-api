@@ -34,6 +34,10 @@ export function getEntityFromPath(pathname) {
   };
 }
 
+export function isEmbeddedSearch(search) {
+  return new URLSearchParams(search).get("embed") === "1";
+}
+
 export function getSelectedEntity() {
   const entityType = window.localStorage.getItem(selectedEntityTypeStorageKey);
   const entityUuid = window.localStorage.getItem(selectedEntityUuidStorageKey);

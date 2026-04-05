@@ -12,7 +12,11 @@ import {
   Typography
 } from "@mui/material";
 import { fetchJson, useIsMobile } from "../api/api.js";
-import { getEntityConfig, getEntityFromPath } from "../entities/entity.js";
+import {
+  getEntityConfig,
+  getEntityFromPath,
+  isEmbeddedSearch
+} from "../entities/entity.js";
 
 function getNavItems(entityType) {
   return [
@@ -22,12 +26,106 @@ function getNavItems(entityType) {
   ];
 }
 
+function BurgerButton({
+  ariaLabel,
+  ariaControls,
+  ariaExpanded,
+  onClick,
+  sx = {},
+  disabled = false
+}) {
+  return (
+    <IconButton
+      aria-label={ariaLabel}
+      aria-controls={ariaControls}
+      aria-haspopup="true"
+      aria-expanded={ariaExpanded}
+      onClick={onClick}
+      disabled={disabled}
+      sx={{
+        width: 48,
+        height: 48,
+        border: "1px solid rgba(20, 17, 15, 0.14)",
+        borderRadius: "50%",
+        color: "primary.main",
+        ...sx
+      }}
+    >
+      <Box
+        component="span"
+        sx={{
+          display: "inline-flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          gap: 0.5
+        }}
+      >
+        {[0, 1, 2].map((bar) => (
+          <Box
+            key={bar}
+            component="span"
+            sx={{
+              display: "block",
+              width: 18,
+              height: 2,
+              borderRadius: 999,
+              bgcolor: "currentColor"
+            }}
+          />
+        ))}
+      </Box>
+    </IconButton>
+  );
+}
+
+function SelectionMenu() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [anchorEl, setAnchorEl] = useState(null);
+  const current =
+    location.pathname.startsWith("/leagues") || location.pathname.startsWith("/league/")
+      ? "/leagues"
+      : "/competitions";
+
+  const handleNavigate = (path) => {
+    setAnchorEl(null);
+    navigate(path);
+  };
+
+  return (
+    <>
+      <BurgerButton
+        ariaLabel="Open selection menu"
+        ariaControls={anchorEl ? "header-selection-menu" : undefined}
+        ariaExpanded={anchorEl ? "true" : undefined}
+        onClick={(event) => setAnchorEl(event.currentTarget)}
+      />
+      <Menu
+        id="header-selection-menu"
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={() => setAnchorEl(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+        transformOrigin={{ vertical: "top", horizontal: "left" }}
+      >
+        <MenuItem selected={current === "/competitions"} onClick={() => handleNavigate("/competitions")}>
+          Competition List
+        </MenuItem>
+        <MenuItem selected={current === "/leagues"} onClick={() => handleNavigate("/leagues")}>
+          League List
+        </MenuItem>
+      </Menu>
+    </>
+  );
+}
+
 function NavTabs({ entityType }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { entityUuid } = getEntityFromPath(location.pathname);
   const entityConfig = getEntityConfig(entityType);
   const navItems = getNavItems(entityType);
+  const searchSuffix = location.search ?? "";
   const current =
     navItems.find((item) =>
       location.pathname.startsWith(`${entityConfig.routeBase}/${entityUuid}/${item.section}`)
@@ -36,7 +134,9 @@ function NavTabs({ entityType }) {
   return (
     <Tabs
       value={current}
-      onChange={(_, value) => navigate(`${entityConfig.routeBase}/${entityUuid}/${value}`)}
+      onChange={(_, value) =>
+        navigate(`${entityConfig.routeBase}/${entityUuid}/${value}${searchSuffix}`)
+      }
       textColor="inherit"
       indicatorColor="secondary"
       aria-label="Main navigation"
@@ -59,6 +159,7 @@ function MobileNavMenu({ entityType }) {
   const { entityUuid } = getEntityFromPath(location.pathname);
   const entityConfig = getEntityConfig(entityType);
   const navItems = getNavItems(entityType);
+  const searchSuffix = location.search ?? "";
   const [anchorEl, setAnchorEl] = useState(null);
   const current =
     navItems.find((item) =>
@@ -67,50 +168,18 @@ function MobileNavMenu({ entityType }) {
 
   const handleNavigate = (section) => {
     setAnchorEl(null);
-    navigate(`${entityConfig.routeBase}/${entityUuid}/${section}`);
+    navigate(`${entityConfig.routeBase}/${entityUuid}/${section}${searchSuffix}`);
   };
 
   return (
     <>
-      <IconButton
-        aria-label="Open navigation menu"
-        aria-controls={anchorEl ? "header-mobile-menu" : undefined}
-        aria-haspopup="true"
-        aria-expanded={anchorEl ? "true" : undefined}
+      <BurgerButton
+        ariaLabel="Open navigation menu"
+        ariaControls={anchorEl ? "header-mobile-menu" : undefined}
+        ariaExpanded={anchorEl ? "true" : undefined}
         onClick={(event) => setAnchorEl(event.currentTarget)}
         disabled={!entityUuid}
-        sx={{
-          width: 48,
-          height: 48,
-          border: "1px solid rgba(20, 17, 15, 0.14)",
-          borderRadius: "50%",
-          color: "primary.main"
-        }}
-      >
-        <Box
-          component="span"
-          sx={{
-            display: "inline-flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            gap: 0.5
-          }}
-        >
-          {[0, 1, 2].map((bar) => (
-            <Box
-              key={bar}
-              component="span"
-              sx={{
-                display: "block",
-                width: 18,
-                height: 2,
-                borderRadius: 999,
-                bgcolor: "currentColor"
-              }}
-            />
-          ))}
-        </Box>
-      </IconButton>
+      />
       <Menu
         id="header-mobile-menu"
         anchorEl={anchorEl}
@@ -136,6 +205,7 @@ function MobileNavMenu({ entityType }) {
 export default function Header() {
   const location = useLocation();
   const isMobile = useIsMobile();
+  const isEmbedded = isEmbeddedSearch(location.search);
   const { entityType, entityUuid } = getEntityFromPath(location.pathname);
   const resolvedEntityType = entityType || "competition";
   const entityConfig = getEntityConfig(resolvedEntityType);
@@ -207,26 +277,29 @@ export default function Header() {
           flexWrap: "wrap"
         }}
       >
-        <Box sx={{ flex: "1 1 0", minWidth: 0 }}>
-          <Typography
-            variant="h6"
-            sx={{
-              fontWeight: 700,
-              lineHeight: 1.15,
-              whiteSpace: "normal",
-              overflowWrap: "anywhere"
-            }}
-          >
-            <Box component="span">{headerTitle.name}</Box>
-            {headerTitle.shortname && (
-              <Box component="span" sx={{ display: "block", mt: 0.25 }}>
-                [{headerTitle.shortname}]
-              </Box>
-            )}
-          </Typography>
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            Teams, Plan, Live
-          </Typography>
+        <Box sx={{ flex: "1 1 0", minWidth: 0, display: "flex", alignItems: "flex-start", gap: 1.5 }}>
+          {!isEmbedded && <SelectionMenu />}
+          <Box sx={{ minWidth: 0 }}>
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: 700,
+                lineHeight: 1.15,
+                whiteSpace: "normal",
+                overflowWrap: "anywhere"
+              }}
+            >
+              <Box component="span">{headerTitle.name}</Box>
+              {headerTitle.shortname && (
+                <Box component="span" sx={{ display: "block", mt: 0.25 }}>
+                  [{headerTitle.shortname}]
+                </Box>
+              )}
+            </Typography>
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              Teams, Plan, Live
+            </Typography>
+          </Box>
         </Box>
         <Box
           sx={{
