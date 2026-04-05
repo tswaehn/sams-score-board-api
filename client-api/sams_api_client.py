@@ -10,14 +10,6 @@ from uuid import UUID
 import requests
 from requests import RequestException
 
-from endpoint_cache import (
-    CachedObject,
-    CompetitionCachedObject,
-    cached_object_from_endpoint,
-    get_cached_json,
-)
-
-
 LOGGER = logging.getLogger("api")
 
 API_BASE_URL = "https://www.ssvb.org/api/v2"
@@ -189,25 +181,6 @@ def _fetch_endpoint_from_upstream(endpoint: str) -> dict | list:
     return aggregated_response
 
 
-def _resolve_competition_cached_object(
-    competition_payload: dict,
-    requested_object: CompetitionCachedObject,
-) -> CompetitionCachedObject:
-    season_link = competition_payload.get("_links", {}).get("season", {}).get("href")
-    if not isinstance(season_link, str):
-        return requested_object
-
-    season_endpoint = extract_endpoint_from_url(season_link)
-    season_payload = fetch_endpoint(season_endpoint)
-    if not isinstance(season_payload, dict):
-        raise RuntimeError(f"Expected season payload to be a dict for {season_endpoint!r}")
-
-    return CompetitionCachedObject(
-        current_season=bool(season_payload.get("currentSeason")),
-        competition_uuid=requested_object.competition_uuid,
-    )
-
-
 def fetch_endpoint_direct(endpoint: str) -> dict | list:
     normalized_endpoint = endpoint.strip("/")
     if not normalized_endpoint:
@@ -220,42 +193,3 @@ def fetch_endpoint_direct(endpoint: str) -> dict | list:
             normalized_endpoint,
         )
         return {}
-
-
-def fetch_endpoint_with_cache_status(
-    endpoint: str,
-    *,
-    current_season: bool | None = None,
-) -> tuple[dict | list, bool]:
-    normalized_endpoint = endpoint.strip("/")
-    cached_object = cached_object_from_endpoint(
-        normalized_endpoint,
-        current_season=current_season,
-    )
-
-    def fetcher() -> dict | list | tuple[dict | list, CachedObject]:
-        payload = _fetch_endpoint_from_upstream(normalized_endpoint)
-        if isinstance(cached_object, CompetitionCachedObject):
-            if not isinstance(payload, dict):
-                raise RuntimeError(
-                    f"Expected competition payload to be a dict for {normalized_endpoint!r}"
-                )
-            return payload, _resolve_competition_cached_object(payload, cached_object)
-        return payload
-
-    return get_cached_json(
-        cached_object=cached_object,
-        fetcher=fetcher,
-    )
-
-
-def fetch_endpoint(
-    endpoint: str,
-    *,
-    current_season: bool | None = None,
-) -> dict | list:
-    payload, _ = fetch_endpoint_with_cache_status(
-        endpoint,
-        current_season=current_season,
-    )
-    return payload

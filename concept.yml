@@ -46,10 +46,8 @@ files:
   root:
     - path: client-api/server.py
       role: FastAPI application, routing, middleware, exception shaping, uvicorn bootstrap
-    - path: client-api/endpoint_cache.py
-      role: standalone endpoint cache with a CachedObject base class plus derived cache-object types, in-memory dict, persisted JSON storage with metadata, fetch queue, worker thread, and in-flight deduplication
     - path: client-api/sams_api_client.py
-      role: upstream SSVB API client, pagination, rate limiting, cache-facing fetch wrappers, a direct upstream fetch helper that bypasses the cache, support for dict/list payloads, optional warm-cache thread
+      role: upstream SSVB API client, pagination, rate limiting, direct upstream fetch helper used by the service runtime, and shared URL/UUID extraction helpers
     - path: client-api/shared/fetch_association.py
       role: Association class with in-process association store, update_all() preload, get(uuid) lookup using direct upstream fetches, and a background updater thread
     - path: client-api/shared/fetch_season.py
@@ -212,7 +210,7 @@ upstream_integrations:
       timeout_seconds: 30
       direct_fetch_helper:
         function: fetch_endpoint_direct(endpoint)
-        behavior: bypasses endpoint_cache and fetches upstream data immediately
+        behavior: fetches upstream data immediately without a separate raw endpoint-cache layer
   live_api:
     transport:
       snapshot: HTTP GET
@@ -224,77 +222,57 @@ upstream_integrations:
     reconnect_delay_seconds: 3
 
 caching:
-  primary_module: client-api/endpoint_cache.py
-  cache_object_model:
-    base_class: CachedObject
-    derived_classes:
-      - CompetitionListCachedObject
-      - CompetitionCachedObject
-      - SeasonCachedObject
-      - AssociationCachedObject
-      - TeamsCachedObject
-      - RankingsCachedObject
-      - MatchGroupsCachedObject
-      - CompetitionMatchesCachedObject
+  primary_module: client-api/periodic_updater.py
+  model:
+    base_class: PeriodicUpdater
+    rule: updater-backed stores persist normalized data to disk and decide freshness from store-level or item-level timestamps
     ttl_policy:
-      current_season_ttl_seconds: 60
-      non_current_season_ttl_seconds: 2419200
-      rule: cache freshness is decided only from the effective currentSeason flag of the cached object
+      short_lived_store_ttl_seconds: 60
+      long_lived_store_ttl_seconds: 86400
   cache_storage:
     type:
-      - in-memory dictionary
-      - on-disk JSON files with cache metadata wrapper
+      - in-memory updater-backed dictionaries
       - on-disk JSON store snapshots for updater-backed stores
     directory: client-api/cache
-    in_memory_shape: CACHE[endpoint_key][uuid_key] = {payload, fetched_at, cached_object}
-    disk_layout: cache/<endpoint_key>/<uuid_key>.json
     updater_store_snapshot_shape:
       file_pattern: cache/*-store.json
       top_level_keys:
         - storedAt
         - store
+        - storeItemStoredAt
       formatting: pretty-printed JSON
-      freshness_rule:
-        ttl_seconds: 86400
-        startup_behavior: run the initial scheduled update only when the persisted snapshot is missing or older than the TTL
     updater_raw_dump_shape:
       file_pattern: cache/*-raw*.json
       contents: original raw upstream payload as pretty-printed JSON without the updater snapshot wrapper
-    collection_uuid_key: _collection
-    payload_types:
-      - dict
-      - list
-    endpoint_key_examples:
-      - competitions
-      - competitions with query uuid key season=<season_uuid>
-      - associations
-      - seasons
-      - competitions__match-groups
-      - competitions__teams
-      - competitions__rankings
-      - match-groups__competition-matches
   initialization:
     trigger: module import
-    function: _load_persisted_cache()
+    function: PeriodicUpdater.load_store()
     side_effects:
       - creates cache directory if missing
-      - loads persisted endpoint folders into memory and restores cached-object metadata when available
-      - falls back to inferring season metadata from payloads for older cache files that only stored raw payloads
-      - starts cache worker thread lazily on first cache miss
-      - may start background season-fetch thread when WARM_CACHE_ENABLED is truthy
+      - loads persisted updater-backed store snapshots into memory
   concurrency:
-    global_cache_lock: RLock
-    fetch_queue: queue.Queue
-    worker_threads: 1
-    in_flight_deduplication: IN_FLIGHT[(endpoint_key, uuid_key)]
+    global_store_lock: RLock
+    inflight_update_deduplication: inflight_updates[uuid or __all__]
     behavior:
-      - cache miss enqueues exactly one fetch request for a key
-      - concurrent requests for the same missing key wait on the same event
-      - all waiting requests unblock when the first fetch resolves
-      - fetched payload is persisted before the request is marked complete
+      - concurrent refreshes for the same uuid or full-store update wait on the same event
+      - refreshed payload is persisted before waiting callers continue
   logging:
-    cache_logger: competition-api.cache
     upstream_client_logger: api
+    updater_loggers:
+      - competition-api.association
+      - competition-api.season
+      - competition-api.teams
+      - competition-api.competition
+      - competition-api.competition-list
+      - competition-api.competition-ranking
+      - competition-api.match-group
+      - competition-api.competition-match
+      - competition-api.competition-teams
+      - competition-api.league
+      - competition-api.league-list
+      - competition-api.league-match-day
+      - competition-api.league-match
+      - competition-api.league-ranking
 
 live_state_model:
   module: client-api/live_endpoint.py
@@ -314,7 +292,7 @@ live_state_model:
     - if worker has not produced payload yet, /api/live/{competition_id} fetches a snapshot directly before filtering
   live_endpoint_behavior:
     - GET /api/live/{competition_id} filters matchDays, matchStates, matchStats, and matchSeries server-side to the requested competition while preserving the live payload shape
-    - competition-scoped filtered live payloads are cached in-process per competition_uuid for 5 seconds
+    - competition-scoped filtered live payloads are cached in-process per competition_uuid for 2 seconds
 
 payload_shapes:
   competition_endpoint_top_level_keys:
@@ -418,7 +396,7 @@ payload_shapes:
     - loaded season currentSeason value is copied to each competition entry of that season
     - a process-global CompetitionListStore instance keeps the aggregated competition list keyed by competition uuid
     - rerunning a season update replaces that season slice in the store state
-    - CompetitionListStore fetches seasons and competitions directly from upstream and does not read them through endpoint_cache
+    - CompetitionListStore fetches seasons and competitions directly from upstream
     - CompetitionListStore.get() returns a deep-copied list of all stored competitions
     - CompetitionListStore persists its primary store snapshot to cache/competition-list-store.json with a storedAt timestamp and rebuilds the season index from the persisted store on load
     - CompetitionListStore dumps the raw /competitions?season=<uuid> payload for each refreshed season to cache for reference when replacing the store
@@ -427,19 +405,14 @@ operational_notes:
   strengths:
     - small codebase with clear module split
     - cache files allow warm startup behavior without immediate upstream refetch
-    - queue-based cache deduplicates concurrent misses per endpoint/uuid key
+    - updater-backed stores deduplicate concurrent refreshes per entity key
     - live route can recover from websocket disconnects by reconnect loop
   constraints:
     - import-time side effects exist in sams_api_client.py
     - cache directory is large and should be treated as normal runtime state, not noise
-    - cache TTL no longer varies by endpoint type; it only distinguishes currentSeason=true vs currentSeason=false
-    - some cached objects such as associations depend on the caller to pass the relevant season flag because upstream payloads do not carry currentSeason directly
+    - cache TTL varies by updater-backed module, primarily 60 seconds or 24 hours
     - test.py is a manual utility script, not an automated test suite
     - project uses plain module imports rather than a packaged Python module structure
-    - collection endpoints are stored with uuid key _collection because they do not have a real UUID in the path
-    - season payloads expose startDate and endDate and should be used when deriving season-specific TTL rules
-    - warm_cache.py can use /seasons directly because the cache now supports top-level list payloads
-    - CompetitionListStore.update_competition_list_by_season() is the entry point for season mutability classification and applies the loaded season currentSeason value to all competitions in that season
     - the global /teams endpoint does not expose competition UUIDs in TeamDto, so competition-scoped team lists need a separate store backed by /competitions/{uuid}/teams
   verified_in_current_context:
     - python3 -m py_compile client-api/*.py succeeded on 2026-04-03
@@ -450,7 +423,7 @@ codex_warmup_guidance:
   read_order:
     - concept.yml
     - client-api/server.py
-    - client-api/endpoint_cache.py
+    - client-api/periodic_updater.py
     - client-api/sams_api_client.py
     - client-api/competition/fetch_competition.py
     - client-api/live_endpoint.py
