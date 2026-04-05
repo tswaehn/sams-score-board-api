@@ -37,7 +37,7 @@ class Season(PeriodicUpdater):
                     continue
 
                 self.dump_raw_json("season-store-raw.json", season_uuid, season)
-                self.set_store_item(season_uuid, season)
+                self.set_store_item(season_uuid, self._normalize_season(season))
             return
 
         payload = fetch_endpoint_direct(f"/seasons/{uuid}")
@@ -45,7 +45,7 @@ class Season(PeriodicUpdater):
             raise RuntimeError(f"Expected season payload to be a dict for {uuid!r}")
 
         self.dump_raw_json("season-store-raw.json", uuid, payload)
-        self.set_store_item(uuid, payload)
+        self.set_store_item(uuid, self._normalize_season(payload))
 
     def get(self, season_uuid: str) -> dict:
         self.wait_for_uuid(season_uuid)
@@ -58,9 +58,19 @@ class Season(PeriodicUpdater):
         if not isinstance(payload, dict):
             raise RuntimeError(f"Expected season payload to be a dict for {season_uuid!r}")
 
+        payload = self._normalize_season(payload)
         self.set_store_item(season_uuid, payload)
 
         return payload
+
+    def _normalize_season(self, season: dict) -> dict:
+        return {
+            "uuid": season.get("uuid"),
+            "name": season.get("name"),
+            "startDate": season.get("startDate"),
+            "endDate": season.get("endDate"),
+            "currentSeason": season.get("currentSeason"),
+        }
 
 
 SEASON = Season()

@@ -25,7 +25,7 @@ class Association(PeriodicUpdater):
             raise RuntimeError(f"Expected association payload to be a dict for {uuid!r}")
 
         self.dump_raw_json("association-store-raw.json", uuid, payload)
-        self.set_store_item(uuid, payload)
+        self.set_store_item(uuid, self._normalize_association(payload))
 
     def get(self, association_uuid: str) -> dict:
         self.wait_for_uuid(association_uuid)
@@ -38,9 +38,19 @@ class Association(PeriodicUpdater):
         if not isinstance(payload, dict):
             raise RuntimeError(f"Expected association payload to be a dict for {association_uuid!r}")
 
+        payload = self._normalize_association(payload)
         self.set_store_item(association_uuid, payload)
 
         return payload
+
+    def _normalize_association(self, association: dict) -> dict:
+        return {
+            "uuid": association.get("uuid"),
+            "name": association.get("name"),
+            "shortname": association.get("shortname"),
+            "level": association.get("level"),
+            "parentUuid": association.get("parentUuid"),
+        }
 
 
 ASSOCIATION = Association()

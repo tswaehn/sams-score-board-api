@@ -1,5 +1,5 @@
 @baseUrl = http://127.0.0.1:8000
-@leagueUuid = 66f4bd4e-e4ba-44fb-95c0-5b7cb4f2ef5f
+@leagueUuid = 00190439-018f-4311-b265-418799d60c11
 
 ### League
 GET {{baseUrl}}/api/league/{{leagueUuid}}
