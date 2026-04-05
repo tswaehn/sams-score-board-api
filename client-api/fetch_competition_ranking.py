@@ -1,2 +1,0 @@
-from competition.fetch_competition_ranking import COMPETITION_RANKING
-

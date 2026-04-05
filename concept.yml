@@ -56,19 +56,19 @@ files:
       role: Season class with in-process season store, update_all() preload, get(uuid) lookup using direct upstream fetches, and a background updater thread
     - path: client-api/shared/fetch_teams.py
       role: Teams class with an in-process global team store keyed by team uuid, update_all() via /teams, get(uuid) via direct upstream fetches, and a background updater thread
-    - path: client-api/fetch_competition_team.py
+    - path: client-api/competition/fetch_competition_team.py
       role: CompetitionTeams class using the shared updater/store base with a competition-uuid-keyed team-list store, get(competition_uuid), and update_all() that refreshes competition-scoped teams by iterating competitions
-    - path: client-api/fetch_competition_match_group.py
+    - path: client-api/competition/fetch_competition_match_group.py
       role: MatchGroup class using the shared updater/store base with persisted raw competition-scoped match-group storage and get(competition_uuid, current_season) returning the normalized competition match-group shape including normalized matches
-    - path: client-api/fetch_competition_match.py
+    - path: client-api/competition/fetch_competition_matches.py
       role: CompetitionMatch class using the shared updater/store base with persisted raw competition-match storage, get(uuid), and get_by_match_group_uuid() returning normalized competition matches
-    - path: client-api/fetch_competition_ranking.py
+    - path: client-api/competition/fetch_competition_ranking.py
       role: CompetitionRanking class using the shared updater/store base with persisted normalized competition-ranking storage, get(competition_uuid), and update_all() that refreshes rankings by iterating competitions with direct endpoint fetches
     - path: client-api/periodic_updater.py
       role: shared base class for daemon updater threads that run on startup only when the persisted store TTL has expired and then nightly at local time 01:00, for the primary in-memory store plus lock used by derived store classes, and for pretty-printed persisted JSON snapshots plus raw reference dumps with timestamps
-    - path: client-api/fetch_competition.py
+    - path: client-api/competition/fetch_competition.py
       role: Competition class with in-process raw competition store, update_all() preload, get(uuid) lookup using direct upstream fetches, and a composition helper that builds the full competition payload from multiple endpoint-backed stores
-    - path: client-api/fetch_competition_list.py
+    - path: client-api/competition/fetch_competition_list.py
       role: CompetitionListStore class maintains the aggregated competition list and lock, updates it per season using direct upstream fetches, exposes get() for copied reads, derives currentSeason mutability from the loaded season, and runs a background updater thread
     - path: client-api/live_endpoint.py
       role: live snapshot fetch plus websocket update loop for /api/live/{competition_id}
@@ -378,7 +378,7 @@ payload_shapes:
     - Competition persists its store snapshot to cache/competition-store.json with a storedAt timestamp
     - Competition dumps the raw /competitions payload to cache/competition-store-raw.json when refreshing the store
     - Competition startup refresh is skipped when the persisted store snapshot is newer than the base TTL
-    - fetch_competition.get(uuid) returns the assembled API response plus a cache-hit flag, and uses get_competition(raw_competition) as the composition helper around Competition.get(uuid), Season.get(uuid), Association.get(uuid), MatchGroup.get(), CompetitionTeams.get(uuid), and CompetitionRanking.get(uuid)
+    - competition.fetch_competition.get(uuid) returns the assembled API response plus a cache-hit flag, and uses get_competition(raw_competition) as the composition helper around Competition.get(uuid), Season.get(uuid), Association.get(uuid), MatchGroup.get(), CompetitionTeams.get(uuid), and CompetitionRanking.get(uuid)
   competition_ranking_access:
     - CompetitionRanking.update_all(current_season=None) refreshes rankings for all stored competitions by iterating CompetitionListStore.get() and fetching /competitions/{uuid}/rankings directly
     - CompetitionRanking.get(competition_uuid, current_season) returns cached normalized rankings for a competition or fetches and stores them on demand
@@ -446,7 +446,7 @@ codex_warmup_guidance:
     - client-api/server.py
     - client-api/endpoint_cache.py
     - client-api/sams_api_client.py
-    - client-api/fetch_competition.py
+    - client-api/competition/fetch_competition.py
     - client-api/live_endpoint.py
   focus_assumption:
     - unless stated otherwise, ongoing work should prioritize the client-api subproject

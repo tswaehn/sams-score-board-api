@@ -49,18 +49,5 @@ class Teams(PeriodicUpdater):
     def _normalize_team(self, team: dict) -> dict:
         return normalize_team(team)
 
-    def _extract_normalized_teams(self, payload: dict, context: str) -> list[dict]:
-        teams = payload.get("content", [])
-        if not isinstance(teams, list):
-            raise RuntimeError(f"Expected teams content to be a list for {context}")
-
-        normalized_teams = []
-        for team in teams:
-            if not isinstance(team, dict):
-                continue
-            normalized_teams.append(self._normalize_team(team))
-
-        return normalized_teams
-
 
 TEAMS = Teams()

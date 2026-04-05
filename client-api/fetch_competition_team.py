@@ -1,2 +1,0 @@
-from competition.fetch_competition_team import COMPETITION_TEAMS
-

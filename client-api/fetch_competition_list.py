@@ -1,2 +1,0 @@
-from competition.fetch_competition_list import COMPETITION_LIST_STORE
-

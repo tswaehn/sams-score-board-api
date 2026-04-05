@@ -47,12 +47,6 @@ class Season(PeriodicUpdater):
         self.dump_raw_json("season-store-raw.json", uuid, payload)
         self.set_store_item(uuid, payload)
 
-    def get_all(self) -> list[dict]:
-        self.wait_for_uuid()
-
-        with self.lock:
-            return list(self.store.values())
-
     def get(self, season_uuid: str) -> dict:
         self.wait_for_uuid(season_uuid)
 

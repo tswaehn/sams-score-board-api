@@ -1,2 +1,0 @@
-from competition.fetch_competition_match_group import MATCH_GROUP
-
