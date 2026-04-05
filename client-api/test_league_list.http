@@ -1,0 +1,5 @@
+@baseUrl = http://127.0.0.1:8000
+
+### League list
+GET {{baseUrl}}/api/league-list
+Accept: application/json
