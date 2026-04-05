@@ -459,6 +459,38 @@ export default function EntityPlan({ expectedEntityType }) {
             </Typography>
           </Paper>
 
+          {entityType === "league" && rankingRows.length > 0 && (
+            <Paper
+              elevation={0}
+              sx={{
+                p: layout.padding.section,
+                borderRadius: layout.radius.surface,
+                border: "1px solid rgba(20, 17, 15, 0.08)",
+                bgcolor: "background.paper",
+                display: "grid",
+                gap: layout.gap.section
+              }}
+            >
+              <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                Ranking
+              </Typography>
+
+              {isMobile ? (
+                <MobileRankingTable
+                  activeGroup={activeGroup ?? { uuid: "league-ranking" }}
+                  rankingRows={rankingRows}
+                  teamByName={teamByName}
+                />
+              ) : (
+                <RankingTable
+                  activeGroup={activeGroup ?? { uuid: "league-ranking" }}
+                  rankingRows={rankingRows}
+                  teamByName={teamByName}
+                />
+              )}
+            </Paper>
+          )}
+
           {groups.length > 0 && (
             isMobile ? (
               <GroupDropdown
@@ -499,18 +531,20 @@ export default function EntityPlan({ expectedEntityType }) {
                 </Typography>
               </Box>
 
-              {isMobile ? (
-                <MobileRankingTable
-                  activeGroup={activeGroup}
-                  rankingRows={rankingRows}
-                  teamByName={teamByName}
-                />
-              ) : (
-                <RankingTable
-                  activeGroup={activeGroup}
-                  rankingRows={rankingRows}
-                  teamByName={teamByName}
-                />
+              {entityType !== "league" && (
+                isMobile ? (
+                  <MobileRankingTable
+                    activeGroup={activeGroup}
+                    rankingRows={rankingRows}
+                    teamByName={teamByName}
+                  />
+                ) : (
+                  <RankingTable
+                    activeGroup={activeGroup}
+                    rankingRows={rankingRows}
+                    teamByName={teamByName}
+                  />
+                )
               )}
 
               <Paper
