@@ -4,6 +4,7 @@ import copy
 
 from periodic_updater import PeriodicUpdater
 from sams_api_client import fetch_endpoint_direct
+from shared.entity_utils import normalize_team
 
 
 STORE_TTL_SECONDS = 24 * 60 * 60
@@ -49,13 +50,7 @@ class CompetitionTeams(PeriodicUpdater):
         return []
 
     def _normalize_team(self, team: dict) -> dict:
-        return {
-            "uuid": team["uuid"],
-            "name": team["name"],
-            "shortName": team["shortName"],
-            "logoImageLink": team["logoImageLink"],
-        }
+        return normalize_team(team)
 
 
 COMPETITION_TEAMS = CompetitionTeams()
-

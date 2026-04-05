@@ -3,7 +3,8 @@ from __future__ import annotations
 import copy
 
 from periodic_updater import PeriodicUpdater
-from sams_api_client import extract_uuid_from_url, fetch_endpoint_direct
+from sams_api_client import fetch_endpoint_direct
+from shared.entity_utils import normalize_match
 
 
 STORE_TTL_SECONDS = 60
@@ -53,23 +54,7 @@ class LeagueMatches(PeriodicUpdater):
         return copy.deepcopy(matches)
 
     def _normalize_match(self, match: dict) -> dict:
-        team1_link = match.get("_links", {}).get("team1")
-        team2_link = match.get("_links", {}).get("team2")
-        team1_uuid = extract_uuid_from_url(team1_link["href"]) if team1_link else None
-        team2_uuid = extract_uuid_from_url(team2_link["href"]) if team2_link else None
-        return {
-            "uuid": match["uuid"],
-            "date": match["date"].split("T", 1)[0] if isinstance(match.get("date"), str) else None,
-            "time": match.get("time"),
-            "location": match.get("location"),
-            "matchNumber": match.get("matchNumber"),
-            "team1_uuid": team1_uuid,
-            "team2_uuid": team2_uuid,
-            "team1_name": match.get("team1Description"),
-            "team2_name": match.get("team2Description"),
-            "results": match.get("results"),
-        }
+        return normalize_match(match, split_date=True)
 
 
 LEAGUE_MATCHES = LeagueMatches()
-

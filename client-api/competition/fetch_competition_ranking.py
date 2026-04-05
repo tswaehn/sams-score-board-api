@@ -4,6 +4,7 @@ import copy
 
 from periodic_updater import PeriodicUpdater
 from sams_api_client import fetch_endpoint_direct
+from shared.entity_utils import normalize_ranking_entry
 
 
 STORE_TTL_SECONDS = 60
@@ -62,17 +63,7 @@ class CompetitionRanking(PeriodicUpdater):
                 if not isinstance(entry, dict):
                     continue
                 rank = entry.get("rank")
-                normalized_ranking[rank] = {
-                    "teamName": entry["teamName"],
-                    "matchesPlayed": entry["matchesPlayed"],
-                    "wins": entry["wins"],
-                    "losses": entry["losses"],
-                    "setWins": entry["setWins"],
-                    "setLosses": entry["setLosses"],
-                    "ballWins": entry["ballWins"],
-                    "ballLosses": entry["ballLosses"],
-                    "ballDifference": entry["ballDifference"],
-                }
+                normalized_ranking[rank] = normalize_ranking_entry(entry)
 
             result[match_group_name] = normalized_ranking
 
@@ -80,4 +71,3 @@ class CompetitionRanking(PeriodicUpdater):
 
 
 COMPETITION_RANKING = CompetitionRanking()
-

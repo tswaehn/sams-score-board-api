@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from fetch_association import ASSOCIATION
-from fetch_season import SEASON
 from league.fetch_league_match_day import LEAGUE_MATCH_DAY_STORE
 from league.fetch_league_ranking import LEAGUE_RANKING
-from fetch_teams import TEAMS
 from periodic_updater import PeriodicUpdater
 from sams_api_client import fetch_endpoint_direct
+from shared.fetch_association import ASSOCIATION
+from shared.fetch_season import SEASON
+from shared.fetch_teams import TEAMS
 
 
 STORE_TTL_SECONDS = 60
@@ -79,4 +79,3 @@ class League(PeriodicUpdater):
 
 
 LEAGUE = League()
-

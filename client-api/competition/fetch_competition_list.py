@@ -3,12 +3,11 @@ from __future__ import annotations
 import copy
 import threading
 import time
-from datetime import datetime, timedelta
 
-from fetch_association import ASSOCIATION
-from fetch_season import SEASON
 from periodic_updater import PeriodicUpdater
-from sams_api_client import extract_endpoint_from_url, extract_uuid_from_url, fetch_endpoint_direct
+from sams_api_client import extract_uuid_from_url, fetch_endpoint_direct
+from shared.entity_utils import build_entry_from_linked_payload, seconds_until_daily_update
+from shared.fetch_season import SEASON
 
 
 STORE_TTL_SECONDS = 24 * 60 * 60
@@ -79,11 +78,7 @@ class CompetitionListStore(PeriodicUpdater):
         self.replace_store(next_store)
 
     def seconds_until_next_update_all(self) -> float:
-        now = datetime.now()
-        next_update = now.replace(hour=1, minute=0, second=0, microsecond=0)
-        if now >= next_update:
-            next_update = next_update + timedelta(days=1)
-        return max((next_update - now).total_seconds(), 0.0)
+        return seconds_until_daily_update(1, 0)
 
     def should_update_all_on_startup(self) -> bool:
         with self.lock:
@@ -117,30 +112,14 @@ class CompetitionListStore(PeriodicUpdater):
         competition: dict,
         season_payload: dict,
     ) -> dict:
-        association_uuid = extract_uuid_from_url(competition["_links"]["association"]["href"])
-        association_url = extract_endpoint_from_url(competition["_links"]["association"]["href"])
-        current_season = bool(season_payload.get("currentSeason"))
-        association = ASSOCIATION.get(association_uuid)
-
-        return {
-            "uuid": competition["uuid"],
-            "entityType": "competition",
-            "name": competition["name"],
-            "gender": competition["gender"],
-            "shortname": competition["shortName"],
-            "currentSeason": current_season,
-            "association_url": association_url,
-            "season_url": f"seasons/{season_payload['uuid']}",
-            "association": {
-                "uuid": association["uuid"],
-                "name": association["name"],
-                "shortname": association["shortname"],
-            },
-            "season": {
-                "uuid": season_payload["uuid"],
-                "name": season_payload["name"],
-            },
-        }
+        entry = build_entry_from_linked_payload(
+            entity_type="competition",
+            payload=competition,
+            association_link=competition["_links"]["association"]["href"],
+            season_link=competition["_links"]["season"]["href"],
+        )
+        entry["currentSeason"] = bool(season_payload.get("currentSeason"))
+        return entry
 
     def build_competition_entry_from_payload(self, competition_payload: dict) -> dict:
         season_uuid = extract_uuid_from_url(competition_payload["_links"]["season"]["href"])
@@ -160,4 +139,3 @@ class CompetitionListStore(PeriodicUpdater):
 
 
 COMPETITION_LIST_STORE = CompetitionListStore()
-

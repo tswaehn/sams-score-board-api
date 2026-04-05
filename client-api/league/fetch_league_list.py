@@ -3,10 +3,12 @@ from __future__ import annotations
 import copy
 import threading
 import time
-from datetime import datetime, timedelta
 
-from fetch_association import ASSOCIATION
-from fetch_season import SEASON
+from shared.entity_utils import (
+    build_entity_list_entry,
+    get_association_and_season,
+    seconds_until_daily_update,
+)
 from periodic_updater import PeriodicUpdater
 from sams_api_client import fetch_endpoint_direct
 
@@ -63,11 +65,7 @@ class LeagueListStore(PeriodicUpdater):
         self.replace_store(next_store)
 
     def seconds_until_next_update_all(self) -> float:
-        now = datetime.now()
-        next_update = now.replace(hour=1, minute=15, second=0, microsecond=0)
-        if now >= next_update:
-            next_update = next_update + timedelta(days=1)
-        return max((next_update - now).total_seconds(), 0.0)
+        return seconds_until_daily_update(1, 15)
 
     def should_update_all_on_startup(self) -> bool:
         with self.lock:
@@ -98,27 +96,16 @@ class LeagueListStore(PeriodicUpdater):
     def build_league_entry(self, league: dict) -> dict:
         association_uuid = league.get("associationUuid")
         season_uuid = league.get("seasonUuid")
-        association = ASSOCIATION.get(association_uuid) if isinstance(association_uuid, str) else {}
-        season = SEASON.get(season_uuid) if isinstance(season_uuid, str) else {}
-        current_season = bool(season.get("currentSeason"))
-
-        return {
-            "uuid": league["uuid"],
-            "entityType": "league",
-            "name": league["name"],
-            "gender": league["gender"],
-            "shortname": league["shortName"],
-            "currentSeason": current_season,
-            "association": {
-                "uuid": association.get("uuid"),
-                "name": association.get("name"),
-                "shortname": association.get("shortname"),
-            },
-            "season": {
-                "uuid": season.get("uuid"),
-                "name": season.get("name"),
-            },
-        }
+        association, season = get_association_and_season(association_uuid, season_uuid)
+        return build_entity_list_entry(
+            entity_type="league",
+            entity_uuid=league["uuid"],
+            name=league["name"],
+            gender=league["gender"],
+            shortname=league.get("shortName"),
+            association=association,
+            season=season,
+        )
 
     def _update_store(self, uuid: str, league_payload: dict | None = None) -> None:
         if league_payload is None:
@@ -132,4 +119,3 @@ class LeagueListStore(PeriodicUpdater):
 
 
 LEAGUE_LIST_STORE = LeagueListStore()
-

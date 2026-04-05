@@ -3,7 +3,8 @@ from __future__ import annotations
 import copy
 
 from periodic_updater import PeriodicUpdater
-from sams_api_client import extract_uuid_from_url, fetch_endpoint_direct
+from sams_api_client import fetch_endpoint_direct
+from shared.entity_utils import normalize_match
 
 
 STORE_TTL_SECONDS = 60
@@ -60,23 +61,7 @@ class CompetitionMatches(PeriodicUpdater):
         return copy.deepcopy(matches)
 
     def _normalize_match(self, match: dict) -> dict:
-        team1_link = match["_links"].get("team1")
-        team2_link = match["_links"].get("team2")
-        team1_uuid = extract_uuid_from_url(team1_link["href"]) if team1_link else None
-        team2_uuid = extract_uuid_from_url(team2_link["href"]) if team2_link else None
-        return {
-            "uuid": match["uuid"],
-            "date": match["date"],
-            "time": match["time"],
-            "location": match["location"],
-            "matchNumber": match["matchNumber"],
-            "team1_uuid": team1_uuid,
-            "team2_uuid": team2_uuid,
-            "team1_name": match["team1Description"],
-            "team2_name": match["team2Description"],
-            "results": match["results"],
-        }
+        return normalize_match(match)
 
 
 COMPETITION_MATCHES = CompetitionMatches()
-

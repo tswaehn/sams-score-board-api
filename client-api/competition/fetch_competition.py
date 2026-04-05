@@ -3,10 +3,10 @@ from __future__ import annotations
 from competition.fetch_competition_match_group import MATCH_GROUP
 from competition.fetch_competition_ranking import COMPETITION_RANKING
 from competition.fetch_competition_team import COMPETITION_TEAMS
-from fetch_association import ASSOCIATION
-from fetch_season import SEASON
 from periodic_updater import PeriodicUpdater
 from sams_api_client import extract_uuid_from_url, fetch_endpoint_direct
+from shared.fetch_association import ASSOCIATION
+from shared.fetch_season import SEASON
 
 
 STORE_TTL_SECONDS = 60
@@ -69,4 +69,3 @@ class Competition(PeriodicUpdater):
 
 
 COMPETITION = Competition()
-

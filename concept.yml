@@ -50,11 +50,11 @@ files:
       role: standalone endpoint cache with a CachedObject base class plus derived cache-object types, in-memory dict, persisted JSON storage with metadata, fetch queue, worker thread, and in-flight deduplication
     - path: client-api/sams_api_client.py
       role: upstream SSVB API client, pagination, rate limiting, cache-facing fetch wrappers, a direct upstream fetch helper that bypasses the cache, support for dict/list payloads, optional warm-cache thread
-    - path: client-api/fetch_association.py
+    - path: client-api/shared/fetch_association.py
       role: Association class with in-process association store, update_all() preload, get(uuid) lookup using direct upstream fetches, and a background updater thread
-    - path: client-api/fetch_season.py
+    - path: client-api/shared/fetch_season.py
       role: Season class with in-process season store, update_all() preload, get(uuid) lookup using direct upstream fetches, and a background updater thread
-    - path: client-api/fetch_teams.py
+    - path: client-api/shared/fetch_teams.py
       role: Teams class with an in-process global team store keyed by team uuid, update_all() via /teams, get(uuid) via direct upstream fetches, and a background updater thread
     - path: client-api/fetch_competition_team.py
       role: CompetitionTeams class using the shared updater/store base with a competition-uuid-keyed team-list store, get(competition_uuid), and update_all() that refreshes competition-scoped teams by iterating competitions
