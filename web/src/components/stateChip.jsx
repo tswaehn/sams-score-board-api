@@ -22,6 +22,20 @@ export function StateChip({ label, size = "small", sx = {} }) {
   return <Chip label={label} size={size} sx={{ ...getBaseChipSx(size), ...sx }} />;
 }
 
+function hasLeagueLiveStats(match) {
+  if (!match || match.finished || match.results?.winner) {
+    return false;
+  }
+
+  const hasSetPoints = Boolean(`${match.results?.setPoints ?? ""}`.trim());
+  const hasBallPoints = Boolean(`${match.results?.ballPoints ?? ""}`.trim());
+  const hasSetBallPoints = (match.results?.sets ?? []).some((set) =>
+    Boolean(`${set?.ballPoints ?? ""}`.trim())
+  );
+
+  return hasSetPoints || hasBallPoints || hasSetBallPoints;
+}
+
 export function getPlannedMatchStatusChip(match) {
   const hasWinner = Boolean(match?.finished || match?.results?.winner);
   const now = Date.now();
@@ -35,6 +49,16 @@ export function getPlannedMatchStatusChip(match) {
       sx: {
         bgcolor: "#e5e7eb",
         color: "#4b5563"
+      }
+    };
+  }
+
+  if (hasLeagueLiveStats(match)) {
+    return {
+      label: "LIVE",
+      sx: {
+        bgcolor: "#d32f2f",
+        color: "#ffffff"
       }
     };
   }
