@@ -30,6 +30,7 @@ Optional environment variables:
 * `PORT` defaults to `8000`
 * `LOG_LEVEL` defaults to `info`
 * `LIVE_API_URL` sets the upstream JSON endpoint for the live endpoint
+* `LIVE_API_SNAPSHOT_REFRESH_SECONDS` defaults to `15` and controls how often the live worker refetches the full snapshot while the websocket remains connected
 * `WARM_CACHE_ENABLED` enables background cache warm-up when set to `1`, `true`, `yes`, or `on`; disabled by default
 
 Endpoints:

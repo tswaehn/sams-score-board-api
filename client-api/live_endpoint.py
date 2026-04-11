@@ -19,6 +19,10 @@ LIVE_API_URL = os.getenv("LIVE_API_URL")
 LIVE_API_TIMEOUT_SECONDS = 30
 LIVE_API_WS_TIMEOUT_SECONDS = 55
 LIVE_API_WS_RECONNECT_SECONDS = 3
+LIVE_API_SNAPSHOT_REFRESH_SECONDS = max(
+    1,
+    int(os.getenv("LIVE_API_SNAPSHOT_REFRESH_SECONDS", "15")),
+)
 LIVE_API_FILTER_CACHE_TTL_SECONDS = 2
 LIVE_API_HEADERS = {
     "Accept": "application/json, text/plain, */*",
@@ -212,16 +216,36 @@ def live_ws_worker() -> None:
     global LIVE_API_STATE_ERROR
 
     ws_url = build_live_ws_url()
+    ws_timeout_seconds = min(
+        LIVE_API_WS_TIMEOUT_SECONDS,
+        LIVE_API_SNAPSHOT_REFRESH_SECONDS,
+    )
 
     while True:
         ws = None
         try:
             store_live_payload(fetch_live_snapshot())
-            ws = create_connection(ws_url, timeout=LIVE_API_WS_TIMEOUT_SECONDS)
+            next_snapshot_refresh_at = time.monotonic() + LIVE_API_SNAPSHOT_REFRESH_SECONDS
+            ws = create_connection(ws_url, timeout=ws_timeout_seconds)
             LOGGER.info("Connected live websocket: %s", ws_url)
 
             while True:
-                raw_message = ws.recv()
+                if time.monotonic() >= next_snapshot_refresh_at:
+                    store_live_payload(fetch_live_snapshot())
+                    next_snapshot_refresh_at = (
+                        time.monotonic() + LIVE_API_SNAPSHOT_REFRESH_SECONDS
+                    )
+
+                try:
+                    raw_message = ws.recv()
+                except WebSocketTimeoutException:
+                    if time.monotonic() >= next_snapshot_refresh_at:
+                        store_live_payload(fetch_live_snapshot())
+                        next_snapshot_refresh_at = (
+                            time.monotonic() + LIVE_API_SNAPSHOT_REFRESH_SECONDS
+                        )
+                    continue
+
                 if not raw_message:
                     raise WebSocketConnectionClosedException("Live websocket closed")
 
@@ -230,6 +254,11 @@ def live_ws_worker() -> None:
                     continue
 
                 merge_live_message(message)
+                if time.monotonic() >= next_snapshot_refresh_at:
+                    store_live_payload(fetch_live_snapshot())
+                    next_snapshot_refresh_at = (
+                        time.monotonic() + LIVE_API_SNAPSHOT_REFRESH_SECONDS
+                    )
         except RequestException as exc:
             with LIVE_API_STATE_LOCK:
                 LIVE_API_STATE_ERROR = "Failed to fetch live data"

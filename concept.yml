@@ -194,6 +194,12 @@ environment:
       used_by:
         - client-api/live_endpoint.py
       expected_path_pattern: /live/<ticker_type>/tickers/<ticker_id>
+    - name: LIVE_API_SNAPSHOT_REFRESH_SECONDS
+      required: false
+      default: 15
+      used_by:
+        - client-api/live_endpoint.py
+      purpose: periodically refresh the full live snapshot while the websocket stays connected so matchDays and matchSeries do not drift stale
 
 upstream_integrations:
   ssvb_rest_api:
@@ -220,6 +226,9 @@ upstream_integrations:
     http_timeout_seconds: 30
     websocket_timeout_seconds: 55
     reconnect_delay_seconds: 3
+    snapshot_refresh_seconds:
+      default: 15
+      source_env: LIVE_API_SNAPSHOT_REFRESH_SECONDS
 
 caching:
   primary_module: client-api/periodic_updater.py
@@ -290,6 +299,7 @@ live_state_model:
     - MATCH_STATS_UPDATE merges payload into matchStats[matchUuid]
   fallback_behavior:
     - if worker has not produced payload yet, /api/live/{competition_id} fetches a snapshot directly before filtering
+    - while the websocket stays connected, the worker periodically refetches the full snapshot so matchDays and matchSeries include upstream schedule changes
   live_endpoint_behavior:
     - GET /api/live/{competition_id} filters matchDays, matchStates, matchStats, and matchSeries server-side to the requested competition while preserving the live payload shape
     - competition-scoped filtered live payloads are cached in-process per competition_uuid for 2 seconds
