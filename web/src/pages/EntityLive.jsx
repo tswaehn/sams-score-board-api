@@ -9,31 +9,17 @@ import {
   Stack,
   Typography
 } from "@mui/material";
-import { useLocation, useParams } from "react-router-dom";
-import { fetchMatchesByCompetitionUuid, useIsMobile } from "../api/api.js";
+import { useParams } from "react-router-dom";
+import { fetchMatchesBySeriesUuid, useIsMobile } from "../api/api.js";
 import { layout } from "../components/layout.js";
 import { MatchResultCard } from "../components/matchResultCard.jsx";
-import { getPlannedMatchStatusChip, StateChip } from "../components/stateChip.jsx";
+import { StateChip } from "../components/stateChip.jsx";
 
 function formatMatchDate(timestamp) {
   return new Intl.DateTimeFormat("de-DE", {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(new Date(timestamp));
-}
-
-function formatLeagueMatchDate(date, time) {
-  const raw = `${date ?? ""}${time ? `T${time}` : ""}`;
-  const parsed = new Date(raw);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return [date, time].filter(Boolean).join(" · ") || "Unknown time";
-  }
-
-  return new Intl.DateTimeFormat("de-DE", {
-    dateStyle: "medium",
-    timeStyle: time ? "short" : undefined
-  }).format(parsed);
 }
 
 function getSetPointStyles(leftPoints, rightPoints, side) {
@@ -141,63 +127,6 @@ function getCompetitionStatusChip(matchState) {
   };
 }
 
-function getLeagueStatusChip(match) {
-  return getPlannedMatchStatusChip(match);
-}
-
-function getLeagueSetBallPoints(match, side) {
-  const sets = match?.results?.sets ?? [];
-
-  return sets.map((set) => {
-    const [leftPoints = "-", rightPoints = "-"] = (set.ballPoints ?? "").split(":");
-    return side === "left" ? leftPoints : rightPoints;
-  });
-}
-
-function hasLeagueLiveStats(match) {
-  if (!match || match.finished || match.results?.winner) {
-    return false;
-  }
-
-  const hasSetPoints = Boolean(`${match.results?.setPoints ?? ""}`.trim());
-  const hasBallPoints = Boolean(`${match.results?.ballPoints ?? ""}`.trim());
-  const hasSetBallPoints = (match.results?.sets ?? []).some((set) =>
-    Boolean(`${set?.ballPoints ?? ""}`.trim())
-  );
-
-  return hasSetPoints || hasBallPoints || hasSetBallPoints;
-}
-
-function getLeagueResultRows(match) {
-  const [leftSetPoints = "-", rightSetPoints = "-"] = (match.results?.setPoints ?? "").split(":");
-  const [leftBallPoints = "-", rightBallPoints = "-"] = (match.results?.ballPoints ?? "").split(":");
-  const team1SetPoints = getLeagueSetBallPoints(match, "left");
-  const team2SetPoints = getLeagueSetBallPoints(match, "right");
-
-  return [
-    {
-      key: `${match.uuid}-team1`,
-      label: match.team1_name,
-      isWinner: match.results?.winner === match.team1_uuid,
-      totalSetPoints: leftSetPoints,
-      setPoints: team1SetPoints,
-      opponentSetPoints: team2SetPoints,
-      ballPoints: leftBallPoints,
-      side: "left"
-    },
-    {
-      key: `${match.uuid}-team2`,
-      label: match.team2_name,
-      isWinner: match.results?.winner === match.team2_uuid,
-      totalSetPoints: rightSetPoints,
-      setPoints: team2SetPoints,
-      opponentSetPoints: team1SetPoints,
-      ballPoints: rightBallPoints,
-      side: "right"
-    }
-  ];
-}
-
 function getCompetitionResultRows(match) {
   const team1SetPoints = getTeamSetPoints(match.matchState, "left");
   const team2SetPoints = getTeamSetPoints(match.matchState, "right");
@@ -240,7 +169,7 @@ function CompetitionMatchRow({ match, isMobile }) {
     return (
       <MatchResultCard
         dateLabel={formatMatchDate(match.date)}
-        locationLabel={match.matchSeriesData?.name ?? "Unknown competition"}
+        locationLabel={match.matchSeriesData?.name ?? "Unknown series"}
         statusChip={statusChip}
         finished
         rows={getCompetitionResultRows(match)}
@@ -277,7 +206,7 @@ function CompetitionMatchRow({ match, isMobile }) {
           />
         </Stack>
         <Typography sx={{ color: "rgba(26, 21, 18, 0.45)" }}>
-          {match.matchSeriesData?.name ?? "Unknown competition"}
+          {match.matchSeriesData?.name ?? "Unknown series"}
         </Typography>
       </Stack>
 
@@ -430,91 +359,6 @@ function CompetitionMatchRow({ match, isMobile }) {
   );
 }
 
-function LeagueMatchRow({ match, isMobile }) {
-  const statusChip = getLeagueStatusChip(match);
-  const isFinished = Boolean(match.results?.winner);
-  const isLive = hasLeagueLiveStats(match);
-
-  if (isFinished || isLive) {
-    return (
-      <MatchResultCard
-        dateLabel={formatLeagueMatchDate(match.date, match.time)}
-        locationLabel={match.location?.name ?? "Unknown location"}
-        statusChip={statusChip}
-        finished={match.finished}
-        rows={getLeagueResultRows(match)}
-        compact={isMobile}
-        showBallPoints={!isMobile}
-      />
-    );
-  }
-
-  return (
-    <Box
-      sx={{
-        p: layout.padding.card,
-        borderRadius: layout.radius.surface,
-        bgcolor: "#ffffff",
-        display: "grid",
-        gap: layout.gap.surface
-      }}
-    >
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        justifyContent="space-between"
-        alignItems={{ xs: "flex-start", sm: "center" }}
-        spacing={0.5}
-      >
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-          <Typography sx={{ fontWeight: 600, color: "rgba(26, 21, 18, 0.45)" }}>
-            {formatLeagueMatchDate(match.date, match.time)}
-          </Typography>
-          <StateChip
-            label={statusChip.label}
-            size="small"
-            sx={statusChip.sx}
-          />
-        </Stack>
-        <Typography sx={{ color: "rgba(26, 21, 18, 0.45)" }}>
-          {match.location?.name ?? "Unknown location"}
-        </Typography>
-      </Stack>
-
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 2fr) 32px",
-          alignItems: "center",
-          columnGap: 1.5
-        }}
-      >
-        <Typography sx={{ fontWeight: match.results?.winner === match.team1_uuid ? 700 : 500 }}>
-          {match.team1_name}
-        </Typography>
-        <Typography variant="body2" sx={{ textAlign: "center", fontWeight: 700 }}>
-          -
-        </Typography>
-      </Box>
-
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 2fr) 32px",
-          alignItems: "center",
-          columnGap: 1.5
-        }}
-      >
-        <Typography sx={{ fontWeight: match.results?.winner === match.team2_uuid ? 700 : 500 }}>
-          {match.team2_name}
-        </Typography>
-        <Typography variant="body2" sx={{ textAlign: "center", fontWeight: 700 }}>
-          -
-        </Typography>
-      </Box>
-    </Box>
-  );
-}
-
 function MatchSection({ title, matches, emptyText, renderMatch }) {
   return (
     <Paper
@@ -544,7 +388,6 @@ function MatchSection({ title, matches, emptyText, renderMatch }) {
 }
 
 export default function EntityLive({ expectedEntityType }) {
-  const location = useLocation();
   const { competitionUuid, leagueUuid } = useParams();
   const isMobile = useIsMobile();
   const [entityType, setEntityType] = useState(expectedEntityType ?? "competition");
@@ -552,10 +395,7 @@ export default function EntityLive({ expectedEntityType }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedTeamId, setSelectedTeamId] = useState("all");
-  const usesCompetitionStyleLive = useMemo(
-    () => matches.some((match) => "matchState" in match),
-    [matches]
-  );
+  const seriesUuid = expectedEntityType === "competition" ? competitionUuid : leagueUuid;
 
   useEffect(() => {
     let isMounted = true;
@@ -568,30 +408,14 @@ export default function EntityLive({ expectedEntityType }) {
       }
 
       try {
-        if (expectedEntityType === "competition") {
-          if (!competitionUuid) {
-            throw new Error("Missing competition uuid");
-          }
-
-          const nextMatches = await fetchMatchesByCompetitionUuid(competitionUuid);
-
-          if (isMounted) {
-            setEntityType("competition");
-            setMatches(nextMatches);
-            setError("");
-            setLoading(false);
-          }
-          return;
+        if (!seriesUuid) {
+          throw new Error(`Missing ${expectedEntityType ?? "live"} uuid`);
         }
 
-        if (!leagueUuid) {
-          throw new Error("Missing league uuid");
-        }
-
-        const nextMatches = await fetchMatchesByCompetitionUuid(leagueUuid);
+        const nextMatches = await fetchMatchesBySeriesUuid(seriesUuid);
 
         if (isMounted) {
-          setEntityType("league");
+          setEntityType(expectedEntityType ?? "competition");
           setMatches(nextMatches);
           setError("");
           setLoading(false);
@@ -609,93 +433,56 @@ export default function EntityLive({ expectedEntityType }) {
     loadMatches();
     const intervalId = window.setInterval(
       loadMatches,
-      expectedEntityType === "competition" ? 1000 : 20000
+      1000
     );
 
     return () => {
       isMounted = false;
       window.clearInterval(intervalId);
     };
-  }, [competitionUuid, expectedEntityType, leagueUuid, location.pathname]);
+  }, [expectedEntityType, seriesUuid]);
 
   const teams = useMemo(() => {
     const teamMap = new Map();
 
     matches.forEach((match) => {
-      if (usesCompetitionStyleLive) {
-        if (match.team1 && match.teamDescription1) {
-          teamMap.set(match.team1, {
-            id: match.team1,
-            name: match.teamDescription1
-          });
-        }
-
-        if (match.team2 && match.teamDescription2) {
-          teamMap.set(match.team2, {
-            id: match.team2,
-            name: match.teamDescription2
-          });
-        }
-        return;
-      }
-
-      if (match.team1_uuid && match.team1_name) {
-        teamMap.set(match.team1_uuid, {
-          id: match.team1_uuid,
-          name: match.team1_name
+      if (match.team1 && match.teamDescription1) {
+        teamMap.set(match.team1, {
+          id: match.team1,
+          name: match.teamDescription1
         });
       }
 
-      if (match.team2_uuid && match.team2_name) {
-        teamMap.set(match.team2_uuid, {
-          id: match.team2_uuid,
-          name: match.team2_name
+      if (match.team2 && match.teamDescription2) {
+        teamMap.set(match.team2, {
+          id: match.team2,
+          name: match.teamDescription2
         });
       }
     });
 
     return Array.from(teamMap.values()).sort((left, right) => left.name.localeCompare(right.name));
-  }, [matches, usesCompetitionStyleLive]);
+  }, [matches]);
 
   const filterMatchesByTeam = (matchList) => {
     if (selectedTeamId === "all") {
       return matchList;
     }
 
-    return matchList.filter((match) =>
-      usesCompetitionStyleLive
-        ? match.team1 === selectedTeamId || match.team2 === selectedTeamId
-        : match.team1_uuid === selectedTeamId || match.team2_uuid === selectedTeamId
-    );
+    return matchList.filter((match) => match.team1 === selectedTeamId || match.team2 === selectedTeamId);
   };
 
   const liveMatches = useMemo(() => {
-    if (usesCompetitionStyleLive) {
-      return matches.filter((match) => match.matchState?.started && !match.matchState?.finished);
-    }
-
-    return matches.filter((match) => hasLeagueLiveStats(match));
-  }, [matches, usesCompetitionStyleLive]);
+    return matches.filter((match) => match.matchState?.started && !match.matchState?.finished);
+  }, [matches]);
 
   const upcomingMatches = useMemo(() => {
-    if (usesCompetitionStyleLive) {
-      return matches.filter((match) => !match.matchState?.started);
-    }
-
-    const now = Date.now();
-    return matches.filter((match) => {
-      const timestamp = new Date(`${match.date ?? ""}${match.time ? `T${match.time}` : ""}`).getTime();
-      return !match.results?.winner && !Number.isNaN(timestamp) && timestamp > now;
-    });
-  }, [matches, usesCompetitionStyleLive]);
+    return matches.filter((match) => !match.matchState?.started);
+  }, [matches]);
 
   const finishedMatches = useMemo(() => {
-    if (usesCompetitionStyleLive) {
-      return matches.filter((match) => match.matchState?.finished);
-    }
-
-    return matches.filter((match) => Boolean(match.results?.winner));
-  }, [matches, usesCompetitionStyleLive]);
+    return matches.filter((match) => match.matchState?.finished);
+  }, [matches]);
 
   const filteredLiveMatches = filterMatchesByTeam(liveMatches);
   const filteredUpcomingMatches = filterMatchesByTeam(upcomingMatches);
@@ -725,12 +512,6 @@ export default function EntityLive({ expectedEntityType }) {
               <Typography variant="h6" sx={{ fontWeight: 700 }}>
                 Wähle dein Team
               </Typography>
-              {entityType === "league" && !usesCompetitionStyleLive && (
-                <Typography color="text.secondary" textAlign="center">
-                  League live uses the cached league schedule and results. The external live feed is
-                  still competition-based.
-                </Typography>
-              )}
               <FormControl size="small" sx={{ minWidth: 240, width: "100%", maxWidth: 360 }}>
                 <InputLabel id="live-team-filter-label">Team</InputLabel>
                 <Select
@@ -751,52 +532,29 @@ export default function EntityLive({ expectedEntityType }) {
             </Stack>
           </Paper>
 
-          {usesCompetitionStyleLive && (
-            <MatchSection
-              title="Live"
-              matches={filteredLiveMatches}
-              emptyText={
-                entityType === "competition"
-                  ? "No matches are currently in progress."
-                  : "No league matches are currently in progress."
-              }
-              renderMatch={(match) => <CompetitionMatchRow key={match.id} match={match} isMobile={isMobile} />}
-            />
-          )}
-
-          {!usesCompetitionStyleLive && entityType === "league" && (
-            <MatchSection
-              title="Live"
-              matches={filteredLiveMatches}
-              emptyText="No league matches with live stats found."
-              renderMatch={(match) => <LeagueMatchRow key={match.uuid} match={match} isMobile={isMobile} />}
-            />
-          )}
+          <MatchSection
+            title="Live"
+            matches={filteredLiveMatches}
+            emptyText={
+              entityType === "competition"
+                ? "No matches are currently in progress."
+                : "No league matches are currently in progress."
+            }
+            renderMatch={(match) => <CompetitionMatchRow key={match.id} match={match} isMobile={isMobile} />}
+          />
 
           <MatchSection
             title="Upcoming Matches"
             matches={filteredUpcomingMatches}
             emptyText="No upcoming matches found."
-            renderMatch={(match) =>
-              usesCompetitionStyleLive ? (
-                <CompetitionMatchRow key={match.id} match={match} isMobile={isMobile} />
-              ) : (
-                <LeagueMatchRow key={match.uuid} match={match} isMobile={isMobile} />
-              )
-            }
+            renderMatch={(match) => <CompetitionMatchRow key={match.id} match={match} isMobile={isMobile} />}
           />
 
           <MatchSection
             title="Finished Matches"
             matches={filteredFinishedMatches}
             emptyText="No finished matches found."
-            renderMatch={(match) =>
-              usesCompetitionStyleLive ? (
-                <CompetitionMatchRow key={match.id} match={match} isMobile={isMobile} />
-              ) : (
-                <LeagueMatchRow key={match.uuid} match={match} isMobile={isMobile} />
-              )
-            }
+            renderMatch={(match) => <CompetitionMatchRow key={match.id} match={match} isMobile={isMobile} />}
           />
         </Box>
       )}

@@ -38,5 +38,5 @@ export { fetchJson } from "./realApi.js";
 export {
   fetchLiveJson,
   fetchUpcomingMatchUuids,
-  fetchMatchesByCompetitionUuid
+  fetchMatchesBySeriesUuid
 } from "./liveApi.js";

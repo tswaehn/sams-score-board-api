@@ -36,10 +36,10 @@ async function fetchWithTimeout(url) {
   }
 }
 
-export async function fetchLiveJson({ competitionUuid, path = "" } = {}) {
+export async function fetchLiveJson({ seriesUuid, path = "" } = {}) {
   const liveApiUrl = `${getApiBaseUrl()}/live`;
-  const scopedLiveApiUrl = competitionUuid
-    ? `${liveApiUrl}/${competitionUuid}`
+  const scopedLiveApiUrl = seriesUuid
+    ? `${liveApiUrl}/${seriesUuid}`
     : liveApiUrl;
   const url = new URL(path ? `${scopedLiveApiUrl}${path}` : scopedLiveApiUrl, window.location.origin);
 
@@ -52,12 +52,12 @@ export async function fetchLiveJson({ competitionUuid, path = "" } = {}) {
   return unwrapResponseData(await response.json());
 }
 
-export async function fetchUpcomingMatchUuids(competitionUuid) {
-  if (!competitionUuid) {
-    throw new Error("Missing competition uuid");
+export async function fetchUpcomingMatchUuids(seriesUuid) {
+  if (!seriesUuid) {
+    throw new Error("Missing live series uuid");
   }
 
-  const payload = await fetchLiveJson({ competitionUuid });
+  const payload = await fetchLiveJson({ seriesUuid });
   const now = Date.now();
 
   return payload.matchDays
@@ -67,12 +67,12 @@ export async function fetchUpcomingMatchUuids(competitionUuid) {
     .map((match) => match.id);
 }
 
-export async function fetchMatchesByCompetitionUuid(competitionUuid) {
-  if (!competitionUuid) {
-    throw new Error("Missing competition uuid");
+export async function fetchMatchesBySeriesUuid(seriesUuid) {
+  if (!seriesUuid) {
+    throw new Error("Missing live series uuid");
   }
 
-  const payload = await fetchLiveJson({ competitionUuid });
+  const payload = await fetchLiveJson({ seriesUuid });
 
   return payload.matchDays
     .flatMap((matchDay) => matchDay.matches ?? [])
