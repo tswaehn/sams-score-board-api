@@ -21,9 +21,8 @@ LIVE_API_WS_TIMEOUT_SECONDS = 55
 LIVE_API_WS_RECONNECT_SECONDS = 3
 LIVE_API_SNAPSHOT_REFRESH_SECONDS = max(
     1,
-    int(os.getenv("LIVE_API_SNAPSHOT_REFRESH_SECONDS", "15")),
+    int(os.getenv("LIVE_API_SNAPSHOT_REFRESH_SECONDS", "60")),
 )
-LIVE_API_FILTER_CACHE_TTL_SECONDS = 2
 LIVE_API_HEADERS = {
     "Accept": "application/json, text/plain, */*",
     "Accept-Language": "en-US,en;q=0.9",
@@ -39,283 +38,268 @@ LIVE_API_HEADERS = {
         "Chrome/127.0.0.0 Safari/537.36"
     ),
 }
-LIVE_API_STATE_LOCK = threading.RLock()
-LIVE_API_STATE_PAYLOAD: dict | None = None
-LIVE_API_STATE_ERROR: str | None = None
-LIVE_API_WS_THREAD: threading.Thread | None = None
-LIVE_API_FILTER_CACHE: dict[str, tuple[float, dict]] = {}
 
 
-def parse_live_api_config() -> tuple[str, str]:
-    if not LIVE_API_URL:
-        raise RuntimeError("Missing environment variable: LIVE_API_URL")
+class LiveStateUpdater:
+    def __init__(self, live_api_url: str | None) -> None:
+        self._live_api_url = live_api_url
+        self._lock = threading.RLock()
+        self._payload: dict = {}
+        self._error: str | None = None
+        self._thread: threading.Thread | None = None
+        self._ticker_type: str | None = None
+        self._ticker_id: str | None = None
+        self._ws_url: str | None = None
 
-    parsed_url = urlparse(LIVE_API_URL)
-    path_segments = [segment for segment in parsed_url.path.split("/") if segment]
-    if len(path_segments) != 4 or path_segments[0] != "live" or path_segments[2] != "tickers":
-        raise RuntimeError(
-            "LIVE_API_URL must match /live/<ticker_type>/tickers/<ticker_id>"
+    def start(self) -> None:
+        with self._lock:
+            if self._ws_url is None:
+                self._ticker_type, self._ticker_id, self._ws_url = self._parse_config()
+
+            if self._thread is not None and self._thread.is_alive():
+                return
+
+            self._thread = threading.Thread(
+                target=self._run,
+                name="live-api-websocket",
+                daemon=True,
+            )
+            self._thread.start()
+
+    def get_payload(self) -> dict:
+        with self._lock:
+            return deepcopy(self._payload)
+
+    def get_competition_payload(self, competition_uuid: str) -> dict:
+        with self._lock:
+            payload = deepcopy(self._payload)
+
+        if not payload:
+            return {}
+
+        return self._filter_payload(payload, competition_uuid)
+
+    def _parse_config(self) -> tuple[str, str, str]:
+        if not self._live_api_url:
+            raise RuntimeError("Missing environment variable: LIVE_API_URL")
+
+        parsed_url = urlparse(self._live_api_url)
+        path_segments = [segment for segment in parsed_url.path.split("/") if segment]
+        if len(path_segments) != 4 or path_segments[0] != "live" or path_segments[2] != "tickers":
+            raise RuntimeError(
+                "LIVE_API_URL must match /live/<ticker_type>/tickers/<ticker_id>"
+            )
+
+        ticker_type = path_segments[1]
+        ticker_id = path_segments[3]
+        if not ticker_type or not ticker_id:
+            raise RuntimeError(
+                "LIVE_API_URL must contain both ticker type and ticker id"
+            )
+
+        if not parsed_url.netloc:
+            raise RuntimeError("LIVE_API_URL must include a hostname")
+
+        return ticker_type, ticker_id, f"wss://{parsed_url.netloc}/{ticker_type}/{ticker_id}"
+
+    def _fetch_snapshot(self) -> dict:
+        response = requests.get(
+            self._live_api_url,
+            headers=LIVE_API_HEADERS,
+            timeout=LIVE_API_TIMEOUT_SECONDS,
         )
+        response.raise_for_status()
 
-    ticker_type = path_segments[1]
-    ticker_id = path_segments[3]
-    if not ticker_type or not ticker_id:
-        raise RuntimeError(
-            "LIVE_API_URL must contain both ticker type and ticker id"
-        )
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise RuntimeError(
+                f"Expected a dict payload from LIVE_API_URL, got {type(payload).__name__}"
+            )
 
-    return ticker_type, ticker_id
-
-
-def build_live_ws_url() -> str:
-    parsed_url = urlparse(LIVE_API_URL or "")
-    ticker_type, ticker_id = parse_live_api_config()
-    if not parsed_url.netloc:
-        raise RuntimeError("LIVE_API_URL must include a hostname")
-
-    return f"wss://{parsed_url.netloc}/{ticker_type}/{ticker_id}"
-
-
-def fetch_live_snapshot() -> dict:
-    response = requests.get(
-        LIVE_API_URL,
-        headers=LIVE_API_HEADERS,
-        timeout=LIVE_API_TIMEOUT_SECONDS,
-    )
-    response.raise_for_status()
-
-    payload = response.json()
-    if not isinstance(payload, dict):
-        raise RuntimeError(
-            f"Expected a dict payload from LIVE_API_URL, got {type(payload).__name__}"
-        )
-
-    return payload
-
-
-def filter_live_payload(payload: dict, competition_uuid: str | None = None) -> dict:
-    if competition_uuid is None:
         return payload
 
-    now = time.monotonic()
-    with LIVE_API_STATE_LOCK:
-        cached_entry = LIVE_API_FILTER_CACHE.get(competition_uuid)
-        if cached_entry is not None:
-            expires_at, cached_payload = cached_entry
-            if expires_at > now:
-                return cached_payload
+    def _store_snapshot(self, payload: dict) -> None:
+        with self._lock:
+            self._payload = payload
+            self._error = None
 
-    match_days = payload.get("matchDays")
-    if not isinstance(match_days, list):
-        raise RuntimeError("Live payload is missing a valid matchDays list")
+    def _set_error(self, message: str) -> None:
+        with self._lock:
+            self._error = message
 
-    filtered_match_days = []
-    included_match_ids: set[str] = set()
+    def _merge_message(self, message: dict) -> None:
+        message_type = message.get("type")
+        message_payload = message.get("payload")
 
-    for match_day in match_days:
-        if not isinstance(match_day, dict):
-            continue
+        with self._lock:
+            if message_type == "FETCH_DATA_RESPONSE_ERROR":
+                payload_type = message_payload.get("type") if isinstance(message_payload, dict) else None
+                self._error = f"Live websocket reported an error: {payload_type or 'unknown'}"
+                return
 
-        matches = match_day.get("matches")
-        if not isinstance(matches, list):
-            continue
+            if not isinstance(message_payload, dict):
+                return
 
-        filtered_matches = []
-        for match in matches:
-            if not isinstance(match, dict):
-                continue
-            if match.get("matchSeries") != competition_uuid:
-                continue
+            if message_type == "MATCH_UPDATE":
+                match_uuid = message_payload.get("matchUuid")
+                if isinstance(match_uuid, str):
+                    match_states = self._payload.setdefault("matchStates", {})
+                    if isinstance(match_states, dict):
+                        match_states[match_uuid] = message_payload
+                return
 
-            filtered_match = deepcopy(match)
-            filtered_matches.append(filtered_match)
+            if message_type == "MATCH_STATS_UPDATE":
+                match_uuid = message_payload.get("matchUuid")
+                if isinstance(match_uuid, str):
+                    match_stats = self._payload.setdefault("matchStats", {})
+                    if isinstance(match_stats, dict):
+                        match_stats[match_uuid] = message_payload
 
-            match_id = filtered_match.get("id")
-            if isinstance(match_id, str):
-                included_match_ids.add(match_id)
+    def _refresh_snapshot_if_due(self, next_refresh_at: float) -> float:
+        if time.monotonic() < next_refresh_at:
+            return next_refresh_at
 
-        if not filtered_matches:
-            continue
+        self._store_snapshot(self._fetch_snapshot())
+        return time.monotonic() + LIVE_API_SNAPSHOT_REFRESH_SECONDS
 
-        filtered_match_day = deepcopy(match_day)
-        filtered_match_day["matches"] = filtered_matches
-        filtered_match_days.append(filtered_match_day)
+    def _run(self) -> None:
+        if self._ws_url is None or self._ticker_type is None or self._ticker_id is None:
+            raise RuntimeError("Live state updater was started without valid websocket config")
 
-    filtered_payload = dict(payload)
-    filtered_payload["matchDays"] = filtered_match_days
-
-    match_series = payload.get("matchSeries")
-    if isinstance(match_series, dict):
-        filtered_payload["matchSeries"] = (
-            {competition_uuid: deepcopy(match_series[competition_uuid])}
-            if competition_uuid in match_series
-            else {}
+        ws_timeout_seconds = min(
+            LIVE_API_WS_TIMEOUT_SECONDS,
+            LIVE_API_SNAPSHOT_REFRESH_SECONDS,
         )
 
-    for key in ("matchStates", "matchStats"):
-        value = payload.get(key)
-        if isinstance(value, dict):
-            filtered_payload[key] = {
-                match_id: deepcopy(match_value)
-                for match_id, match_value in value.items()
-                if match_id in included_match_ids
-            }
+        while True:
+            ws = None
+            try:
+                self._store_snapshot(self._fetch_snapshot())
+                next_snapshot_refresh_at = time.monotonic() + LIVE_API_SNAPSHOT_REFRESH_SECONDS
+                ws = create_connection(self._ws_url, timeout=ws_timeout_seconds)
+                LOGGER.info(
+                    "Connected live websocket: %s (%s/%s)",
+                    self._ws_url,
+                    self._ticker_type,
+                    self._ticker_id,
+                )
 
-    with LIVE_API_STATE_LOCK:
-        LIVE_API_FILTER_CACHE[competition_uuid] = (
-            now + LIVE_API_FILTER_CACHE_TTL_SECONDS,
-            filtered_payload,
-        )
-
-    return filtered_payload
-
-
-def store_live_payload(payload: dict) -> None:
-    global LIVE_API_STATE_PAYLOAD, LIVE_API_STATE_ERROR, LIVE_API_FILTER_CACHE
-
-    with LIVE_API_STATE_LOCK:
-        LIVE_API_STATE_PAYLOAD = payload
-        LIVE_API_STATE_ERROR = None
-        LIVE_API_FILTER_CACHE = {}
-
-
-def merge_live_message(message: dict) -> None:
-    global LIVE_API_STATE_ERROR
-
-    message_type = message.get("type")
-    message_payload = message.get("payload")
-
-    with LIVE_API_STATE_LOCK:
-        if message_type == "FETCH_DATA_RESPONSE_ERROR":
-            payload_type = message_payload.get("type") if isinstance(message_payload, dict) else None
-            LIVE_API_STATE_ERROR = (
-                f"Live websocket reported an error: {payload_type or 'unknown'}"
-            )
-            return
-
-        if not isinstance(LIVE_API_STATE_PAYLOAD, dict):
-            return
-
-        if message_type == "MATCH_UPDATE" and isinstance(message_payload, dict):
-            match_uuid = message_payload.get("matchUuid")
-            if isinstance(match_uuid, str):
-                match_states = LIVE_API_STATE_PAYLOAD.setdefault("matchStates", {})
-                if isinstance(match_states, dict):
-                    match_states[match_uuid] = message_payload
-            return
-
-        if message_type == "MATCH_STATS_UPDATE" and isinstance(message_payload, dict):
-            match_uuid = message_payload.get("matchUuid")
-            if isinstance(match_uuid, str):
-                match_stats = LIVE_API_STATE_PAYLOAD.setdefault("matchStats", {})
-                if isinstance(match_stats, dict):
-                    match_stats[match_uuid] = message_payload
-
-
-def live_ws_worker() -> None:
-    global LIVE_API_STATE_ERROR
-
-    ws_url = build_live_ws_url()
-    ws_timeout_seconds = min(
-        LIVE_API_WS_TIMEOUT_SECONDS,
-        LIVE_API_SNAPSHOT_REFRESH_SECONDS,
-    )
-
-    while True:
-        ws = None
-        try:
-            store_live_payload(fetch_live_snapshot())
-            next_snapshot_refresh_at = time.monotonic() + LIVE_API_SNAPSHOT_REFRESH_SECONDS
-            ws = create_connection(ws_url, timeout=ws_timeout_seconds)
-            LOGGER.info("Connected live websocket: %s", ws_url)
-
-            while True:
-                if time.monotonic() >= next_snapshot_refresh_at:
-                    store_live_payload(fetch_live_snapshot())
-                    next_snapshot_refresh_at = (
-                        time.monotonic() + LIVE_API_SNAPSHOT_REFRESH_SECONDS
+                while True:
+                    next_snapshot_refresh_at = self._refresh_snapshot_if_due(
+                        next_snapshot_refresh_at
                     )
 
-                try:
-                    raw_message = ws.recv()
-                except WebSocketTimeoutException:
-                    if time.monotonic() >= next_snapshot_refresh_at:
-                        store_live_payload(fetch_live_snapshot())
-                        next_snapshot_refresh_at = (
-                            time.monotonic() + LIVE_API_SNAPSHOT_REFRESH_SECONDS
+                    try:
+                        raw_message = ws.recv()
+                    except WebSocketTimeoutException:
+                        next_snapshot_refresh_at = self._refresh_snapshot_if_due(
+                            next_snapshot_refresh_at
                         )
-                    continue
+                        continue
 
-                if not raw_message:
-                    raise WebSocketConnectionClosedException("Live websocket closed")
+                    if not raw_message:
+                        raise WebSocketConnectionClosedException("Live websocket closed")
 
-                message = json.loads(raw_message)
-                if not isinstance(message, dict):
-                    continue
+                    message = json.loads(raw_message)
+                    if not isinstance(message, dict):
+                        continue
 
-                merge_live_message(message)
-                if time.monotonic() >= next_snapshot_refresh_at:
-                    store_live_payload(fetch_live_snapshot())
-                    next_snapshot_refresh_at = (
-                        time.monotonic() + LIVE_API_SNAPSHOT_REFRESH_SECONDS
+                    self._merge_message(message)
+                    next_snapshot_refresh_at = self._refresh_snapshot_if_due(
+                        next_snapshot_refresh_at
                     )
-        except RequestException as exc:
-            with LIVE_API_STATE_LOCK:
-                LIVE_API_STATE_ERROR = "Failed to fetch live data"
-            LOGGER.warning("Live snapshot fetch failed: %s", exc)
-        except (
-            RuntimeError,
-            ValueError,
-            WebSocketConnectionClosedException,
-            WebSocketTimeoutException,
-        ) as exc:
-            with LIVE_API_STATE_LOCK:
-                LIVE_API_STATE_ERROR = "Live websocket disconnected"
-            LOGGER.warning("Live websocket loop failed: %s", exc)
-        except Exception:
-            with LIVE_API_STATE_LOCK:
-                LIVE_API_STATE_ERROR = "Live websocket disconnected"
-            LOGGER.exception("Unexpected live websocket error")
-        finally:
-            if ws is not None:
-                try:
-                    ws.close()
-                except Exception:
-                    pass
+            except RequestException as exc:
+                self._set_error("Failed to fetch live data")
+                LOGGER.warning("Live snapshot fetch failed: %s", exc)
+            except (
+                RuntimeError,
+                ValueError,
+                WebSocketConnectionClosedException,
+                WebSocketTimeoutException,
+            ) as exc:
+                self._set_error("Live websocket disconnected")
+                LOGGER.warning("Live websocket loop failed: %s", exc)
+            except Exception:
+                self._set_error("Live websocket disconnected")
+                LOGGER.exception("Unexpected live websocket error")
+            finally:
+                if ws is not None:
+                    try:
+                        ws.close()
+                    except Exception:
+                        pass
 
-        time.sleep(LIVE_API_WS_RECONNECT_SECONDS)
+            time.sleep(LIVE_API_WS_RECONNECT_SECONDS)
+
+    def _filter_payload(self, payload: dict, competition_uuid: str) -> dict:
+        match_days = payload.get("matchDays")
+        if not isinstance(match_days, list):
+            return {}
+
+        filtered_match_days = []
+        included_match_ids: set[str] = set()
+
+        for match_day in match_days:
+            if not isinstance(match_day, dict):
+                continue
+
+            matches = match_day.get("matches")
+            if not isinstance(matches, list):
+                continue
+
+            filtered_matches = []
+            for match in matches:
+                if not isinstance(match, dict):
+                    continue
+                if match.get("matchSeries") != competition_uuid:
+                    continue
+
+                filtered_match = deepcopy(match)
+                filtered_matches.append(filtered_match)
+
+                match_id = filtered_match.get("id")
+                if isinstance(match_id, str):
+                    included_match_ids.add(match_id)
+
+            if not filtered_matches:
+                continue
+
+            filtered_match_day = deepcopy(match_day)
+            filtered_match_day["matches"] = filtered_matches
+            filtered_match_days.append(filtered_match_day)
+
+        filtered_payload = dict(payload)
+        filtered_payload["matchDays"] = filtered_match_days
+
+        match_series = payload.get("matchSeries")
+        if isinstance(match_series, dict):
+            filtered_payload["matchSeries"] = (
+                {competition_uuid: deepcopy(match_series[competition_uuid])}
+                if competition_uuid in match_series
+                else {}
+            )
+
+        for key in ("matchStates", "matchStats"):
+            value = payload.get(key)
+            if isinstance(value, dict):
+                filtered_payload[key] = {
+                    match_id: deepcopy(match_value)
+                    for match_id, match_value in value.items()
+                    if match_id in included_match_ids
+                }
+
+        return filtered_payload
 
 
-def ensure_live_ws_worker() -> None:
-    global LIVE_API_WS_THREAD
-
-    with LIVE_API_STATE_LOCK:
-        if LIVE_API_WS_THREAD is not None and LIVE_API_WS_THREAD.is_alive():
-            return
-
-        LIVE_API_WS_THREAD = threading.Thread(
-            target=live_ws_worker,
-            name="live-api-websocket",
-            daemon=True,
-        )
-        LIVE_API_WS_THREAD.start()
+LIVE_STATE_UPDATER = LiveStateUpdater(LIVE_API_URL)
 
 
 def startup_live_endpoint() -> None:
-    parse_live_api_config()
-    store_live_payload(fetch_live_snapshot())
-    ensure_live_ws_worker()
+    LIVE_STATE_UPDATER.start()
 
 
 def get_live_payload(competition_uuid: str | None = None) -> dict:
-    parse_live_api_config()
-    ensure_live_ws_worker()
+    if competition_uuid is None:
+        return LIVE_STATE_UPDATER.get_payload()
 
-    with LIVE_API_STATE_LOCK:
-        payload = LIVE_API_STATE_PAYLOAD
-
-    if payload is None:
-        payload = fetch_live_snapshot()
-        store_live_payload(payload)
-
-    return filter_live_payload(payload, competition_uuid)
+    return LIVE_STATE_UPDATER.get_competition_payload(competition_uuid)

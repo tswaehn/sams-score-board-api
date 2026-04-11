@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 import logging
 import os
 from uuid import UUID, uuid4
@@ -9,8 +10,6 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from requests import RequestException
-
 from competition.fetch_competition import COMPETITION
 from competition.fetch_competition_list import COMPETITION_LIST_STORE
 from league.fetch_league import LEAGUE
@@ -28,11 +27,26 @@ logging.basicConfig(
 )
 LOGGER = logging.getLogger("api")
 
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    if not LIVE_API_URL:
+        LOGGER.info("Skipping live endpoint startup: LIVE_API_URL is not configured")
+    else:
+        try:
+            startup_live_endpoint()
+        except Exception:
+            LOGGER.exception("Live endpoint startup failed")
+
+    yield
+
+
 app = FastAPI(
     title="Competition and League API",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -42,19 +56,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.on_event("startup")
-async def startup() -> None:
-    if not LIVE_API_URL:
-        LOGGER.info("Skipping live endpoint startup: LIVE_API_URL is not configured")
-        return
-
-    try:
-        startup_live_endpoint()
-    except Exception:
-        LOGGER.exception("Live endpoint startup failed")
-
 
 @app.middleware("http")
 async def attach_request_id(request: Request, call_next):
@@ -172,12 +173,8 @@ async def league_list(request: Request) -> dict:
 async def live_by_competition(competition_id: UUID, request: Request) -> dict:
     try:
         payload = get_live_payload(str(competition_id))
-    except RequestException as exc:
-        raise HTTPException(status_code=502, detail="Failed to fetch live data") from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=502, detail="Live API did not return valid JSON") from exc
 
     return payload
 

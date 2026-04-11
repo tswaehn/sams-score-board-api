@@ -119,6 +119,12 @@ api_surface:
       purpose: return current live payload from snapshot plus websocket updates
 
 http_behavior:
+  lifecycle:
+    startup:
+      mechanism: FastAPI lifespan handler
+      details:
+        - starts the live endpoint updater when LIVE_API_URL is configured
+        - logs and continues if live endpoint startup fails
   middleware:
     - name: request-id
       details:
@@ -196,10 +202,10 @@ environment:
       expected_path_pattern: /live/<ticker_type>/tickers/<ticker_id>
     - name: LIVE_API_SNAPSHOT_REFRESH_SECONDS
       required: false
-      default: 15
+      default: 60
       used_by:
         - client-api/live_endpoint.py
-      purpose: periodically refresh the full live snapshot while the websocket stays connected so matchDays and matchSeries do not drift stale
+      purpose: periodically refresh the full live snapshot inside the live updater so matchDays and matchSeries stay aligned with upstream while websocket deltas update match state
 
 upstream_integrations:
   ssvb_rest_api:
@@ -285,24 +291,29 @@ caching:
 
 live_state_model:
   module: client-api/live_endpoint.py
+  owner:
+    class: LiveStateUpdater
+    singleton: LIVE_STATE_UPDATER
   state:
-    payload: process-global dict or null
-    error: process-global string or null
-    websocket_thread: process-global daemon thread or null
+    payload: updater-owned in-memory dict
+    error: updater-owned string or null
+    websocket_thread: updater-owned daemon thread or null
   startup_sequence:
     - validate LIVE_API_URL
-    - ensure websocket worker thread exists
-    - if no payload available, fetch HTTP snapshot synchronously
+    - start the updater thread once
   websocket_merge_rules:
     - FETCH_DATA_RESPONSE_ERROR sets error state
     - MATCH_UPDATE merges payload into matchStates[matchUuid]
     - MATCH_STATS_UPDATE merges payload into matchStats[matchUuid]
-  fallback_behavior:
-    - if worker has not produced payload yet, /api/live/{competition_id} fetches a snapshot directly before filtering
-    - while the websocket stays connected, the worker periodically refetches the full snapshot so matchDays and matchSeries include upstream schedule changes
+  updater_behavior:
+    - the updater is the only component allowed to fetch or mutate live state
+    - the updater refreshes the full snapshot before opening the websocket and again every LIVE_API_SNAPSHOT_REFRESH_SECONDS
+    - websocket messages are treated as deltas layered onto the stored snapshot
+    - if no snapshot is available yet, endpoint reads return an empty dict
   live_endpoint_behavior:
+    - GET /api/live/{competition_id} reads only from the updater public API
+    - GET /api/live/{competition_id} does not start or repair the updater lifecycle
     - GET /api/live/{competition_id} filters matchDays, matchStates, matchStats, and matchSeries server-side to the requested competition while preserving the live payload shape
-    - competition-scoped filtered live payloads are cached in-process per competition_uuid for 2 seconds
 
 payload_shapes:
   competition_endpoint_top_level_keys:
