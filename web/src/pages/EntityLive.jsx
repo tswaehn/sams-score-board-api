@@ -11,9 +11,10 @@ import {
 } from "@mui/material";
 import { useParams } from "react-router-dom";
 import { fetchMatchesBySeriesUuid, useIsMobile } from "../api/api.js";
+import { BallPoint } from "../components/ballPoint.jsx";
 import { layout } from "../components/layout.js";
 import { MatchResultCard } from "../components/matchResultCard.jsx";
-import { StateChip } from "../components/stateChip.jsx";
+import { getCompetitionStatusChip, StatusChip } from "../components/stateChip.jsx";
 
 function formatMatchDate(timestamp) {
   return new Intl.DateTimeFormat("de-DE", {
@@ -27,43 +28,25 @@ function getSetPointStyles(leftPoints, rightPoints, side) {
   const rightValue = Number(rightPoints);
 
   if (Number.isNaN(leftValue) || Number.isNaN(rightValue) || leftValue === rightValue) {
-    return {};
+    return "default";
   }
 
   const isHigher =
     (side === "left" && leftValue > rightValue) ||
     (side === "right" && rightValue > leftValue);
 
-  return {
-    bgcolor: isHigher ? "rgba(178, 232, 187, 0.6)" : "rgba(244, 199, 199, 0.7)",
-    borderRadius: 1,
-    px: 0.75,
-    py: 0.25,
-    fontWeight: isHigher ? 700 : 400
-  };
+  return isHigher ? "won" : "lost";
 }
 
-function getActiveSetStyles(matchState, setIndex) {
+function getActiveSetState(matchState, setIndex, servingTeam, teamKey) {
   const isInProgress = matchState?.started && !matchState?.finished;
   const lastSetIndex = (matchState?.matchSets?.length ?? 0) - 1;
 
   if (isInProgress && setIndex === lastSetIndex) {
-    return {
-      bgcolor: "#e5e7eb",
-      borderRadius: 1,
-      px: 0.75,
-      py: 0.25
-    };
+    return servingTeam === teamKey ? "activeServing" : "active";
   }
 
-  return {};
-}
-
-function isActiveSet(matchState, setIndex) {
-  const isInProgress = matchState?.started && !matchState?.finished;
-  const lastSetIndex = (matchState?.matchSets?.length ?? 0) - 1;
-
-  return isInProgress && setIndex === lastSetIndex;
+  return null;
 }
 
 function getTeamSetPoints(matchState, side) {
@@ -95,36 +78,6 @@ function getWinnerSide(matchState) {
   }
 
   return leftPoints > rightPoints ? "team1" : "team2";
-}
-
-function getCompetitionStatusChip(matchState) {
-  if (!matchState?.started) {
-    return {
-      label: "SCHEDULED",
-      sx: {
-        bgcolor: "#fef3c7",
-        color: "#c2410c"
-      }
-    };
-  }
-
-  if (matchState.finished) {
-    return {
-      label: "FINISHED",
-      sx: {
-        bgcolor: "#e5e7eb",
-        color: "#4b5563"
-      }
-    };
-  }
-
-  return {
-    label: "IN PROGRESS",
-    sx: {
-      bgcolor: "#d32f2f",
-      color: "#ffffff"
-    }
-  };
 }
 
 function getCompetitionResultRows(match) {
@@ -199,11 +152,7 @@ function CompetitionMatchRow({ match, isMobile }) {
           <Typography sx={{ fontWeight: 600, color: "rgba(26, 21, 18, 0.45)" }}>
             {formatMatchDate(match.date)}
           </Typography>
-          <StateChip
-            label={statusChip.label}
-            size="small"
-            sx={statusChip.sx}
-          />
+          <StatusChip type={getCompetitionStatusChip(match.matchState)} size="small" />
         </Stack>
         <Typography sx={{ color: "rgba(26, 21, 18, 0.45)" }}>
           {match.matchSeriesData?.name ?? "Unknown series"}
@@ -253,31 +202,15 @@ function CompetitionMatchRow({ match, isMobile }) {
         <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ justifySelf: "end" }}>
           {team1SetPoints.map((points, index) => {
             const opposingPoints = team2SetPoints[index] ?? "-";
-            const activeSet = isActiveSet(match.matchState, index);
+            const activeState = getActiveSetState(match.matchState, index, servingTeam, "team1");
 
             return (
-              <Typography
+              <BallPoint
                 key={`${match.id}-team1-set-${index + 1}`}
-                variant="body2"
-                color="text.secondary"
-                sx={{
-                  width: 32,
-                  textAlign: "center",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  ...getActiveSetStyles(match.matchState, index),
-                  ...(activeSet && servingTeam === "team1"
-                    ? {
-                        fontWeight: 700,
-                        border: "1px solid #4b5563"
-                      }
-                    : {}),
-                  ...(!activeSet ? getSetPointStyles(points, opposingPoints, "left") : {})
-                }}
-              >
-                {points}
-              </Typography>
+                value={points}
+                size="set"
+                state={activeState ?? getSetPointStyles(points, opposingPoints, "left")}
+              />
             );
           })}
         </Stack>
@@ -326,31 +259,15 @@ function CompetitionMatchRow({ match, isMobile }) {
         <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ justifySelf: "end" }}>
           {team2SetPoints.map((points, index) => {
             const opposingPoints = team1SetPoints[index] ?? "-";
-            const activeSet = isActiveSet(match.matchState, index);
+            const activeState = getActiveSetState(match.matchState, index, servingTeam, "team2");
 
             return (
-              <Typography
+              <BallPoint
                 key={`${match.id}-team2-set-${index + 1}`}
-                variant="body2"
-                color="text.secondary"
-                sx={{
-                  width: 32,
-                  textAlign: "center",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  ...getActiveSetStyles(match.matchState, index),
-                  ...(activeSet && servingTeam === "team2"
-                    ? {
-                        fontWeight: 700,
-                        border: "1px solid #4b5563"
-                      }
-                    : {}),
-                  ...(!activeSet ? getSetPointStyles(opposingPoints, points, "right") : {})
-                }}
-              >
-                {points}
-              </Typography>
+                value={points}
+                size="set"
+                state={activeState ?? getSetPointStyles(opposingPoints, points, "right")}
+              />
             );
           })}
         </Stack>

@@ -1,4 +1,4 @@
-import { Chip } from "@mui/material";
+import { Box, Chip } from "@mui/material";
 
 function getBaseChipSx(size) {
   if (size === "small") {
@@ -18,8 +18,76 @@ function getBaseChipSx(size) {
   };
 }
 
-export function StateChip({ label, size = "small", sx = {} }) {
-  return <Chip label={label} size={size} sx={{ ...getBaseChipSx(size), ...sx }} />;
+function BaseStateChip({ label, size = "small", chipSx }) {
+  return <Chip label={label} size={size} sx={{ ...getBaseChipSx(size), ...chipSx }} />;
+}
+
+export function FinishedChip({ size = "small" }) {
+  return (
+    <BaseStateChip
+      label="FINISHED"
+      size={size}
+      chipSx={{
+        bgcolor: "#e5e7eb",
+        color: "#4b5563"
+      }}
+    />
+  );
+}
+
+export function LiveChip({ size = "small" }) {
+  return (
+    <BaseStateChip
+      label="LIVE"
+      size={size}
+      chipSx={{
+        bgcolor: "#d32f2f",
+        color: "#ffffff"
+      }}
+    />
+  );
+}
+
+export function UpcomingChip({ size = "small" }) {
+  return (
+    <BaseStateChip
+      label="UPCOMING"
+      size={size}
+      chipSx={{
+        bgcolor: "#fef3c7",
+        color: "#c2410c"
+      }}
+    />
+  );
+}
+
+export function ScheduledChip({ size = "small" }) {
+  return (
+    <BaseStateChip
+      label="SCHEDULED"
+      size={size}
+      chipSx={{
+        bgcolor: "#fef3c7",
+        color: "#c2410c"
+      }}
+    />
+  );
+}
+
+export function StatusChip({ type, size = "small" }) {
+  if (type === "FINISHED") {
+    return <FinishedChip size={size} />;
+  }
+
+  if (type === "LIVE") {
+    return <LiveChip size={size} />;
+  }
+
+  if (type === "UPCOMING") {
+    return <UpcomingChip size={size} />;
+  }
+
+  return <ScheduledChip size={size} />;
 }
 
 function hasLeagueLiveStats(match) {
@@ -44,74 +112,44 @@ export function getPlannedMatchStatusChip(match) {
   ).getTime();
 
   if (hasWinner) {
-    return {
-      label: "FINISHED",
-      sx: {
-        bgcolor: "#e5e7eb",
-        color: "#4b5563"
-      }
-    };
+    return "FINISHED";
   }
 
   if (hasLeagueLiveStats(match)) {
-    return {
-      label: "LIVE",
-      sx: {
-        bgcolor: "#d32f2f",
-        color: "#ffffff"
-      }
-    };
+    return "LIVE";
   }
 
   if (!Number.isNaN(matchTimestamp) && matchTimestamp > now) {
-    return {
-      label: "UPCOMING",
-      sx: {
-        bgcolor: "#fef3c7",
-        color: "#c2410c"
-      }
-    };
+    return "UPCOMING";
   }
 
-  return {
-    label: "SCHEDULED",
-    sx: {
-      bgcolor: "#e5e7eb",
-      color: "#4b5563"
-    }
-  };
+  return "SCHEDULED";
 }
 
 export function getPlannedGroupStatusChip(group) {
   if (group?.finished) {
-    return {
-      label: "FINISHED",
-      sx: {
-        bgcolor: "#e5e7eb",
-        color: "#4b5563"
-      }
-    };
+    return "FINISHED";
   }
 
-  return {
-    label: "UPCOMING",
-    sx: {
-      bgcolor: "#fef3c7",
-      color: "#c2410c"
-    }
-  };
+  return "SCHEDULED";
+}
+
+export function getCompetitionStatusChip(matchState) {
+  if (matchState?.finished) {
+    return "FINISHED";
+  }
+
+  if (matchState?.started) {
+    return "LIVE";
+  }
+
+  return "SCHEDULED";
 }
 
 export function FinishedStateChip({ finished, compact = false }) {
   return (
-    <StateChip
-      label={finished ? "FINISHED" : "OPEN"}
-      size={compact ? "small" : "medium"}
-      sx={{
-        alignSelf: "flex-start",
-        bgcolor: finished ? "#e5e7eb" : "#fef3c7",
-        color: finished ? "#4b5563" : "#c2410c"
-      }}
-    />
+    <Box sx={{ alignSelf: "flex-start" }}>
+      <StatusChip type={finished ? "FINISHED" : "SCHEDULED"} size={compact ? "small" : "medium"} />
+    </Box>
   );
 }

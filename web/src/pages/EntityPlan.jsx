@@ -25,7 +25,11 @@ import {
 } from "../api/api.js";
 import { layout } from "../components/layout.js";
 import { MatchResultCard } from "../components/matchResultCard.jsx";
-import { getPlannedGroupStatusChip, getPlannedMatchStatusChip, StateChip } from "../components/stateChip.jsx";
+import {
+  getPlannedGroupStatusChip,
+  getPlannedMatchStatusChip,
+  StatusChip
+} from "../components/stateChip.jsx";
 
 function getRankingRows(rankings, rankingName) {
   const groupRankings = rankings[rankingName] ?? {};
@@ -122,11 +126,7 @@ function GroupDropdown({ activeGroupId, groups, label, onChange }) {
                 sx={{ width: "100%" }}
               >
                 <Typography>{group.name}</Typography>
-                <StateChip
-                  label={getPlannedGroupStatusChip(group).label}
-                  size="small"
-                  sx={getPlannedGroupStatusChip(group).sx}
-                />
+                <StatusChip type={getPlannedGroupStatusChip(group)} size="small" />
               </Stack>
             </MenuItem>
           ))}
@@ -153,11 +153,7 @@ function GroupTabs({ activeGroupId, groups, onChange }) {
           label={(
             <Stack spacing={0.5} alignItems="center">
               <Typography sx={{ fontWeight: 600 }}>{group.name}</Typography>
-              <StateChip
-                label={getPlannedGroupStatusChip(group).label}
-                size="small"
-                sx={getPlannedGroupStatusChip(group).sx}
-              />
+              <StatusChip type={getPlannedGroupStatusChip(group)} size="small" />
             </Stack>
           )}
           sx={{ textTransform: "none", py: 1.25, minHeight: 72 }}

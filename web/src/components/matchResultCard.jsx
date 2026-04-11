@@ -1,36 +1,33 @@
 import { Box, Stack, Typography } from "@mui/material";
+import { BallPoint } from "./ballPoint.jsx";
 import { layout } from "./layout.js";
-import { FinishedStateChip, StateChip } from "./stateChip.jsx";
+import {
+  FinishedStateChip,
+  StatusChip
+} from "./stateChip.jsx";
 
 function getSetPointStyles(leftPoints, rightPoints, side) {
   const leftValue = Number(leftPoints);
   const rightValue = Number(rightPoints);
 
   if (Number.isNaN(leftValue) || Number.isNaN(rightValue) || leftValue === rightValue) {
-    return {};
+    return "default";
   }
 
   const isHigher =
     (side === "left" && leftValue > rightValue) ||
     (side === "right" && rightValue > leftValue);
 
-  return {
-    bgcolor: isHigher ? "rgba(178, 232, 187, 0.6)" : "rgba(244, 199, 199, 0.7)",
-    borderRadius: 1,
-    px: 0.75,
-    py: 0.25,
-    fontWeight: isHigher ? 700 : 400
-  };
+  return isHigher ? "won" : "lost";
 }
 
 function TeamResultRow({
   row,
   nameColumnFraction,
   setPointWidth,
-  setChipWidth,
   setSpacing,
   showBallPoints,
-  ballPointWidth
+  compact
 }) {
   return (
     <Box
@@ -62,41 +59,24 @@ function TeamResultRow({
           const opposingPoints = row.opponentSetPoints[index] ?? "-";
 
           return (
-            <Typography
+            <BallPoint
               key={`${row.key}-set-${index + 1}`}
-              variant="body2"
-              color="text.secondary"
-              sx={{
-                width: setChipWidth,
-                textAlign: "center",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                ...getSetPointStyles(
-                  row.side === "left" ? points : opposingPoints,
-                  row.side === "left" ? opposingPoints : points,
-                  row.side
-                )
-              }}
-            >
-              {points}
-            </Typography>
+              value={points}
+              size={compact ? "compactSet" : "set"}
+              state={getSetPointStyles(
+                row.side === "left" ? points : opposingPoints,
+                row.side === "left" ? opposingPoints : points,
+                row.side
+              )}
+            />
           );
         })}
         {showBallPoints && (
-          <Typography
-            variant="body2"
-            sx={{
-              width: ballPointWidth,
-              textAlign: "center",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "rgba(26, 21, 18, 0.45)"
-            }}
-          >
-            {row.ballPoints ?? "-"}
-          </Typography>
+          <BallPoint
+            value={row.ballPoints}
+            size="total"
+            state="muted"
+          />
         )}
       </Stack>
     </Box>
@@ -113,11 +93,9 @@ export function MatchResultCard({
   showBallPoints = true
 }) {
   const nameColumnFraction = compact ? 1 : 2;
-  const setChipWidth = compact ? 28 : 32;
   const setPointWidth = 32;
-  const ballPointWidth = 40;
   const setSpacing = compact ? 0.5 : 1;
-  const isFinishedStatusChip = String(statusChip?.label ?? "").toUpperCase() === "FINISHED";
+  const isFinishedStatusChip = statusChip === "FINISHED";
   const showFinishedChip = typeof finished === "boolean" && !isFinishedStatusChip;
 
   return (
@@ -141,11 +119,7 @@ export function MatchResultCard({
             {dateLabel}
           </Typography>
           {statusChip && !isFinishedStatusChip && (
-            <StateChip
-              label={statusChip.label}
-              size="small"
-              sx={statusChip.sx}
-            />
+            <StatusChip type={statusChip} size="small" />
           )}
           {isFinishedStatusChip && <FinishedStateChip finished compact />}
           {showFinishedChip && <FinishedStateChip finished={finished} compact />}
@@ -163,10 +137,9 @@ export function MatchResultCard({
           row={row}
           nameColumnFraction={nameColumnFraction}
           setPointWidth={setPointWidth}
-          setChipWidth={setChipWidth}
           setSpacing={setSpacing}
           showBallPoints={showBallPoints}
-          ballPointWidth={ballPointWidth}
+          compact={compact}
         />
       ))}
     </Box>
