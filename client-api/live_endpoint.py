@@ -295,6 +295,9 @@ LIVE_STATE_UPDATER = LiveStateUpdater(LIVE_API_URL)
 
 
 def startup_live_endpoint() -> None:
+    if not LIVE_API_URL:
+        raise RuntimeError("LIVE_API_URL is required to start the live endpoint")
+
     LIVE_STATE_UPDATER.start()
 
 

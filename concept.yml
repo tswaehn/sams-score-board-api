@@ -123,8 +123,9 @@ http_behavior:
     startup:
       mechanism: FastAPI lifespan handler
       details:
-        - starts the live endpoint updater when LIVE_API_URL is configured
-        - logs and continues if live endpoint startup fails
+        - requires LIVE_API_URL to be configured
+        - starts the live endpoint updater once
+        - raises startup errors so FastAPI fails to start instead of serving with an uninitialized live endpoint
   middleware:
     - name: request-id
       details:

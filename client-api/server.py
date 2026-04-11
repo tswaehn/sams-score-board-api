@@ -30,13 +30,11 @@ LOGGER = logging.getLogger("api")
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    if not LIVE_API_URL:
-        LOGGER.info("Skipping live endpoint startup: LIVE_API_URL is not configured")
-    else:
-        try:
-            startup_live_endpoint()
-        except Exception:
-            LOGGER.exception("Live endpoint startup failed")
+    try:
+        startup_live_endpoint()
+    except Exception:
+        LOGGER.exception("Live endpoint startup failed")
+        raise
 
     yield
 
