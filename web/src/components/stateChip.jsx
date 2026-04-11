@@ -1,6 +1,17 @@
 import { Box, Chip } from "@mui/material";
 
 function getBaseChipSx(size) {
+  if (size === "xsmall") {
+    return {
+      height: 16,
+      fontSize: "0.625rem",
+      fontWeight: 700,
+      "& .MuiChip-label": {
+        px: 0.5
+      }
+    };
+  }
+
   if (size === "small") {
     return {
       height: 20,

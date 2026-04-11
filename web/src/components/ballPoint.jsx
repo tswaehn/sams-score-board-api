@@ -38,19 +38,22 @@ const BALL_POINT_STYLES = {
 const BALL_POINT_SIZES = {
   set: 32,
   compactSet: 28,
+  tinySet: 22,
   total: 40
 };
 
 export function BallPoint({ value, state = "default", size = "set" }) {
   return (
     <Typography
-      variant="body2"
+      variant={size === "tinySet" ? "caption" : "body2"}
       sx={{
         width: BALL_POINT_SIZES[size] ?? BALL_POINT_SIZES.set,
         textAlign: "center",
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
+        fontSize: size === "tinySet" ? "0.65rem" : undefined,
+        lineHeight: size === "tinySet" ? 1.1 : undefined,
         ...BALL_POINT_STYLES[state]
       }}
     >

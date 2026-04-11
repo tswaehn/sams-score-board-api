@@ -82,10 +82,16 @@ function SelectionMenu() {
   const location = useLocation();
   const navigate = useNavigate();
   const [anchorEl, setAnchorEl] = useState(null);
+  const { entityType, entityUuid } = getEntityFromPath(location.pathname);
+  const searchSuffix = location.search ?? "";
   const current =
     location.pathname.startsWith("/leagues") || location.pathname.startsWith("/league/")
       ? "/leagues"
       : "/competitions";
+  const isCompetitionOverviewRoute =
+    entityType === "competition" &&
+    entityUuid &&
+    location.pathname.startsWith(`/competition/${entityUuid}/full-screen`);
 
   const handleNavigate = (path) => {
     setAnchorEl(null);
@@ -108,6 +114,14 @@ function SelectionMenu() {
         anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
         transformOrigin={{ vertical: "top", horizontal: "left" }}
       >
+        {entityType === "competition" && entityUuid && (
+          <MenuItem
+            selected={Boolean(isCompetitionOverviewRoute)}
+            onClick={() => handleNavigate(`/competition/${entityUuid}/full-screen${searchSuffix}`)}
+          >
+            Competition Overview
+          </MenuItem>
+        )}
         <MenuItem selected={current === "/competitions"} onClick={() => handleNavigate("/competitions")}>
           Competition List
         </MenuItem>
