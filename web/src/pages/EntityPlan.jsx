@@ -84,7 +84,8 @@ function getMatchResultRows(match, leftLabel, rightLabel) {
   return [
     {
       key: `${match.uuid}-team1`,
-      label: leftLabel,
+      teamName: leftLabel.name,
+      teamShortName: leftLabel.shortName,
       isWinner: winnerUuid === match.team1_uuid,
       totalSetPoints: totalSetPoints.leftPoints,
       setPoints: team1SetPoints,
@@ -94,7 +95,8 @@ function getMatchResultRows(match, leftLabel, rightLabel) {
     },
     {
       key: `${match.uuid}-team2`,
-      label: rightLabel,
+      teamName: rightLabel.name,
+      teamShortName: rightLabel.shortName,
       isWinner: winnerUuid === match.team2_uuid,
       totalSetPoints: totalSetPoints.rightPoints,
       setPoints: team2SetPoints,
@@ -281,11 +283,17 @@ function MobileRankingTable({ activeGroup, rankingRows, teamByName }) {
   );
 }
 
-function MatchCard({ match, teamByUuid }) {
+function PlanMatchCard({ match, teamByUuid, compact = false }) {
   const team1 = teamByUuid.get(match.team1_uuid);
   const team2 = teamByUuid.get(match.team2_uuid);
-  const team1Label = team1?.name ?? match.team1_name ?? match.team1_uuid ?? "";
-  const team2Label = team2?.name ?? match.team2_name ?? match.team2_uuid ?? "";
+  const team1Label = {
+    name: team1?.name ?? match.team1_name ?? match.team1_uuid ?? "",
+    shortName: team1?.short_name
+  };
+  const team2Label = {
+    name: team2?.name ?? match.team2_name ?? match.team2_uuid ?? "",
+    shortName: team2?.short_name
+  };
 
   return (
     <MatchResultCard
@@ -297,33 +305,8 @@ function MatchCard({ match, teamByUuid }) {
       locationLabel={match.location?.name}
       statusChip={getPlannedMatchStatusChip(match)}
       rows={getMatchResultRows(match, team1Label, team2Label)}
-    />
-  );
-}
-
-function MobileMatchCard({ match, teamByUuid }) {
-  const team1 = teamByUuid.get(match.team1_uuid);
-  const team2 = teamByUuid.get(match.team2_uuid);
-  const team1Label = getTeamShortName(
-    team1?.name ?? match.team1_name ?? match.team1_uuid ?? "",
-    team1?.short_name
-  );
-  const team2Label = getTeamShortName(
-    team2?.name ?? match.team2_name ?? match.team2_uuid ?? "",
-    team2?.short_name
-  );
-  return (
-    <MatchResultCard
-      dateLabel={[
-        match.date,
-        match.time,
-        match.matchNumber != null ? `(Spiel ${match.matchNumber})` : null
-      ].filter(Boolean).join(" · ")}
-      locationLabel={match.location?.name}
-      statusChip={getPlannedMatchStatusChip(match)}
-      rows={getMatchResultRows(match, team1Label, team2Label)}
-      compact
-      showBallPoints={false}
+      compact={compact}
+      showBallPoints={!compact}
     />
   );
 }
@@ -620,9 +603,9 @@ export default function EntityPlan({ expectedEntityType }) {
 
               {filteredMatchRows.map((match) =>
                 isMobile ? (
-                  <MobileMatchCard key={match.uuid} match={match} teamByUuid={teamByUuid} />
+                  <PlanMatchCard key={match.uuid} match={match} teamByUuid={teamByUuid} compact />
                 ) : (
-                  <MatchCard key={match.uuid} match={match} teamByUuid={teamByUuid} />
+                  <PlanMatchCard key={match.uuid} match={match} teamByUuid={teamByUuid} />
                 )
               )}
             </Paper>

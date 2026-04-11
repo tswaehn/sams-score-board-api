@@ -11,10 +11,9 @@ import {
 } from "@mui/material";
 import { useParams } from "react-router-dom";
 import { fetchMatchesBySeriesUuid, useIsMobile } from "../api/api.js";
-import { BallPoint } from "../components/ballPoint.jsx";
 import { layout } from "../components/layout.js";
 import { MatchResultCard } from "../components/matchResultCard.jsx";
-import { getCompetitionStatusChip, StatusChip } from "../components/stateChip.jsx";
+import { getCompetitionStatusChip } from "../components/stateChip.jsx";
 
 function formatMatchDate(timestamp) {
   return new Intl.DateTimeFormat("de-DE", {
@@ -85,194 +84,71 @@ function getCompetitionResultRows(match) {
   const team2SetPoints = getTeamSetPoints(match.matchState, "right");
   const totalSetPoints = getTotalSetPoints(match.matchState);
   const winnerSide = getWinnerSide(match.matchState);
+  const isInProgress = match.matchState?.started && !match.matchState?.finished;
+  const servingTeam = isInProgress ? match.matchState?.serving : null;
+
+  function getServingAdornment(teamKey) {
+    if (servingTeam !== teamKey) {
+      return null;
+    }
+
+    return (
+      <Box
+        component="img"
+        src="/volleyball.png"
+        alt=""
+        aria-hidden="true"
+        sx={{ width: 14, height: 14, flexShrink: 0 }}
+      />
+    );
+  }
 
   return [
     {
       key: `${match.id}-team1`,
-      label: match.teamDescription1,
+      teamName: match.teamDescription1,
       isWinner: winnerSide === "team1",
+      isHighlighted: winnerSide === "team1" || servingTeam === "team1",
+      labelAdornment: getServingAdornment("team1"),
       totalSetPoints: totalSetPoints.leftPoints,
       setPoints: team1SetPoints,
       opponentSetPoints: team2SetPoints,
+      setPointStates: team1SetPoints.map((points, index) => {
+        const activeState = getActiveSetState(match.matchState, index, servingTeam, "team1");
+        return activeState ?? getSetPointStyles(points, team2SetPoints[index] ?? "-", "left");
+      }),
       side: "left"
     },
     {
       key: `${match.id}-team2`,
-      label: match.teamDescription2,
+      teamName: match.teamDescription2,
       isWinner: winnerSide === "team2",
+      isHighlighted: winnerSide === "team2" || servingTeam === "team2",
+      labelAdornment: getServingAdornment("team2"),
       totalSetPoints: totalSetPoints.rightPoints,
       setPoints: team2SetPoints,
       opponentSetPoints: team1SetPoints,
+      setPointStates: team2SetPoints.map((points, index) => {
+        const activeState = getActiveSetState(match.matchState, index, servingTeam, "team2");
+        return activeState ?? getSetPointStyles(team1SetPoints[index] ?? "-", points, "right");
+      }),
       side: "right"
     }
   ];
 }
 
 function CompetitionMatchRow({ match, isMobile }) {
-  const team1SetPoints = getTeamSetPoints(match.matchState, "left");
-  const team2SetPoints = getTeamSetPoints(match.matchState, "right");
-  const totalSetPoints = getTotalSetPoints(match.matchState);
-  const winnerSide = getWinnerSide(match.matchState);
   const statusChip = getCompetitionStatusChip(match.matchState);
-  const isFinished = Boolean(match.matchState?.finished);
-  const isInProgress = match.matchState?.started && !match.matchState?.finished;
-  const servingTeam = isInProgress ? match.matchState?.serving : null;
-
-  if (isFinished) {
-    return (
-      <MatchResultCard
-        dateLabel={formatMatchDate(match.date)}
-        locationLabel={match.matchSeriesData?.name ?? "Unknown series"}
-        statusChip={statusChip}
-        finished
-        rows={getCompetitionResultRows(match)}
-        compact={isMobile}
-        showBallPoints={false}
-      />
-    );
-  }
 
   return (
-    <Box
-      sx={{
-        p: layout.padding.card,
-        borderRadius: layout.radius.surface,
-        bgcolor: "#ffffff",
-        display: "grid",
-        gap: layout.gap.surface
-      }}
-    >
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        justifyContent="space-between"
-        alignItems={{ xs: "flex-start", sm: "center" }}
-        spacing={0.5}
-      >
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-          <Typography sx={{ fontWeight: 600, color: "rgba(26, 21, 18, 0.45)" }}>
-            {formatMatchDate(match.date)}
-          </Typography>
-          <StatusChip type={getCompetitionStatusChip(match.matchState)} size="small" />
-        </Stack>
-        <Typography sx={{ color: "rgba(26, 21, 18, 0.45)" }}>
-          {match.matchSeriesData?.name ?? "Unknown series"}
-        </Typography>
-      </Stack>
-
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 2fr) 32px minmax(0, 1fr)",
-          alignItems: "center",
-          columnGap: 1.5
-        }}
-      >
-        <Typography
-          sx={{
-            fontWeight: winnerSide === "team1" || servingTeam === "team1" ? 700 : 500,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 0.75
-          }}
-        >
-          <Box component="span">{match.teamDescription1}</Box>
-          {servingTeam === "team1" && (
-            <Box
-              component="img"
-              src="/volleyball.png"
-              alt=""
-              aria-hidden="true"
-              sx={{ width: 14, height: 14, flexShrink: 0 }}
-            />
-          )}
-        </Typography>
-        <Typography
-          variant="body2"
-          sx={{
-            width: 32,
-            textAlign: "center",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontWeight: servingTeam === "team1" || winnerSide === "team1" ? 700 : 500
-          }}
-        >
-          {totalSetPoints.leftPoints}
-        </Typography>
-        <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ justifySelf: "end" }}>
-          {team1SetPoints.map((points, index) => {
-            const opposingPoints = team2SetPoints[index] ?? "-";
-            const activeState = getActiveSetState(match.matchState, index, servingTeam, "team1");
-
-            return (
-              <BallPoint
-                key={`${match.id}-team1-set-${index + 1}`}
-                value={points}
-                size="set"
-                state={activeState ?? getSetPointStyles(points, opposingPoints, "left")}
-              />
-            );
-          })}
-        </Stack>
-      </Box>
-
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 2fr) 32px minmax(0, 1fr)",
-          alignItems: "center",
-          columnGap: 1.5
-        }}
-      >
-        <Typography
-          sx={{
-            fontWeight: winnerSide === "team2" || servingTeam === "team2" ? 700 : 500,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 0.75
-          }}
-        >
-          <Box component="span">{match.teamDescription2}</Box>
-          {servingTeam === "team2" && (
-            <Box
-              component="img"
-              src="/volleyball.png"
-              alt=""
-              aria-hidden="true"
-              sx={{ width: 14, height: 14, flexShrink: 0 }}
-            />
-          )}
-        </Typography>
-        <Typography
-          variant="body2"
-          sx={{
-            width: 32,
-            textAlign: "center",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontWeight: servingTeam === "team2" || winnerSide === "team2" ? 700 : 500
-          }}
-        >
-          {totalSetPoints.rightPoints}
-        </Typography>
-        <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ justifySelf: "end" }}>
-          {team2SetPoints.map((points, index) => {
-            const opposingPoints = team1SetPoints[index] ?? "-";
-            const activeState = getActiveSetState(match.matchState, index, servingTeam, "team2");
-
-            return (
-              <BallPoint
-                key={`${match.id}-team2-set-${index + 1}`}
-                value={points}
-                size="set"
-                state={activeState ?? getSetPointStyles(opposingPoints, points, "right")}
-              />
-            );
-          })}
-        </Stack>
-      </Box>
-    </Box>
+    <MatchResultCard
+      dateLabel={formatMatchDate(match.date)}
+      locationLabel={match.matchSeriesData?.name ?? "Unknown series"}
+      statusChip={statusChip}
+      rows={getCompetitionResultRows(match)}
+      compact={isMobile}
+      showBallPoints={false}
+    />
   );
 }
 

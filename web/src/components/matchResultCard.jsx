@@ -1,4 +1,5 @@
 import { Box, Stack, Typography } from "@mui/material";
+import { getTeamShortName } from "../api/api.js";
 import { BallPoint } from "./ballPoint.jsx";
 import { layout } from "./layout.js";
 import {
@@ -29,6 +30,11 @@ function TeamResultRow({
   showBallPoints,
   compact
 }) {
+  const fullLabel = row.teamName ?? "";
+  const displayLabel = compact
+    ? getTeamShortName(fullLabel, row.teamShortName)
+    : fullLabel;
+
   return (
     <Box
       sx={{
@@ -38,8 +44,16 @@ function TeamResultRow({
         columnGap: { xs: 1, sm: 1.5 }
       }}
     >
-      <Typography sx={{ fontWeight: row.isWinner ? 700 : 500 }}>
-        {row.label}
+      <Typography
+        sx={{
+          fontWeight: row.isHighlighted || row.isWinner ? 700 : 500,
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 0.75
+        }}
+      >
+        <Box component="span">{displayLabel}</Box>
+        {row.labelAdornment ?? null}
       </Typography>
       <Typography
         variant="body2"
@@ -49,7 +63,7 @@ function TeamResultRow({
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
-          fontWeight: 700
+          fontWeight: row.isHighlighted || row.isWinner ? 700 : 500
         }}
       >
         {row.totalSetPoints ?? "-"}
@@ -57,17 +71,18 @@ function TeamResultRow({
       <Stack direction="row" spacing={setSpacing} justifyContent="flex-end" sx={{ justifySelf: "end" }}>
         {row.setPoints.map((points, index) => {
           const opposingPoints = row.opponentSetPoints[index] ?? "-";
+          const defaultState = getSetPointStyles(
+            row.side === "left" ? points : opposingPoints,
+            row.side === "left" ? opposingPoints : points,
+            row.side
+          );
 
           return (
             <BallPoint
               key={`${row.key}-set-${index + 1}`}
               value={points}
               size={compact ? "compactSet" : "set"}
-              state={getSetPointStyles(
-                row.side === "left" ? points : opposingPoints,
-                row.side === "left" ? opposingPoints : points,
-                row.side
-              )}
+              state={row.setPointStates?.[index] ?? defaultState}
             />
           );
         })}

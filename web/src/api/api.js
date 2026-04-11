@@ -7,7 +7,7 @@ export function getApiBaseUrl() {
   return window.__APP_CONFIG__?.apiBaseUrl ?? defaultApiBaseUrl;
 }
 
-export function getTeamShortName(name, shortName, maxLength = 15) {
+export function getTeamShortName(name, shortName, maxLength = 25) {
   const normalizedShortName = shortName?.trim();
   const normalizedName = name?.trim() ?? "";
   const sourceName = normalizedShortName || normalizedName;
