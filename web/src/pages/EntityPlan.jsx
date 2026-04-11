@@ -47,6 +47,10 @@ function getSortedMatches(group) {
   });
 }
 
+function getDefaultActiveGroupId(groups) {
+  return groups.find((group) => !group.finished)?.uuid ?? groups[0]?.uuid ?? null;
+}
+
 function getSetBallPoints(match, side) {
   const sets = match?.results?.sets ?? [];
 
@@ -379,7 +383,7 @@ export default function EntityPlan({ expectedEntityType }) {
           setActiveGroupId((current) =>
             nextGroups.some((group) => group.uuid === current)
               ? current
-              : nextGroups[0]?.uuid ?? null
+              : getDefaultActiveGroupId(nextGroups)
           );
           setLoading(false);
           setError("");
