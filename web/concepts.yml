@@ -1,0 +1,56 @@
+app:
+  name: sams-scoreboard-web
+  type: react-vite-single-page-app
+  purpose: >
+    Frontend for browsing volleyball competitions and leagues, including team lists,
+    match plans, and live score views, with support for full-page and iframe-embedded use.
+
+concept:
+  summary: >
+    The app presents two related entity types, competitions and leagues, behind a shared UI shell.
+    Users select an entity, then navigate between Teams, Plan, and Live views. The live view is fed
+    from the backend live endpoint and is rendered as match cards with status chips and score details.
+  primary_entities:
+    - competition
+    - league
+  navigation:
+    sections:
+      - teams
+      - plan
+      - live
+    route_patterns:
+      - /competitions
+      - /leagues
+      - /competition/:competitionUuid/teams
+      - /competition/:competitionUuid/plan
+      - /competition/:competitionUuid/live
+      - /league/:leagueUuid/teams
+      - /league/:leagueUuid/plan
+      - /league/:leagueUuid/live
+  behavior:
+    - Shared header and footer wrap all routed pages.
+    - Entity selection is persisted locally so the app can restore the previous choice.
+    - The app supports embed mode with reduced UI via the query param `embed=1`.
+    - When embedded in an iframe, the app reports its window size to the parent frame.
+    - Live pages poll the backend periodically and group matches into live, upcoming, and finished sections.
+  data_sources:
+    - Real API endpoints under `/api/...` for entity data, lists, teams, and plans.
+    - Live API endpoints under `/live/...` for live match state and stats.
+  rendering_model:
+    - Competition and league routes remain distinct in routing and selection handling.
+    - Live pages may share the same backend live feed shape and render the same live match card layout.
+
+tools:
+  package_manager:
+    preferred: npm
+    fallback_when_missing:
+      - Check whether `nvm` is installed.
+      - If `npm` is unavailable, try loading Node through `nvm` before failing.
+      - Example command: `export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && nvm use`
+  commands:
+    dev: npm run dev
+    build: npm run build
+    preview: npm run preview
+  notes:
+    - Assume `rg` is the preferred search tool for source inspection.
+    - If `npm` is not on PATH, do not stop immediately; try `nvm` first.
