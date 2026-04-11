@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import {
   AppBar,
   Box,
+  Divider,
   IconButton,
   Menu,
   MenuItem,
@@ -114,20 +115,23 @@ function SelectionMenu() {
         anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
         transformOrigin={{ vertical: "top", horizontal: "left" }}
       >
-        {entityType === "competition" && entityUuid && (
-          <MenuItem
-            selected={Boolean(isCompetitionOverviewRoute)}
-            onClick={() => handleNavigate(`/competition/${entityUuid}/full-screen${searchSuffix}`)}
-          >
-            Competition Overview
-          </MenuItem>
-        )}
         <MenuItem selected={current === "/competitions"} onClick={() => handleNavigate("/competitions")}>
           Competition List
         </MenuItem>
         <MenuItem selected={current === "/leagues"} onClick={() => handleNavigate("/leagues")}>
           League List
         </MenuItem>
+        {entityType === "competition" && entityUuid && (
+          <>
+            <Divider />
+            <MenuItem
+              selected={Boolean(isCompetitionOverviewRoute)}
+              onClick={() => handleNavigate(`/competition/${entityUuid}/full-screen${searchSuffix}`)}
+            >
+              Full Screen
+            </MenuItem>
+          </>
+        )}
       </Menu>
     </>
   );

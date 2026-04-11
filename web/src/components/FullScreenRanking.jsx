@@ -104,11 +104,11 @@ function FullScreenRankingTableBody({ group, rankingRows, teamByName, compact })
     >
       <TableHead>
         <TableRow>
-          <TableCell sx={{ ...cellSx, width: 44 }}>Rank</TableCell>
+          <TableCell sx={{ ...cellSx, width: 34 }}>#</TableCell>
           <TableCell sx={cellSx}>Team</TableCell>
-          <TableCell align="right" sx={{ ...cellSx, width: 60 }}>W/L</TableCell>
-          <TableCell align="right" sx={{ ...cellSx, width: 72 }}>Sets</TableCell>
-          <TableCell align="right" sx={{ ...cellSx, width: 52 }}>Diff</TableCell>
+          <TableCell align="right" sx={{ ...cellSx, width: 48 }}>W/L</TableCell>
+          <TableCell align="right" sx={{ ...cellSx, width: 56 }}>Sets</TableCell>
+          <TableCell align="right" sx={{ ...cellSx, width: 42 }}>Diff</TableCell>
         </TableRow>
       </TableHead>
       <TableBody>
@@ -118,7 +118,7 @@ function FullScreenRankingTableBody({ group, rankingRows, teamByName, compact })
 
           return (
             <TableRow key={`${group.uuid}-${row.rank}`} hover>
-              <TableCell sx={{ ...cellSx, width: 44 }}>{row.rank}</TableCell>
+              <TableCell sx={{ ...cellSx, width: 34 }}>{row.rank}</TableCell>
               <TableCell
                 sx={{
                   ...cellSx,
@@ -132,13 +132,13 @@ function FullScreenRankingTableBody({ group, rankingRows, teamByName, compact })
                   ? getTeamShortName(teamName, team?.short_name, 16)
                   : teamName}
               </TableCell>
-              <TableCell align="right" sx={{ ...cellSx, width: 60 }}>
+              <TableCell align="right" sx={{ ...cellSx, width: 48 }}>
                 {row.wins}/{row.losses}
               </TableCell>
-              <TableCell align="right" sx={{ ...cellSx, width: 72 }}>
+              <TableCell align="right" sx={{ ...cellSx, width: 56 }}>
                 {row.setWins}:{row.setLosses}
               </TableCell>
-              <TableCell align="right" sx={{ ...cellSx, width: 52 }}>
+              <TableCell align="right" sx={{ ...cellSx, width: 42 }}>
                 {row.ballDifference}
               </TableCell>
             </TableRow>
@@ -163,7 +163,8 @@ function FullScreenRankingMatchesBody({ matches, teamByUuid, compact }) {
       sx={{
         display: "grid",
         gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-        gap: layout.gap.cardList
+        gap: layout.gap.cardList,
+        alignItems: "start"
       }}
     >
       {matches.map((match) => (
@@ -188,8 +189,11 @@ export default function FullScreenRanking({
   matches,
   teamByName,
   teamByUuid,
+  displayMode = "ranking",
   compact = false
 }) {
+  const showMatches = displayMode === "matches" && matches.length > 0;
+
   return (
     <Paper
       elevation={0}
@@ -206,29 +210,36 @@ export default function FullScreenRanking({
     >
       <FullScreenRankingHeader group={group} />
 
-      {rankingRows.length > 0 ? (
-        <FullScreenRankingTableBody
-          group={group}
-          rankingRows={rankingRows}
-          teamByName={teamByName}
-          compact={compact}
-        />
-      ) : (
-        <VirtualRanking
+      {showMatches ? (
+        <FullScreenRankingMatchesBody
           matches={matches}
           teamByUuid={teamByUuid}
           compact={compact}
         />
-      )}
-
-      {!group?.finished && (
-        <Box sx={{ pt: 0.25 }}>
-          <FullScreenRankingMatchesBody
-            matches={matches}
-            teamByUuid={teamByUuid}
-            compact={compact}
-          />
-        </Box>
+      ) : (
+        <>
+          {rankingRows.length > 0 ? (
+            <FullScreenRankingTableBody
+              group={group}
+              rankingRows={rankingRows}
+              teamByName={teamByName}
+              compact={compact}
+            />
+          ) : (
+            <VirtualRanking
+              matches={matches}
+              teamByUuid={teamByUuid}
+              compact={compact}
+            />
+          )}
+          {displayMode === "matches" && matches.length === 0 && (
+            <Box sx={{ pt: 0.25 }}>
+              <Typography color="text.secondary">
+                No matches available for this stage.
+              </Typography>
+            </Box>
+          )}
+        </>
       )}
     </Paper>
   );

@@ -91,6 +91,8 @@ export default function FullScreenMatch({
   statusChip,
   rows
 }) {
+  const isFinished = statusChip === "FINISHED";
+
   return (
     <Box
       sx={{
@@ -98,7 +100,7 @@ export default function FullScreenMatch({
         p: 0.5,
         borderRadius: 0.5,
         border: "1px solid rgba(20, 17, 15, 0.08)",
-        bgcolor: "background.paper",
+        bgcolor: isFinished ? "#f2f2f2" : "#ffffff",
         display: "grid",
         gap: 0.5
       }}

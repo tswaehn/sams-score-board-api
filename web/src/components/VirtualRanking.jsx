@@ -123,17 +123,17 @@ export default function VirtualRanking({ matches, teamByUuid, compact = false })
     >
       <TableHead>
         <TableRow>
-          <TableCell sx={{ ...cellSx, width: 44 }}>Rank</TableCell>
+          <TableCell sx={{ ...cellSx, width: 34 }}>#</TableCell>
           <TableCell sx={cellSx}>Team</TableCell>
-          <TableCell align="right" sx={{ ...cellSx, width: 60 }}>W/L</TableCell>
-          <TableCell align="right" sx={{ ...cellSx, width: 72 }}>Sets</TableCell>
-          <TableCell align="right" sx={{ ...cellSx, width: 52 }}>Diff</TableCell>
+          <TableCell align="right" sx={{ ...cellSx, width: 48 }}>W/L</TableCell>
+          <TableCell align="right" sx={{ ...cellSx, width: 56 }}>Sets</TableCell>
+          <TableCell align="right" sx={{ ...cellSx, width: 42 }}>Diff</TableCell>
         </TableRow>
       </TableHead>
       <TableBody>
         {rankingRows.map((row) => (
           <TableRow key={row.teamUuid} hover>
-            <TableCell sx={{ ...cellSx, width: 44 }}>{row.rank}</TableCell>
+            <TableCell sx={{ ...cellSx, width: 34 }}>{row.rank}</TableCell>
             <TableCell
               sx={{
                 ...cellSx,
@@ -142,18 +142,18 @@ export default function VirtualRanking({ matches, teamByUuid, compact = false })
                 overflow: "hidden",
                 textOverflow: "ellipsis"
               }}
-            >
-              {compact
-                ? getTeamShortName(row.teamName, teamByUuid.get(row.teamUuid)?.short_name, 16)
-                : row.teamName}
+              >
+                {compact
+                  ? getTeamShortName(row.teamName, teamByUuid.get(row.teamUuid)?.short_name, 16)
+                  : row.teamName}
             </TableCell>
-            <TableCell align="right" sx={{ ...cellSx, width: 60 }}>
+            <TableCell align="right" sx={{ ...cellSx, width: 48 }}>
               {row.wins}/{row.losses}
             </TableCell>
-            <TableCell align="right" sx={{ ...cellSx, width: 72 }}>
+            <TableCell align="right" sx={{ ...cellSx, width: 56 }}>
               {row.setWins}:{row.setLosses}
             </TableCell>
-            <TableCell align="right" sx={{ ...cellSx, width: 52 }}>
+            <TableCell align="right" sx={{ ...cellSx, width: 42 }}>
               {row.ballDifference}
             </TableCell>
           </TableRow>

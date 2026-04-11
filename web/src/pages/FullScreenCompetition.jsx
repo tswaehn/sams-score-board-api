@@ -31,6 +31,7 @@ export default function FullScreenCompetition() {
   const [matchGroups, setMatchGroups] = useState([]);
   const [rankings, setRankings] = useState({});
   const [teams, setTeams] = useState([]);
+  const [displayMode, setDisplayMode] = useState("ranking");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -111,8 +112,8 @@ export default function FullScreenCompetition() {
     if (stageRankings.length >= 8) {
       const rows = [];
 
-      for (let index = 0; index < stageRankings.length; index += 4) {
-        rows.push(stageRankings.slice(index, index + 4));
+      for (let index = 0; index < stageRankings.length; index += 6) {
+        rows.push(stageRankings.slice(index, index + 6));
       }
 
       return rows;
@@ -132,13 +133,34 @@ export default function FullScreenCompetition() {
       .flatMap(([, items]) => {
         const rows = [];
 
-        for (let index = 0; index < items.length; index += 5) {
-          rows.push(items.slice(index, index + 5));
+        for (let index = 0; index < items.length; index += 6) {
+          rows.push(items.slice(index, index + 6));
         }
 
         return rows;
       });
   }, [stageRankings]);
+
+  const hasMatchDisplay = useMemo(() => {
+    return stageRankings.some(({ matches }) => matches.length > 0);
+  }, [stageRankings]);
+
+  useEffect(() => {
+    if (!hasMatchDisplay) {
+      setDisplayMode("ranking");
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setDisplayMode((currentMode) =>
+        currentMode === "ranking" ? "matches" : "ranking"
+      );
+    }, 25000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [hasMatchDisplay]);
 
   return (
     <Box sx={{ display: "grid", gap: 1 }}>
@@ -179,6 +201,7 @@ export default function FullScreenCompetition() {
                   matches={matches}
                   teamByName={teamByName}
                   teamByUuid={teamByUuid}
+                  displayMode={displayMode}
                   compact={isMobile}
                 />
               ))}
