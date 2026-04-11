@@ -10,7 +10,7 @@ import {
   Typography
 } from "@mui/material";
 import { useLocation, useParams } from "react-router-dom";
-import { fetchJson, fetchMatchesByCompetitionUuid, useIsMobile } from "../api/api.js";
+import { fetchMatchesByCompetitionUuid, useIsMobile } from "../api/api.js";
 import { layout } from "../components/layout.js";
 import { MatchResultCard } from "../components/matchResultCard.jsx";
 import { getPlannedMatchStatusChip, StateChip } from "../components/stateChip.jsx";
@@ -152,6 +152,20 @@ function getLeagueSetBallPoints(match, side) {
     const [leftPoints = "-", rightPoints = "-"] = (set.ballPoints ?? "").split(":");
     return side === "left" ? leftPoints : rightPoints;
   });
+}
+
+function hasLeagueLiveStats(match) {
+  if (!match || match.finished || match.results?.winner) {
+    return false;
+  }
+
+  const hasSetPoints = Boolean(`${match.results?.setPoints ?? ""}`.trim());
+  const hasBallPoints = Boolean(`${match.results?.ballPoints ?? ""}`.trim());
+  const hasSetBallPoints = (match.results?.sets ?? []).some((set) =>
+    Boolean(`${set?.ballPoints ?? ""}`.trim())
+  );
+
+  return hasSetPoints || hasBallPoints || hasSetBallPoints;
 }
 
 function getLeagueResultRows(match) {
@@ -419,8 +433,9 @@ function CompetitionMatchRow({ match, isMobile }) {
 function LeagueMatchRow({ match, isMobile }) {
   const statusChip = getLeagueStatusChip(match);
   const isFinished = Boolean(match.results?.winner);
+  const isLive = hasLeagueLiveStats(match);
 
-  if (isFinished) {
+  if (isFinished || isLive) {
     return (
       <MatchResultCard
         dateLabel={formatLeagueMatchDate(match.date, match.time)}
@@ -528,23 +543,6 @@ function MatchSection({ title, matches, emptyText, renderMatch }) {
   );
 }
 
-function getLeagueMatchesFromPlanPayload(data) {
-  return (data.matchDays ?? [])
-    .flatMap((matchDay) =>
-      Object.values(matchDay.matches ?? {}).map((match) => ({
-        ...match,
-        matchDayName: matchDay.name,
-        matchDayDate: matchDay.matchdate
-      }))
-    )
-    .sort((left, right) => {
-      const leftDateTime = `${left.date ?? ""}T${left.time ?? "00:00"}`;
-      const rightDateTime = `${right.date ?? ""}T${right.time ?? "00:00"}`;
-
-      return leftDateTime.localeCompare(rightDateTime);
-    });
-}
-
 export default function EntityLive({ expectedEntityType }) {
   const location = useLocation();
   const { competitionUuid, leagueUuid } = useParams();
@@ -554,6 +552,10 @@ export default function EntityLive({ expectedEntityType }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedTeamId, setSelectedTeamId] = useState("all");
+  const usesCompetitionStyleLive = useMemo(
+    () => matches.some((match) => "matchState" in match),
+    [matches]
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -586,15 +588,11 @@ export default function EntityLive({ expectedEntityType }) {
           throw new Error("Missing league uuid");
         }
 
-        const data = await fetchJson("/api/plan");
-
-        if (data.entityType !== "league") {
-          throw new Error(`Unexpected entity type: ${data.entityType}`);
-        }
+        const nextMatches = await fetchMatchesByCompetitionUuid(leagueUuid);
 
         if (isMounted) {
           setEntityType("league");
-          setMatches(getLeagueMatchesFromPlanPayload(data));
+          setMatches(nextMatches);
           setError("");
           setLoading(false);
         }
@@ -624,7 +622,7 @@ export default function EntityLive({ expectedEntityType }) {
     const teamMap = new Map();
 
     matches.forEach((match) => {
-      if (entityType === "competition") {
+      if (usesCompetitionStyleLive) {
         if (match.team1 && match.teamDescription1) {
           teamMap.set(match.team1, {
             id: match.team1,
@@ -657,7 +655,7 @@ export default function EntityLive({ expectedEntityType }) {
     });
 
     return Array.from(teamMap.values()).sort((left, right) => left.name.localeCompare(right.name));
-  }, [entityType, matches]);
+  }, [matches, usesCompetitionStyleLive]);
 
   const filterMatchesByTeam = (matchList) => {
     if (selectedTeamId === "all") {
@@ -665,22 +663,22 @@ export default function EntityLive({ expectedEntityType }) {
     }
 
     return matchList.filter((match) =>
-      entityType === "competition"
+      usesCompetitionStyleLive
         ? match.team1 === selectedTeamId || match.team2 === selectedTeamId
         : match.team1_uuid === selectedTeamId || match.team2_uuid === selectedTeamId
     );
   };
 
   const liveMatches = useMemo(() => {
-    if (entityType === "competition") {
+    if (usesCompetitionStyleLive) {
       return matches.filter((match) => match.matchState?.started && !match.matchState?.finished);
     }
 
-    return [];
-  }, [entityType, matches]);
+    return matches.filter((match) => hasLeagueLiveStats(match));
+  }, [matches, usesCompetitionStyleLive]);
 
   const upcomingMatches = useMemo(() => {
-    if (entityType === "competition") {
+    if (usesCompetitionStyleLive) {
       return matches.filter((match) => !match.matchState?.started);
     }
 
@@ -689,32 +687,19 @@ export default function EntityLive({ expectedEntityType }) {
       const timestamp = new Date(`${match.date ?? ""}${match.time ? `T${match.time}` : ""}`).getTime();
       return !match.results?.winner && !Number.isNaN(timestamp) && timestamp > now;
     });
-  }, [entityType, matches]);
+  }, [matches, usesCompetitionStyleLive]);
 
   const finishedMatches = useMemo(() => {
-    if (entityType === "competition") {
+    if (usesCompetitionStyleLive) {
       return matches.filter((match) => match.matchState?.finished);
     }
 
     return matches.filter((match) => Boolean(match.results?.winner));
-  }, [entityType, matches]);
-
-  const scheduledMatches = useMemo(() => {
-    if (entityType !== "league") {
-      return [];
-    }
-
-    const now = Date.now();
-    return matches.filter((match) => {
-      const timestamp = new Date(`${match.date ?? ""}${match.time ? `T${match.time}` : ""}`).getTime();
-      return !match.results?.winner && (Number.isNaN(timestamp) || timestamp <= now);
-    });
-  }, [entityType, matches]);
+  }, [matches, usesCompetitionStyleLive]);
 
   const filteredLiveMatches = filterMatchesByTeam(liveMatches);
   const filteredUpcomingMatches = filterMatchesByTeam(upcomingMatches);
   const filteredFinishedMatches = filterMatchesByTeam(finishedMatches);
-  const filteredScheduledMatches = filterMatchesByTeam(scheduledMatches);
 
   return (
     <Box sx={{ display: "grid", gap: layout.gap.page }}>
@@ -740,7 +725,7 @@ export default function EntityLive({ expectedEntityType }) {
               <Typography variant="h6" sx={{ fontWeight: 700 }}>
                 Wähle dein Team
               </Typography>
-              {entityType === "league" && (
+              {entityType === "league" && !usesCompetitionStyleLive && (
                 <Typography color="text.secondary" textAlign="center">
                   League live uses the cached league schedule and results. The external live feed is
                   still competition-based.
@@ -766,20 +751,24 @@ export default function EntityLive({ expectedEntityType }) {
             </Stack>
           </Paper>
 
-          {entityType === "competition" && (
+          {usesCompetitionStyleLive && (
             <MatchSection
               title="Live"
               matches={filteredLiveMatches}
-              emptyText="No matches are currently in progress."
+              emptyText={
+                entityType === "competition"
+                  ? "No matches are currently in progress."
+                  : "No league matches are currently in progress."
+              }
               renderMatch={(match) => <CompetitionMatchRow key={match.id} match={match} isMobile={isMobile} />}
             />
           )}
 
-          {entityType === "league" && (
+          {!usesCompetitionStyleLive && entityType === "league" && (
             <MatchSection
-              title="Scheduled"
-              matches={filteredScheduledMatches}
-              emptyText="No scheduled matches found."
+              title="Live"
+              matches={filteredLiveMatches}
+              emptyText="No league matches with live stats found."
               renderMatch={(match) => <LeagueMatchRow key={match.uuid} match={match} isMobile={isMobile} />}
             />
           )}
@@ -789,7 +778,7 @@ export default function EntityLive({ expectedEntityType }) {
             matches={filteredUpcomingMatches}
             emptyText="No upcoming matches found."
             renderMatch={(match) =>
-              entityType === "competition" ? (
+              usesCompetitionStyleLive ? (
                 <CompetitionMatchRow key={match.id} match={match} isMobile={isMobile} />
               ) : (
                 <LeagueMatchRow key={match.uuid} match={match} isMobile={isMobile} />
@@ -802,7 +791,7 @@ export default function EntityLive({ expectedEntityType }) {
             matches={filteredFinishedMatches}
             emptyText="No finished matches found."
             renderMatch={(match) =>
-              entityType === "competition" ? (
+              usesCompetitionStyleLive ? (
                 <CompetitionMatchRow key={match.id} match={match} isMobile={isMobile} />
               ) : (
                 <LeagueMatchRow key={match.uuid} match={match} isMobile={isMobile} />
