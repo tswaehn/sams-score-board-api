@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import { Box, Typography } from "@mui/material";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Box, LinearProgress, Typography } from "@mui/material";
 import { useLocation } from "react-router-dom";
 import { fetchJson, useIsMobile } from "../api/api.js";
-import { layout } from "../components/layout.js";
 import FullScreenRanking from "../components/FullScreenRanking.jsx";
+
+const VIEW_SWAP_PERIOD_MS = 25000;
+const PROGRESS_UPDATE_MS = 50;
 
 function getRankingRows(rankings, rankingName) {
   const groupRankings = rankings[rankingName] ?? {};
@@ -28,10 +30,12 @@ function getSortedMatches(group) {
 export default function FullScreenCompetition() {
   const location = useLocation();
   const isMobile = useIsMobile();
+  const cycleStartedAtRef = useRef(Date.now());
   const [matchGroups, setMatchGroups] = useState([]);
   const [rankings, setRankings] = useState({});
   const [teams, setTeams] = useState([]);
   const [displayMode, setDisplayMode] = useState("ranking");
+  const [swapProgress, setSwapProgress] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -148,22 +152,35 @@ export default function FullScreenCompetition() {
   useEffect(() => {
     if (!hasMatchDisplay) {
       setDisplayMode("ranking");
+      setSwapProgress(0);
       return undefined;
     }
+
+    cycleStartedAtRef.current = Date.now();
+    setSwapProgress(0);
 
     const intervalId = window.setInterval(() => {
       setDisplayMode((currentMode) =>
         currentMode === "ranking" ? "matches" : "ranking"
       );
-    }, 25000);
+      cycleStartedAtRef.current = Date.now();
+      setSwapProgress(0);
+    }, VIEW_SWAP_PERIOD_MS);
+
+    const progressId = window.setInterval(() => {
+      const elapsed = Date.now() - cycleStartedAtRef.current;
+      const nextProgress = Math.min((elapsed / VIEW_SWAP_PERIOD_MS) * 100, 100);
+      setSwapProgress(nextProgress);
+    }, PROGRESS_UPDATE_MS);
 
     return () => {
       window.clearInterval(intervalId);
+      window.clearInterval(progressId);
     };
   }, [hasMatchDisplay]);
 
   return (
-    <Box sx={{ display: "grid", gap: 1 }}>
+    <Box sx={{ display: "grid" }}>
       {loading && (
         <Typography color="text.secondary">Loading competition overview...</Typography>
       )}
@@ -174,40 +191,57 @@ export default function FullScreenCompetition() {
       )}
 
       {!loading && !error && (
-        <Box
-          sx={{
-            display: "grid",
-            gap: 1
-          }}
-        >
-          {stageRankingRows.map((stageRankingRow, index) => (
-            <Box
-              key={`tourney-level-row-${index}`}
+        <>
+          {hasMatchDisplay && (
+            <LinearProgress
+              variant="determinate"
+              value={swapProgress}
               sx={{
-                display: "grid",
-                gridTemplateColumns: {
-                  xs: "1fr",
-                  md: `repeat(${Math.max(stageRankingRow.length, 1)}, minmax(0, 1fr))`
-                },
-                gap: 1,
-                alignItems: "stretch"
+                height: 3,
+                borderRadius: 999,
+                bgcolor: "rgba(20, 17, 15, 0.08)",
+                "& .MuiLinearProgress-bar": {
+                  borderRadius: 999
+                }
               }}
-            >
-              {stageRankingRow.map(({ group, rankingRows, matches }) => (
-                <FullScreenRanking
-                  key={group.uuid}
-                  group={group}
-                  rankingRows={rankingRows}
-                  matches={matches}
-                  teamByName={teamByName}
-                  teamByUuid={teamByUuid}
-                  displayMode={displayMode}
-                  compact={isMobile}
-                />
-              ))}
-            </Box>
-          ))}
-        </Box>
+            />
+          )}
+
+          <Box
+            sx={{
+              display: "grid",
+              gap: 1
+            }}
+          >
+            {stageRankingRows.map((stageRankingRow, index) => (
+              <Box
+                key={`tourney-level-row-${index}`}
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: {
+                    xs: "1fr",
+                    md: `repeat(${Math.max(stageRankingRow.length, 1)}, minmax(0, 1fr))`
+                  },
+                  gap: 1,
+                  alignItems: "stretch"
+                }}
+              >
+                {stageRankingRow.map(({ group, rankingRows, matches }) => (
+                  <FullScreenRanking
+                    key={group.uuid}
+                    group={group}
+                    rankingRows={rankingRows}
+                    matches={matches}
+                    teamByName={teamByName}
+                    teamByUuid={teamByUuid}
+                    displayMode={displayMode}
+                    compact={isMobile}
+                  />
+                ))}
+              </Box>
+            ))}
+          </Box>
+        </>
       )}
     </Box>
   );
