@@ -8,6 +8,7 @@ from uuid import UUID
 
 import requests
 from requests import RequestException
+from metrics import METRICS
 from server_config import SSVB_API_KEY
 
 LOGGER = logging.getLogger("api")
@@ -85,9 +86,9 @@ def fetch_page(
     *,
     total_pages: int | None = None,
 ) -> dict | list:
+    started_at = time.monotonic()
     try:
         wait_for_request_slot()
-        started_at = time.monotonic()
         headers = {
             **DEFAULT_HEADERS,
             "X-Api-Key": api_key,
@@ -131,10 +132,37 @@ def fetch_page(
             progress_label,
             duration_ms,
         )
+        METRICS.record_upstream_request(
+            method="GET",
+            endpoint=extract_endpoint_from_url(url),
+            status_code=response.status_code,
+            duration_ms=duration_ms,
+            page=page,
+            success=True,
+        )
         return payload
     except RequestException as exc:
+        duration_ms = (time.monotonic() - started_at) * 1000.0
+        status_code = exc.response.status_code if exc.response is not None else 0
+        METRICS.record_upstream_request(
+            method="GET",
+            endpoint=extract_endpoint_from_url(url),
+            status_code=status_code,
+            duration_ms=duration_ms,
+            page=page,
+            success=False,
+        )
         raise RuntimeError(f"Request to {url!r} failed on page {page}: {exc}") from exc
     except ValueError as exc:
+        duration_ms = (time.monotonic() - started_at) * 1000.0
+        METRICS.record_upstream_request(
+            method="GET",
+            endpoint=extract_endpoint_from_url(url),
+            status_code=200,
+            duration_ms=duration_ms,
+            page=page,
+            success=False,
+        )
         raise RuntimeError(f"Failed to decode JSON from {url!r} on page {page}: {exc}") from exc
 
 

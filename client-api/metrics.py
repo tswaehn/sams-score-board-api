@@ -139,6 +139,31 @@ class InfluxMetricsClient:
             },
         )
 
+    def record_upstream_request(
+        self,
+        *,
+        method: str,
+        endpoint: str,
+        status_code: int,
+        duration_ms: float,
+        page: int,
+        success: bool,
+    ) -> None:
+        self.write_point(
+            "upstream_requests",
+            tags={
+                "method": method,
+                "endpoint": endpoint,
+                "status_code": str(status_code),
+                "success": str(success).lower(),
+            },
+            fields={
+                "count": 1,
+                "duration_ms": float(duration_ms),
+                "page": int(page),
+            },
+        )
+
     def _run(self) -> None:
         write_url = (
             f"{INFLUXDB_URL.rstrip('/')}/api/v2/write"
