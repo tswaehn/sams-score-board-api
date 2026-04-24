@@ -331,7 +331,6 @@ live_state_model:
 configuration_model:
   module: client-api/server_config.py
   source_precedence:
-    - direct environment variables
     - JSON file referenced by SERVER_CONFIG_PATH
     - hard-coded defaults
   supported_keys:

@@ -141,7 +141,7 @@ def fetch_page(
 def _fetch_endpoint_from_upstream(endpoint: str) -> dict | list:
     api_key = SSVB_API_KEY
     if not api_key:
-        raise RuntimeError("Missing environment variable: SSVB_API_KEY")
+        raise RuntimeError("Missing ssvb_api_key in server config")
 
     url = build_url(endpoint)
     first_page = fetch_page(url, api_key, page=0)

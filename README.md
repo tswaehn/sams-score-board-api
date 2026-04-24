@@ -73,23 +73,18 @@ SERVER_CONFIG_PATH=./config/server_config.local.json \
 uvicorn server:app --host 0.0.0.0 --port 8000
 ```
 
-Optional environment variables:
+Runtime configuration:
 
-* `HOST` defaults to `0.0.0.0`
-* `PORT` defaults to `8000`
-* `LOG_LEVEL` defaults to `info`
-* `TZ` optionally sets the process timezone; this mainly affects server-side daily refresh scheduling
-* `SERVER_CONFIG_PATH` points to a JSON config file; direct env vars still override config-file values
-* `SSVB_API_KEY` authenticates requests to the upstream SAMS REST API
-* `LIVE_API_URLS` sets the upstream live endpoints for the live endpoint worker as a comma-separated list
-* `LIVE_API_SNAPSHOT_REFRESH_SECONDS` defaults to `60` and controls how often the live worker refetches the full snapshot while the websocket remains connected
+* `SERVER_CONFIG_PATH` points to the JSON config file used by `client-api`
+* the config file contains `host`, `port`, `log_level`, `tz`, `ssvb_api_key`, `live_api_urls`, and `live_api_snapshot_refresh_seconds`
+* defaults still apply for `host`, `port`, `log_level`, and `live_api_snapshot_refresh_seconds` when omitted from the file
 
 Configuration files:
 
 * [`client-api/config/server_config_template.json`](./client-api/config/server_config_template.json) contains the full anonymous config schema for `client-api`
 * create a real config file such as `client-api/config/server_config.local.json` from that template and point `SERVER_CONFIG_PATH` at it
 * [`docker-compose.yml.example`](./docker-compose.yml.example) contains the same two-service example for `client-api` and `web`
-* the config file supports `tz`, which maps to the `TZ` process environment variable
+* the config file supports `tz`, which is applied as the process timezone
 * `API_BASE_URL` for the `web` container must be a browser-reachable URL, not an internal Docker service hostname, because it is injected into client-side JavaScript
 
 Endpoints:

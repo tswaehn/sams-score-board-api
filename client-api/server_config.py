@@ -29,16 +29,7 @@ def _load_config_file(config_path: str | None) -> dict[str, Any]:
     return payload
 
 
-def _env_or_config(
-    env_name: str,
-    config: dict[str, Any],
-    config_key: str,
-    default: Any = None,
-) -> Any:
-    env_value = os.getenv(env_name)
-    if env_value is not None:
-        return env_value
-
+def _config_value(config: dict[str, Any], config_key: str, default: Any = None) -> Any:
     if config_key in config:
         return config[config_key]
 
@@ -66,22 +57,21 @@ def _normalize_live_api_urls(value: Any) -> list[str]:
 
 CONFIG_FILE = _load_config_file(SERVER_CONFIG_PATH)
 
-TIMEZONE = _env_or_config("TZ", CONFIG_FILE, "tz")
+TIMEZONE = _config_value(CONFIG_FILE, "tz")
 if TIMEZONE:
     os.environ["TZ"] = str(TIMEZONE)
     if hasattr(time, "tzset"):
         time.tzset()
 
-HOST = str(_env_or_config("HOST", CONFIG_FILE, "host", "0.0.0.0"))
-PORT = int(_env_or_config("PORT", CONFIG_FILE, "port", 8000))
-LOG_LEVEL = str(_env_or_config("LOG_LEVEL", CONFIG_FILE, "log_level", "info")).lower()
-SSVB_API_KEY = _env_or_config("SSVB_API_KEY", CONFIG_FILE, "ssvb_api_key")
+HOST = str(_config_value(CONFIG_FILE, "host", "0.0.0.0"))
+PORT = int(_config_value(CONFIG_FILE, "port", 8000))
+LOG_LEVEL = str(_config_value(CONFIG_FILE, "log_level", "info")).lower()
+SSVB_API_KEY = _config_value(CONFIG_FILE, "ssvb_api_key")
 LIVE_API_URLS = _normalize_live_api_urls(
-    _env_or_config("LIVE_API_URLS", CONFIG_FILE, "live_api_urls", [])
+    _config_value(CONFIG_FILE, "live_api_urls", [])
 )
 LIVE_API_SNAPSHOT_REFRESH_SECONDS = int(
-    _env_or_config(
-        "LIVE_API_SNAPSHOT_REFRESH_SECONDS",
+    _config_value(
         CONFIG_FILE,
         "live_api_snapshot_refresh_seconds",
         60,

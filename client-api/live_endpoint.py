@@ -42,7 +42,7 @@ def _get_live_api_urls() -> list[str]:
 
 def _parse_live_api_url(live_api_url: str | None) -> tuple[str, str, str]:
     if not live_api_url:
-        raise RuntimeError("Missing environment variable: LIVE_API_URLS")
+        raise RuntimeError("Missing live_api_urls in server config")
 
     parsed_url = urlparse(live_api_url)
     path_segments = [segment for segment in parsed_url.path.split("/") if segment]
@@ -352,7 +352,7 @@ LIVE_STATE_UPDATER = MultiLiveStateUpdater(_get_live_api_urls())
 
 def startup_live_endpoint() -> None:
     if not _get_live_api_urls():
-        raise RuntimeError("LIVE_API_URLS is required to start the live endpoint")
+        raise RuntimeError("live_api_urls is required to start the live endpoint")
 
     LIVE_STATE_UPDATER.start()
 
