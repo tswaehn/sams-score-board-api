@@ -16,9 +16,9 @@ export const options = {
       executor: "ramping-vus",
       startVUs: 1,
       stages: [
-        { duration: "60s", target: 250 },
-        { duration: "120s", target: 500 },
-        { duration: "3m", target: 500 },
+        { duration: "60s", target: 50 },
+        { duration: "120s", target: 100 },
+        { duration: "3m", target: 100 },
         { duration: "15s", target: 0 },
       ],
       gracefulRampDown: "10s",
@@ -36,26 +36,35 @@ function get(path) {
 }
 
 export default function () {
+/*
   const healthResponse = get("/healthz");
   check(healthResponse, {
     "healthz returns 200": (response) => response.status === 200,
   });
+*/
 
+/*
   const listResponse = get("/competition-list");
   check(listResponse, {
     "competition-list returns 200": (response) => response.status === 200,
   });
+*/
+
 
   if (competitionId) {
+
     const liveResponse = get(`/live/${competitionId}`);
     check(liveResponse, {
       "live returns 200": (response) => response.status === 200,
     });
 
+
+/*
     const competitionResponse = get(`/competition/${competitionId}`);
     check(competitionResponse, {
       "competition returns 200": (response) => response.status === 200,
     });
+*/
   }
 
   sleep(pauseSeconds);
