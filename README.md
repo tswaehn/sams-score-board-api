@@ -4,9 +4,25 @@ Example `docker-compose.yml`:
 
 ```yaml
 services:
+  influxdb:
+    image: influxdb:2.7
+    ports:
+      - "127.0.0.1:8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: replace-with-influxdb-password
+      DOCKER_INFLUXDB_INIT_ORG: sams-scoreboard
+      DOCKER_INFLUXDB_INIT_BUCKET: client-api
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: replace-with-influxdb-token
+    volumes:
+      - ./influxdb/data:/var/lib/influxdb2
+
   client-api:
     build:
       context: ./client-api
+    depends_on:
+      - influxdb
     ports:
       - "127.0.0.1:8000:8000"
     environment:
@@ -77,16 +93,18 @@ Runtime configuration:
 
 * `SERVER_CONFIG_PATH` is required and must point to the JSON config file used by `client-api`
 * startup fails immediately if the config file is missing, invalid JSON, or missing required keys
-* the config file contains `host`, `port`, `log_level`, `tz`, `write_raw_cache`, `ssvb_api_key`, `live_api_urls`, and `live_api_snapshot_refresh_seconds`
-* defaults still apply for `host`, `port`, `log_level`, `write_raw_cache`, and `live_api_snapshot_refresh_seconds` when omitted from the file
+* the config file contains `host`, `port`, `log_level`, `tz`, `write_raw_cache`, `influxdb`, `ssvb_api_key`, `live_api_urls`, and `live_api_snapshot_refresh_seconds`
+* `influxdb` is a nested object with `enabled`, `url`, `org`, `bucket`, `token`, and `timeout_seconds`
+* defaults still apply for `host`, `port`, `log_level`, `write_raw_cache`, `influxdb.enabled`, `influxdb.timeout_seconds`, and `live_api_snapshot_refresh_seconds` when omitted from the file
 
 Configuration files:
 
 * [`client-api/config/server_config_template.json`](./client-api/config/server_config_template.json) contains the full anonymous config schema for `client-api`
 * create a real config file such as `client-api/config/server_config.local.json` from that template and point `SERVER_CONFIG_PATH` at it
-* [`docker-compose.yml.example`](./docker-compose.yml.example) contains the same two-service example for `client-api` and `web`
+* [`docker-compose.yml.example`](./docker-compose.yml.example) contains the same `influxdb`, `client-api`, and `web` example
 * the config file supports `tz`, which is applied as the process timezone
 * `write_raw_cache` controls whether `*-raw.json` cache files are written; it defaults to `false`
+* the InfluxDB config is optional; when enabled, `client-api` writes best-effort request metrics without affecting API responses if InfluxDB is unavailable
 * required config keys are `ssvb_api_key` and `live_api_urls`
 * `API_BASE_URL` for the `web` container must be a browser-reachable URL, not an internal Docker service hostname, because it is injected into client-side JavaScript
 

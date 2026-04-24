@@ -36,6 +36,15 @@ def _config_value(config: dict[str, Any], config_key: str, default: Any = None) 
     return default
 
 
+def _config_section(config: dict[str, Any], config_key: str) -> dict[str, Any]:
+    value = _config_value(config, config_key, {})
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        return value
+    raise RuntimeError(f"Config key must be an object: {config_key}")
+
+
 def _normalize_live_api_urls(value: Any) -> list[str]:
     if value is None:
         return []
@@ -72,6 +81,17 @@ def _normalize_bool(value: Any, *, default: bool = False) -> bool:
     raise RuntimeError("write_raw_cache must be a boolean value")
 
 
+def _normalize_optional_string(value: Any) -> str | None:
+    if value is None:
+        return None
+
+    if isinstance(value, str):
+        stripped = value.strip()
+        return stripped or None
+
+    raise RuntimeError("Expected an optional string config value")
+
+
 def _require_config_value(config: dict[str, Any], config_key: str) -> Any:
     value = _config_value(config, config_key)
     if value is None:
@@ -84,6 +104,7 @@ def _require_config_value(config: dict[str, Any], config_key: str) -> Any:
 
 
 CONFIG_FILE = _load_config_file(SERVER_CONFIG_PATH)
+INFLUXDB_CONFIG = _config_section(CONFIG_FILE, "influxdb")
 
 TIMEZONE = _config_value(CONFIG_FILE, "tz")
 if TIMEZONE:
@@ -101,6 +122,12 @@ LIVE_API_URLS = _normalize_live_api_urls(
 if not LIVE_API_URLS:
     raise RuntimeError("Config key live_api_urls must contain at least one URL")
 WRITE_RAW_CACHE = _normalize_bool(_config_value(CONFIG_FILE, "write_raw_cache", False))
+INFLUXDB_ENABLED = _normalize_bool(_config_value(INFLUXDB_CONFIG, "enabled", False))
+INFLUXDB_URL = _normalize_optional_string(_config_value(INFLUXDB_CONFIG, "url"))
+INFLUXDB_ORG = _normalize_optional_string(_config_value(INFLUXDB_CONFIG, "org"))
+INFLUXDB_BUCKET = _normalize_optional_string(_config_value(INFLUXDB_CONFIG, "bucket"))
+INFLUXDB_TOKEN = _normalize_optional_string(_config_value(INFLUXDB_CONFIG, "token"))
+INFLUXDB_TIMEOUT_SECONDS = float(_config_value(INFLUXDB_CONFIG, "timeout_seconds", 1.0))
 LIVE_API_SNAPSHOT_REFRESH_SECONDS = int(
     _config_value(
         CONFIG_FILE,

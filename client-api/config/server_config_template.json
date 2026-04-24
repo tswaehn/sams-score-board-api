@@ -4,6 +4,14 @@
   "port": 8000,
   "log_level": "info",
   "write_raw_cache": false,
+  "influxdb": {
+    "enabled": false,
+    "url": "http://influxdb:8086",
+    "org": "sams-scoreboard",
+    "bucket": "client-api",
+    "token": "replace-with-influxdb-token",
+    "timeout_seconds": 1.0
+  },
   "ssvb_api_key": "replace-with-api-key",
   "live_api_urls": [
     "https://example.invalid/live/indoor/tickers/source-a",

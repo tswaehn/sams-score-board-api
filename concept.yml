@@ -209,6 +209,44 @@ environment:
         - client-api/server_config.py
         - client-api/periodic_updater.py
       purpose: enable or disable writing raw upstream cache dump files alongside normalized cache stores
+    - name: INFLUXDB_ENABLED
+      required: false
+      default: false
+      used_by:
+        - client-api/server_config.py
+        - client-api/metrics.py
+      purpose: enable or disable optional InfluxDB metrics export
+    - name: INFLUXDB_URL
+      required: false
+      used_by:
+        - client-api/server_config.py
+        - client-api/metrics.py
+      purpose: base URL of the InfluxDB server for metrics export
+    - name: INFLUXDB_ORG
+      required: false
+      used_by:
+        - client-api/server_config.py
+        - client-api/metrics.py
+      purpose: InfluxDB organization name used for metrics writes
+    - name: INFLUXDB_BUCKET
+      required: false
+      used_by:
+        - client-api/server_config.py
+        - client-api/metrics.py
+      purpose: InfluxDB bucket used for metrics writes
+    - name: INFLUXDB_TOKEN
+      required: false
+      used_by:
+        - client-api/server_config.py
+        - client-api/metrics.py
+      purpose: InfluxDB token used for authenticated metrics writes
+    - name: INFLUXDB_TIMEOUT_SECONDS
+      required: false
+      default: 1.0
+      used_by:
+        - client-api/server_config.py
+        - client-api/metrics.py
+      purpose: timeout for best-effort InfluxDB write calls
     - name: SERVER_CONFIG_PATH
       required: true_for_client_api_startup
       used_by:
@@ -352,6 +390,12 @@ configuration_model:
     - port
     - log_level
     - write_raw_cache
+    - influxdb.enabled
+    - influxdb.url
+    - influxdb.org
+    - influxdb.bucket
+    - influxdb.token
+    - influxdb.timeout_seconds
     - ssvb_api_key
     - live_api_urls
     - live_api_snapshot_refresh_seconds

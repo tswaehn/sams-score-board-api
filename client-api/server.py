@@ -9,11 +9,13 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+import time
 from competition.fetch_competition import COMPETITION
 from competition.fetch_competition_list import COMPETITION_LIST_STORE
 from league.fetch_league import LEAGUE
 from league.fetch_league_list import LEAGUE_LIST_STORE
 from live_endpoint import get_live_payload, startup_live_endpoint
+from metrics import METRICS
 from server_config import HOST, LOG_LEVEL, PORT
 
 
@@ -27,12 +29,15 @@ LOGGER = logging.getLogger("api")
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     try:
+        METRICS.start()
         startup_live_endpoint()
     except Exception:
         LOGGER.exception("Live endpoint startup failed")
         raise
 
     yield
+
+    METRICS.stop()
 
 
 app = FastAPI(
@@ -53,10 +58,29 @@ app.add_middleware(
 
 @app.middleware("http")
 async def attach_request_id(request: Request, call_next):
+    started_at = time.perf_counter()
     request_id = request.headers.get("X-Request-Id") or str(uuid4())
     request.state.request_id = request_id
 
-    response = await call_next(request)
+    try:
+        response = await call_next(request)
+    except Exception:
+        duration_ms = (time.perf_counter() - started_at) * 1000.0
+        METRICS.record_http_request(
+            method=request.method,
+            path=request.scope.get("route").path if request.scope.get("route") else request.url.path,
+            status_code=500,
+            duration_ms=duration_ms,
+        )
+        raise
+
+    duration_ms = (time.perf_counter() - started_at) * 1000.0
+    METRICS.record_http_request(
+        method=request.method,
+        path=request.scope.get("route").path if request.scope.get("route") else request.url.path,
+        status_code=response.status_code,
+        duration_ms=duration_ms,
+    )
     response.headers["X-Request-Id"] = request_id
     response.headers["Cache-Control"] = "no-store"
     response.headers["X-Content-Type-Options"] = "nosniff"
