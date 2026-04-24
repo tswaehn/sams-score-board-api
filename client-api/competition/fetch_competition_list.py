@@ -72,8 +72,7 @@ class CompetitionListStore(PeriodicUpdater):
             next_store[competition_uuid] = self.build_competition_entry_from_payload(competition)
             raw_payload[competition_uuid] = competition
 
-        raw_file_path = self.store_file_path.parent / "competition-list-store-raw.json"
-        self._write_json_file(raw_file_path, raw_payload)
+        self.dump_raw_store("competition-list-store-raw.json", raw_payload)
         self.replace_store(next_store, STORE_TTL_SECONDS)
 
     def seconds_until_next_update_all(self) -> float:

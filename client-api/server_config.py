@@ -55,6 +55,23 @@ def _normalize_live_api_urls(value: Any) -> list[str]:
     raise RuntimeError("live_api_urls must be a comma-separated string or an array of strings")
 
 
+def _normalize_bool(value: Any, *, default: bool = False) -> bool:
+    if value is None:
+        return default
+
+    if isinstance(value, bool):
+        return value
+
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+
+    raise RuntimeError("write_raw_cache must be a boolean value")
+
+
 def _require_config_value(config: dict[str, Any], config_key: str) -> Any:
     value = _config_value(config, config_key)
     if value is None:
@@ -83,6 +100,7 @@ LIVE_API_URLS = _normalize_live_api_urls(
 )
 if not LIVE_API_URLS:
     raise RuntimeError("Config key live_api_urls must contain at least one URL")
+WRITE_RAW_CACHE = _normalize_bool(_config_value(CONFIG_FILE, "write_raw_cache", False))
 LIVE_API_SNAPSHOT_REFRESH_SECONDS = int(
     _config_value(
         CONFIG_FILE,

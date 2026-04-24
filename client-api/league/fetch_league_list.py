@@ -59,8 +59,7 @@ class LeagueListStore(PeriodicUpdater):
             next_store[league_uuid] = self.build_league_entry(league)
             raw_payload[league_uuid] = league
 
-        raw_file_path = self.store_file_path.parent / "league-list-store-raw.json"
-        self._write_json_file(raw_file_path, raw_payload)
+        self.dump_raw_store("league-list-store-raw.json", raw_payload)
         self.replace_store(next_store, STORE_TTL_SECONDS)
 
     def seconds_until_next_update_all(self) -> float:

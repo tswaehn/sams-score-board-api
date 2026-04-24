@@ -6,6 +6,7 @@ import threading
 import time
 from pathlib import Path
 from typing import Any
+from server_config import WRITE_RAW_CACHE
 
 
 class PeriodicUpdater:
@@ -46,6 +47,9 @@ class PeriodicUpdater:
         self._write_json_file(self.store_file_path, payload)
 
     def dump_raw_json(self, file_name: str, uuid: str, payload: dict[str, Any]) -> None:
+        if not WRITE_RAW_CACHE:
+            return
+
         raw_file_path = self.store_file_path.parent / file_name
         raw_payload: dict[str, Any] = {}
 
@@ -62,6 +66,13 @@ class PeriodicUpdater:
 
         raw_payload[uuid] = payload
         self._write_json_file(raw_file_path, raw_payload)
+
+    def dump_raw_store(self, file_name: str, payload: dict[str, Any]) -> None:
+        if not WRITE_RAW_CACHE:
+            return
+
+        raw_file_path = self.store_file_path.parent / file_name
+        self._write_json_file(raw_file_path, payload)
 
     def replace_store(self, store: dict[str, Any], ttl_seconds: float) -> None:
         with self.lock:
