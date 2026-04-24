@@ -180,6 +180,11 @@ environment:
       default: info
       used_by:
         - client-api/server.py
+    - name: TZ
+      required: false
+      used_by:
+        - client-api/server_config.py
+      purpose: set the process timezone, mainly for daily refresh scheduling based on datetime.now()
     - name: SSVB_API_KEY
       required: true
       used_by:
@@ -330,6 +335,7 @@ configuration_model:
     - JSON file referenced by SERVER_CONFIG_PATH
     - hard-coded defaults
   supported_keys:
+    - tz
     - host
     - port
     - log_level

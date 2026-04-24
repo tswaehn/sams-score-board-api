@@ -78,6 +78,7 @@ Optional environment variables:
 * `HOST` defaults to `0.0.0.0`
 * `PORT` defaults to `8000`
 * `LOG_LEVEL` defaults to `info`
+* `TZ` optionally sets the process timezone; this mainly affects server-side daily refresh scheduling
 * `SERVER_CONFIG_PATH` points to a JSON config file; direct env vars still override config-file values
 * `SSVB_API_KEY` authenticates requests to the upstream SAMS REST API
 * `LIVE_API_URLS` sets the upstream live endpoints for the live endpoint worker as a comma-separated list
@@ -88,6 +89,7 @@ Configuration files:
 * [`client-api/config/server_config_template.json`](./client-api/config/server_config_template.json) contains the full anonymous config schema for `client-api`
 * create a real config file such as `client-api/config/server_config.local.json` from that template and point `SERVER_CONFIG_PATH` at it
 * [`docker-compose.yml.example`](./docker-compose.yml.example) contains the same two-service example for `client-api` and `web`
+* the config file supports `tz`, which maps to the `TZ` process environment variable
 * `API_BASE_URL` for the `web` container must be a browser-reachable URL, not an internal Docker service hostname, because it is injected into client-side JavaScript
 
 Endpoints:

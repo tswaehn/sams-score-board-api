@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from pathlib import Path
 from typing import Any
 
@@ -64,6 +65,12 @@ def _normalize_live_api_urls(value: Any) -> list[str]:
 
 
 CONFIG_FILE = _load_config_file(SERVER_CONFIG_PATH)
+
+TIMEZONE = _env_or_config("TZ", CONFIG_FILE, "tz")
+if TIMEZONE:
+    os.environ["TZ"] = str(TIMEZONE)
+    if hasattr(time, "tzset"):
+        time.tzset()
 
 HOST = str(_env_or_config("HOST", CONFIG_FILE, "host", "0.0.0.0"))
 PORT = int(_env_or_config("PORT", CONFIG_FILE, "port", 8000))
