@@ -123,8 +123,8 @@ http_behavior:
     startup:
       mechanism: FastAPI lifespan handler
       details:
-        - requires LIVE_API_URL to be configured
-        - starts the live endpoint updater once
+        - requires LIVE_API_URL or LIVE_API_URLS to be configured
+        - starts one live endpoint updater per configured upstream URL
         - raises startup errors so FastAPI fails to start instead of serving with an uninitialized live endpoint
   middleware:
     - name: request-id
@@ -201,6 +201,14 @@ environment:
       used_by:
         - client-api/live_endpoint.py
       expected_path_pattern: /live/<ticker_type>/tickers/<ticker_id>
+      purpose: configure one upstream live snapshot plus websocket source
+    - name: LIVE_API_URLS
+      required: false
+      used_by:
+        - client-api/live_endpoint.py
+      format: comma-separated list of LIVE_API_URL-compatible values
+      precedence: overrides LIVE_API_URL when non-empty
+      purpose: configure multiple upstream live sources whose payloads are merged before serving
     - name: LIVE_API_SNAPSHOT_REFRESH_SECONDS
       required: false
       default: 60
@@ -228,7 +236,10 @@ upstream_integrations:
     transport:
       snapshot: HTTP GET
       updates: WebSocket
-    source_env: LIVE_API_URL
+    source_env:
+      primary: LIVE_API_URLS
+      fallback: LIVE_API_URL
+    source_cardinality: one_or_many
     websocket_url_derivation: replace /live/<ticker_type>/tickers/<ticker_id> with wss://<host>/<ticker_type>/<ticker_id>
     http_timeout_seconds: 30
     websocket_timeout_seconds: 55
@@ -293,15 +304,21 @@ caching:
 live_state_model:
   module: client-api/live_endpoint.py
   owner:
-    class: LiveStateUpdater
+    classes:
+      source_updater: LiveStateUpdater
+      aggregate_updater: MultiLiveStateUpdater
     singleton: LIVE_STATE_UPDATER
   state:
-    payload: updater-owned in-memory dict
-    error: updater-owned string or null
-    websocket_thread: updater-owned daemon thread or null
+    payload: one in-memory dict per source updater, merged on read
+    error: source-updater-owned string or null
+    websocket_thread: one daemon thread per source updater or null
   startup_sequence:
-    - validate LIVE_API_URL
-    - start the updater thread once
+    - validate LIVE_API_URLS or fallback LIVE_API_URL
+    - start one updater thread per configured source
+  aggregate_merge_rules:
+    - concatenate matchDays arrays from all sources
+    - shallow-merge matchSeries, matchStates, and matchStats by key
+    - use the first available settings object
   websocket_merge_rules:
     - FETCH_DATA_RESPONSE_ERROR sets error state
     - MATCH_UPDATE merges payload into matchStates[matchUuid]

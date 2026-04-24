@@ -16,6 +16,7 @@ from websocket import WebSocketConnectionClosedException, WebSocketTimeoutExcept
 LOGGER = logging.getLogger("api.live")
 
 LIVE_API_URL = os.getenv("LIVE_API_URL")
+LIVE_API_URLS = os.getenv("LIVE_API_URLS")
 LIVE_API_TIMEOUT_SECONDS = 30
 LIVE_API_WS_TIMEOUT_SECONDS = 55
 LIVE_API_WS_RECONNECT_SECONDS = 3
@@ -38,6 +39,42 @@ LIVE_API_HEADERS = {
         "Chrome/127.0.0.0 Safari/537.36"
     ),
 }
+
+
+def _get_live_api_urls() -> list[str]:
+    if LIVE_API_URLS:
+        urls = [url.strip() for url in LIVE_API_URLS.split(",") if url.strip()]
+        if urls:
+            return urls
+
+    if LIVE_API_URL:
+        return [LIVE_API_URL]
+
+    return []
+
+
+def _parse_live_api_url(live_api_url: str | None) -> tuple[str, str, str]:
+    if not live_api_url:
+        raise RuntimeError("Missing environment variable: LIVE_API_URL or LIVE_API_URLS")
+
+    parsed_url = urlparse(live_api_url)
+    path_segments = [segment for segment in parsed_url.path.split("/") if segment]
+    if len(path_segments) != 4 or path_segments[0] != "live" or path_segments[2] != "tickers":
+        raise RuntimeError(
+            "Live API URL must match /live/<ticker_type>/tickers/<ticker_id>"
+        )
+
+    ticker_type = path_segments[1]
+    ticker_id = path_segments[3]
+    if not ticker_type or not ticker_id:
+        raise RuntimeError(
+            "Live API URL must contain both ticker type and ticker id"
+        )
+
+    if not parsed_url.netloc:
+        raise RuntimeError("Live API URL must include a hostname")
+
+    return ticker_type, ticker_id, f"wss://{parsed_url.netloc}/{ticker_type}/{ticker_id}"
 
 
 class LiveStateUpdater:
@@ -80,27 +117,7 @@ class LiveStateUpdater:
         return self._filter_payload(payload, competition_uuid)
 
     def _parse_config(self) -> tuple[str, str, str]:
-        if not self._live_api_url:
-            raise RuntimeError("Missing environment variable: LIVE_API_URL")
-
-        parsed_url = urlparse(self._live_api_url)
-        path_segments = [segment for segment in parsed_url.path.split("/") if segment]
-        if len(path_segments) != 4 or path_segments[0] != "live" or path_segments[2] != "tickers":
-            raise RuntimeError(
-                "LIVE_API_URL must match /live/<ticker_type>/tickers/<ticker_id>"
-            )
-
-        ticker_type = path_segments[1]
-        ticker_id = path_segments[3]
-        if not ticker_type or not ticker_id:
-            raise RuntimeError(
-                "LIVE_API_URL must contain both ticker type and ticker id"
-            )
-
-        if not parsed_url.netloc:
-            raise RuntimeError("LIVE_API_URL must include a hostname")
-
-        return ticker_type, ticker_id, f"wss://{parsed_url.netloc}/{ticker_type}/{ticker_id}"
+        return _parse_live_api_url(self._live_api_url)
 
     def _fetch_snapshot(self) -> dict:
         response = requests.get(
@@ -231,7 +248,8 @@ class LiveStateUpdater:
 
             time.sleep(LIVE_API_WS_RECONNECT_SECONDS)
 
-    def _filter_payload(self, payload: dict, competition_uuid: str) -> dict:
+    @staticmethod
+    def _filter_payload(payload: dict, competition_uuid: str) -> dict:
         match_days = payload.get("matchDays")
         if not isinstance(match_days, list):
             return {}
@@ -291,12 +309,63 @@ class LiveStateUpdater:
         return filtered_payload
 
 
-LIVE_STATE_UPDATER = LiveStateUpdater(LIVE_API_URL)
+class MultiLiveStateUpdater:
+    def __init__(self, live_api_urls: list[str]) -> None:
+        self._updaters = [LiveStateUpdater(live_api_url) for live_api_url in live_api_urls]
+
+    def start(self) -> None:
+        for updater in self._updaters:
+            updater.start()
+
+    def get_payload(self) -> dict:
+        payloads = [updater.get_payload() for updater in self._updaters]
+        return self._merge_payloads(payloads)
+
+    def get_competition_payload(self, competition_uuid: str) -> dict:
+        payload = self.get_payload()
+        return LiveStateUpdater._filter_payload(payload, competition_uuid)
+
+    def _merge_payloads(self, payloads: list[dict]) -> dict:
+        merged_payload: dict = {}
+        merged_match_days: list = []
+        merged_dict_sections = {
+            "matchSeries": {},
+            "matchStates": {},
+            "matchStats": {},
+        }
+
+        for payload in payloads:
+            if not isinstance(payload, dict) or not payload:
+                continue
+
+            match_days = payload.get("matchDays")
+            if isinstance(match_days, list):
+                merged_match_days.extend(deepcopy(match_days))
+
+            for key, merged_section in merged_dict_sections.items():
+                value = payload.get(key)
+                if isinstance(value, dict):
+                    merged_section.update(deepcopy(value))
+
+            settings = payload.get("settings")
+            if "settings" not in merged_payload and isinstance(settings, dict):
+                merged_payload["settings"] = deepcopy(settings)
+
+        if merged_match_days:
+            merged_payload["matchDays"] = merged_match_days
+
+        for key, merged_section in merged_dict_sections.items():
+            merged_payload[key] = merged_section
+
+        return merged_payload
+
+
+LIVE_STATE_UPDATER = MultiLiveStateUpdater(_get_live_api_urls())
 
 
 def startup_live_endpoint() -> None:
-    if not LIVE_API_URL:
-        raise RuntimeError("LIVE_API_URL is required to start the live endpoint")
+    if not _get_live_api_urls():
+        raise RuntimeError("LIVE_API_URL or LIVE_API_URLS is required to start the live endpoint")
 
     LIVE_STATE_UPDATER.start()
 
