@@ -14,7 +14,7 @@ from competition.fetch_competition import COMPETITION
 from competition.fetch_competition_list import COMPETITION_LIST_STORE
 from league.fetch_league import LEAGUE
 from league.fetch_league_list import LEAGUE_LIST_STORE
-from live_endpoint import LIVE_API_URL, get_live_payload, startup_live_endpoint
+from live_endpoint import get_live_payload, startup_live_endpoint
 
 
 HOST = os.getenv("HOST", "0.0.0.0")
