@@ -101,6 +101,12 @@ class PeriodicUpdater:
             expires_at = self.store_item_expires_at.get(key)
             return expires_at if isinstance(expires_at, (int, float)) else None
 
+    def _is_store_item_expired_locked(self, key: str) -> bool:
+        expires_at = self.store_item_expires_at.get(key)
+        if not isinstance(expires_at, (int, float)):
+            return True
+        return time.time() > expires_at
+
     def _run_coalesced_update(self, uuid: str | None = None) -> bool:
         update_key = uuid if uuid is not None else "__all__"
 
@@ -137,6 +143,37 @@ class PeriodicUpdater:
                     store_item = self.store.get(uuid)
                     if store_item is not None and not self.is_store_item_expired(uuid):
                         return
+
+            if self._run_coalesced_update(uuid):
+                return
+
+    def trigger_background_update(self, uuid: str | None = None) -> None:
+        update_key = uuid if uuid is not None else "__all__"
+
+        with self.lock:
+            if update_key in self.inflight_updates:
+                return
+
+        def _run() -> None:
+            try:
+                self._run_coalesced_update(uuid)
+            except Exception:
+                self.logger.exception("Background cache update failed for key=%s", update_key)
+
+        threading.Thread(
+            target=_run,
+            name=f"{self.thread_name}-{update_key}-background",
+            daemon=True,
+        ).start()
+
+    def ensure_store_item_available(self, uuid: str) -> None:
+        while True:
+            with self.lock:
+                store_item = self.store.get(uuid)
+                if store_item is not None:
+                    if self._is_store_item_expired_locked(uuid):
+                        self.trigger_background_update(uuid)
+                    return
 
             if self._run_coalesced_update(uuid):
                 return

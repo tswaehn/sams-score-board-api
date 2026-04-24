@@ -32,9 +32,9 @@ class League(PeriodicUpdater):
         self.set_store_item(uuid, self.normalize_league(league), STORE_TTL_SECONDS)
 
     def get(self, league_uuid: str) -> tuple[dict, bool]:
-        self.wait_for_uuid(league_uuid)
-
         was_cached = self.get_store_item(league_uuid) is not None
+        self.ensure_store_item_available(league_uuid)
+
         league = self.get_store_item(league_uuid)
         if league is None:
             raise KeyError(f"League {league_uuid!r} not found in store")

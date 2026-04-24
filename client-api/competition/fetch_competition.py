@@ -32,9 +32,9 @@ class Competition(PeriodicUpdater):
         self.set_store_item(uuid, self.normalize_competition(competition), STORE_TTL_SECONDS)
 
     def get(self, competition_uuid: str) -> tuple[dict, bool]:
-        self.wait_for_uuid(competition_uuid)
-
         was_cached = self.get_store_item(competition_uuid) is not None
+        self.ensure_store_item_available(competition_uuid)
+
         competition = self.get_store_item(competition_uuid)
         if competition is None:
             raise KeyError(f"Competition {competition_uuid!r} not found in store")
