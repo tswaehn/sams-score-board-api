@@ -226,7 +226,7 @@ export default function EntityLive({ expectedEntityType }) {
     loadMatches();
     const intervalId = window.setInterval(
       loadMatches,
-      1000
+      2000
     );
 
     return () => {
