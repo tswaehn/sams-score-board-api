@@ -4,3 +4,4 @@ web/.idea
 .idea/
 .env
 client-api/cache/
+client-api/config/server_config.json
