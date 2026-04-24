@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import threading
 import time
 from copy import deepcopy
@@ -11,19 +10,15 @@ from urllib.parse import urlparse
 import requests
 from requests import RequestException
 from websocket import WebSocketConnectionClosedException, WebSocketTimeoutException, create_connection
+from server_config import LIVE_API_SNAPSHOT_REFRESH_SECONDS, LIVE_API_URLS
 
 
 LOGGER = logging.getLogger("api.live")
 
-LIVE_API_URL = os.getenv("LIVE_API_URL")
-LIVE_API_URLS = os.getenv("LIVE_API_URLS")
 LIVE_API_TIMEOUT_SECONDS = 30
 LIVE_API_WS_TIMEOUT_SECONDS = 55
 LIVE_API_WS_RECONNECT_SECONDS = 3
-LIVE_API_SNAPSHOT_REFRESH_SECONDS = max(
-    1,
-    int(os.getenv("LIVE_API_SNAPSHOT_REFRESH_SECONDS", "60")),
-)
+LIVE_API_SNAPSHOT_REFRESH_SECONDS = max(1, LIVE_API_SNAPSHOT_REFRESH_SECONDS)
 LIVE_API_HEADERS = {
     "Accept": "application/json, text/plain, */*",
     "Accept-Language": "en-US,en;q=0.9",
@@ -42,20 +37,12 @@ LIVE_API_HEADERS = {
 
 
 def _get_live_api_urls() -> list[str]:
-    if LIVE_API_URLS:
-        urls = [url.strip() for url in LIVE_API_URLS.split(",") if url.strip()]
-        if urls:
-            return urls
-
-    if LIVE_API_URL:
-        return [LIVE_API_URL]
-
-    return []
+    return list(LIVE_API_URLS)
 
 
 def _parse_live_api_url(live_api_url: str | None) -> tuple[str, str, str]:
     if not live_api_url:
-        raise RuntimeError("Missing environment variable: LIVE_API_URL or LIVE_API_URLS")
+        raise RuntimeError("Missing environment variable: LIVE_API_URLS")
 
     parsed_url = urlparse(live_api_url)
     path_segments = [segment for segment in parsed_url.path.split("/") if segment]
@@ -130,7 +117,7 @@ class LiveStateUpdater:
         payload = response.json()
         if not isinstance(payload, dict):
             raise RuntimeError(
-                f"Expected a dict payload from LIVE_API_URL, got {type(payload).__name__}"
+                f"Expected a dict payload from configured live API URL, got {type(payload).__name__}"
             )
 
         return payload
@@ -365,7 +352,7 @@ LIVE_STATE_UPDATER = MultiLiveStateUpdater(_get_live_api_urls())
 
 def startup_live_endpoint() -> None:
     if not _get_live_api_urls():
-        raise RuntimeError("LIVE_API_URL or LIVE_API_URLS is required to start the live endpoint")
+        raise RuntimeError("LIVE_API_URLS is required to start the live endpoint")
 
     LIVE_STATE_UPDATER.start()
 

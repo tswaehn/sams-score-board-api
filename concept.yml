@@ -123,7 +123,7 @@ http_behavior:
     startup:
       mechanism: FastAPI lifespan handler
       details:
-        - requires LIVE_API_URL or LIVE_API_URLS to be configured
+        - requires LIVE_API_URLS to be configured
         - starts one live endpoint updater per configured upstream URL
         - raises startup errors so FastAPI fails to start instead of serving with an uninitialized live endpoint
   middleware:
@@ -185,36 +185,28 @@ environment:
       used_by:
         - client-api/sams_api_client.py
       purpose: authenticate requests against https://www.ssvb.org/api/v2
-    - name: WARM_CACHE_ENABLED
-      required: false
-      default: disabled
-      accepted_truthy_values:
-        - "1"
-        - "true"
-        - "yes"
-        - "on"
-      used_by:
-        - client-api/sams_api_client.py
-      purpose: start background season-fetch thread during module import
-    - name: LIVE_API_URL
+    - name: LIVE_API_URLS
       required: true_for_live_route
       used_by:
         - client-api/live_endpoint.py
-      expected_path_pattern: /live/<ticker_type>/tickers/<ticker_id>
-      purpose: configure one upstream live snapshot plus websocket source
-    - name: LIVE_API_URLS
-      required: false
-      used_by:
-        - client-api/live_endpoint.py
       format: comma-separated list of LIVE_API_URL-compatible values
-      precedence: overrides LIVE_API_URL when non-empty
-      purpose: configure multiple upstream live sources whose payloads are merged before serving
+      purpose: configure one or more upstream live sources whose payloads are merged before serving
     - name: LIVE_API_SNAPSHOT_REFRESH_SECONDS
       required: false
       default: 60
       used_by:
         - client-api/live_endpoint.py
       purpose: periodically refresh the full live snapshot inside the live updater so matchDays and matchSeries stay aligned with upstream while websocket deltas update match state
+    - name: SERVER_CONFIG_PATH
+      required: false
+      used_by:
+        - client-api/server_config.py
+      purpose: point to a JSON file that defines the client-api runtime configuration
+    - name: SSVB_API_KEY
+      required: true_for_upstream_rest_requests
+      used_by:
+        - client-api/sams_api_client.py
+      purpose: authenticate requests to the upstream SAMS REST API
 
 upstream_integrations:
   ssvb_rest_api:
@@ -236,16 +228,14 @@ upstream_integrations:
     transport:
       snapshot: HTTP GET
       updates: WebSocket
-    source_env:
-      primary: LIVE_API_URLS
-      fallback: LIVE_API_URL
+    source_env: LIVE_API_URLS
     source_cardinality: one_or_many
     websocket_url_derivation: replace /live/<ticker_type>/tickers/<ticker_id> with wss://<host>/<ticker_type>/<ticker_id>
     http_timeout_seconds: 30
     websocket_timeout_seconds: 55
     reconnect_delay_seconds: 3
     snapshot_refresh_seconds:
-      default: 15
+      default: 60
       source_env: LIVE_API_SNAPSHOT_REFRESH_SECONDS
 
 caching:
@@ -313,7 +303,7 @@ live_state_model:
     error: source-updater-owned string or null
     websocket_thread: one daemon thread per source updater or null
   startup_sequence:
-    - validate LIVE_API_URLS or fallback LIVE_API_URL
+    - validate LIVE_API_URLS
     - start one updater thread per configured source
   aggregate_merge_rules:
     - concatenate matchDays arrays from all sources
@@ -332,6 +322,20 @@ live_state_model:
     - GET /api/live/{competition_id} reads only from the updater public API
     - GET /api/live/{competition_id} does not start or repair the updater lifecycle
     - GET /api/live/{competition_id} filters matchDays, matchStates, matchStats, and matchSeries server-side to the requested competition while preserving the live payload shape
+
+configuration_model:
+  module: client-api/server_config.py
+  source_precedence:
+    - direct environment variables
+    - JSON file referenced by SERVER_CONFIG_PATH
+    - hard-coded defaults
+  supported_keys:
+    - host
+    - port
+    - log_level
+    - ssvb_api_key
+    - live_api_urls
+    - live_api_snapshot_refresh_seconds
 
 payload_shapes:
   competition_endpoint_top_level_keys:

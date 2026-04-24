@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 import logging
-import os
 from uuid import UUID, uuid4
 
 import uvicorn
@@ -15,11 +14,8 @@ from competition.fetch_competition_list import COMPETITION_LIST_STORE
 from league.fetch_league import LEAGUE
 from league.fetch_league_list import LEAGUE_LIST_STORE
 from live_endpoint import get_live_payload, startup_live_endpoint
+from server_config import HOST, LOG_LEVEL, PORT
 
-
-HOST = os.getenv("HOST", "0.0.0.0")
-PORT = int(os.getenv("PORT", "8000"))
-LOG_LEVEL = os.getenv("LOG_LEVEL", "info").lower()
 
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL.upper(), logging.INFO),

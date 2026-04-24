@@ -1,4 +1,54 @@
-# client-api
+# how to use it
+
+Example `docker-compose.yml`:
+
+```yaml
+services:
+  client-api:
+    build:
+      context: ./client-api
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      SERVER_CONFIG_PATH: /app/config/server_config.json
+    volumes:
+      - ./client-api/config/server_config.local.json:/app/config/server_config.json:ro
+      - ./client-api/cache:/app/cache
+
+  web:
+    build:
+      context: ./web
+    depends_on:
+      - client-api
+    ports:
+      - "127.0.0.1:8080:80"
+    environment:
+      API_BASE_URL: https://your-domain.com/api
+```
+
+This setup assumes you may run an external `nginx` on the host in front of these localhost-only container ports.
+
+Example nginx site config:
+
+```nginx
+server {
+  listen 80;
+  server_name your-domain.com;
+
+  location /api/ {
+    proxy_pass http://127.0.0.1:8000/api/;
+  }
+
+  location / {
+    proxy_pass http://127.0.0.1:8080/;
+  }
+}
+```
+
+
+
+# modules provided by this repo
+## client-api
 
 The `client-api` directory contains a FastAPI server for exposing competition data from the upstream SAMS API.
 
@@ -19,8 +69,7 @@ Run the API server:
 
 ```bash
 cd client-api
-SSVB_API_KEY=your_api_key \
-LIVE_API_URL=https://example.com/live.json \
+SERVER_CONFIG_PATH=./config/server_config.local.json \
 uvicorn server:app --host 0.0.0.0 --port 8000
 ```
 
@@ -29,10 +78,17 @@ Optional environment variables:
 * `HOST` defaults to `0.0.0.0`
 * `PORT` defaults to `8000`
 * `LOG_LEVEL` defaults to `info`
-* `LIVE_API_URL` sets one upstream live endpoint for the live endpoint worker
-* `LIVE_API_URLS` optionally sets multiple upstream live endpoints as a comma-separated list and takes precedence over `LIVE_API_URL`
-* `LIVE_API_SNAPSHOT_REFRESH_SECONDS` defaults to `15` and controls how often the live worker refetches the full snapshot while the websocket remains connected
-* `WARM_CACHE_ENABLED` enables background cache warm-up when set to `1`, `true`, `yes`, or `on`; disabled by default
+* `SERVER_CONFIG_PATH` points to a JSON config file; direct env vars still override config-file values
+* `SSVB_API_KEY` authenticates requests to the upstream SAMS REST API
+* `LIVE_API_URLS` sets the upstream live endpoints for the live endpoint worker as a comma-separated list
+* `LIVE_API_SNAPSHOT_REFRESH_SECONDS` defaults to `60` and controls how often the live worker refetches the full snapshot while the websocket remains connected
+
+Configuration files:
+
+* [`client-api/config/server_config_template.json`](./client-api/config/server_config_template.json) contains the full anonymous config schema for `client-api`
+* create a real config file such as `client-api/config/server_config.local.json` from that template and point `SERVER_CONFIG_PATH` at it
+* [`docker-compose.yml.example`](./docker-compose.yml.example) contains the same two-service example for `client-api` and `web`
+* `API_BASE_URL` for the `web` container must be a browser-reachable URL, not an internal Docker service hostname, because it is injected into client-side JavaScript
 
 Endpoints:
 
@@ -83,7 +139,7 @@ BASE_URL=http://127.0.0.1:8000 COMPETITION_ID=<uuid> SLEEP_SECONDS=0.2 k6 run lo
 ./load-tests/run-simple.sh --vus 20 --duration 30s
 ```
 
-# web
+## web
 
 The `web` directory contains the Vite frontend.
 
@@ -128,11 +184,12 @@ If `API_BASE_URL` is not set in the container, the runtime default is:
 http://localhost:8000/api
 ```
 
-
-# wiki
+# docs
+## wiki
 
 * https://wiki.sams-server.de/wiki/REST-API-Schnittstelle
 
+note: REST API requires an API key provided by the responsible association
 
 ```
 {
@@ -198,10 +255,11 @@ http://localhost:8000/api
 }
 ```
 
-# sams ticker
+## sams live ticker
 
 * https://backend.sams-ticker.de/live/indoor/tickers/dvv
 * https://backend.sams-ticker.de/live/indoor/tickers/ssvb
 
 front end 
+* https://dvv.sams-ticker.de/
 * https://ssvb.sams-ticker.de/

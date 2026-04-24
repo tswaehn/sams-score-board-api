@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import threading
 import time
 from urllib.parse import urlparse
@@ -9,6 +8,7 @@ from uuid import UUID
 
 import requests
 from requests import RequestException
+from server_config import SSVB_API_KEY
 
 LOGGER = logging.getLogger("api")
 
@@ -139,7 +139,7 @@ def fetch_page(
 
 
 def _fetch_endpoint_from_upstream(endpoint: str) -> dict | list:
-    api_key = os.getenv("SSVB_API_KEY")
+    api_key = SSVB_API_KEY
     if not api_key:
         raise RuntimeError("Missing environment variable: SSVB_API_KEY")
 
