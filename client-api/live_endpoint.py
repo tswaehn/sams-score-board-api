@@ -69,6 +69,8 @@ class LiveStateUpdater:
         self._live_api_url = live_api_url
         self._lock = threading.RLock()
         self._payload: dict = {}
+        self._version = 0
+        self._competition_payload_cache: dict[str, tuple[int, dict]] = {}
         self._error: str | None = None
         self._thread: threading.Thread | None = None
         self._ticker_type: str | None = None
@@ -96,12 +98,18 @@ class LiveStateUpdater:
 
     def get_competition_payload(self, competition_uuid: str) -> dict:
         with self._lock:
-            payload = deepcopy(self._payload)
+            if not self._payload:
+                return {}
 
-        if not payload:
-            return {}
+            cached_entry = self._competition_payload_cache.get(competition_uuid)
+            if cached_entry is not None:
+                cached_version, cached_payload = cached_entry
+                if cached_version == self._version:
+                    return deepcopy(cached_payload)
 
-        return self._filter_payload(payload, competition_uuid)
+            filtered_payload = self._filter_payload(self._payload, competition_uuid)
+            self._competition_payload_cache[competition_uuid] = (self._version, filtered_payload)
+            return deepcopy(filtered_payload)
 
     def _parse_config(self) -> tuple[str, str, str]:
         return _parse_live_api_url(self._live_api_url)
@@ -125,6 +133,8 @@ class LiveStateUpdater:
     def _store_snapshot(self, payload: dict) -> None:
         with self._lock:
             self._payload = payload
+            self._version += 1
+            self._competition_payload_cache.clear()
             self._error = None
 
     def _set_error(self, message: str) -> None:
@@ -150,6 +160,8 @@ class LiveStateUpdater:
                     match_states = self._payload.setdefault("matchStates", {})
                     if isinstance(match_states, dict):
                         match_states[match_uuid] = message_payload
+                        self._version += 1
+                        self._competition_payload_cache.clear()
                 return
 
             if message_type == "MATCH_STATS_UPDATE":
@@ -158,6 +170,8 @@ class LiveStateUpdater:
                     match_stats = self._payload.setdefault("matchStats", {})
                     if isinstance(match_stats, dict):
                         match_stats[match_uuid] = message_payload
+                        self._version += 1
+                        self._competition_payload_cache.clear()
 
     def _refresh_snapshot_if_due(self, next_refresh_at: float) -> float:
         if time.monotonic() < next_refresh_at:
@@ -309,8 +323,8 @@ class MultiLiveStateUpdater:
         return self._merge_payloads(payloads)
 
     def get_competition_payload(self, competition_uuid: str) -> dict:
-        payload = self.get_payload()
-        return LiveStateUpdater._filter_payload(payload, competition_uuid)
+        payloads = [updater.get_competition_payload(competition_uuid) for updater in self._updaters]
+        return self._merge_payloads(payloads)
 
     def _merge_payloads(self, payloads: list[dict]) -> dict:
         merged_payload: dict = {}
