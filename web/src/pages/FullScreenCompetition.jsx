@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Box, LinearProgress, Typography } from "@mui/material";
+import { Box, Typography } from "@mui/material";
 import { useLocation } from "react-router-dom";
 import { fetchJson, useIsMobile } from "../api/api.js";
 import FullScreenRanking from "../components/FullScreenRanking.jsx";
 
 const VIEW_SWAP_PERIOD_MS = 25000;
-const PROGRESS_UPDATE_MS = 50;
+const PROGRESS_UPDATE_MS = 250;
 
 function getRankingRows(rankings, rankingName) {
   const groupRankings = rankings[rankingName] ?? {};
@@ -193,18 +193,27 @@ export default function FullScreenCompetition() {
       {!loading && !error && (
         <>
           {hasMatchDisplay && (
-            <LinearProgress
-              variant="determinate"
-              value={swapProgress}
+            <Box
               sx={{
-                height: 3,
+                height: 4,
                 borderRadius: 999,
-                bgcolor: "rgba(20, 17, 15, 0.08)",
-                "& .MuiLinearProgress-bar": {
-                  borderRadius: 999
-                }
+                overflow: "hidden",
+                bgcolor: "rgba(20, 17, 15, 0.08)"
               }}
-            />
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(swapProgress)}
+            >
+              <Box
+                sx={{
+                  height: "100%",
+                  width: `${swapProgress}%`,
+                  bgcolor: "secondary.main",
+                  transition: "width 250ms linear"
+                }}
+              />
+            </Box>
           )}
 
           <Box
