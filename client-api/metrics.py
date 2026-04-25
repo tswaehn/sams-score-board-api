@@ -71,6 +71,10 @@ def _format_line(
     return f"{measurement_part} {','.join(field_parts)} {timestamp_ns}"
 
 
+def _current_day_key() -> str:
+    return time.strftime("%Y-%m-%d", time.localtime())
+
+
 class InfluxMetricsClient:
     def __init__(self) -> None:
         self._enabled = bool(
@@ -84,6 +88,9 @@ class InfluxMetricsClient:
         self._unique_client_lock = threading.Lock()
         self._active_unique_client_bucket = int(time.time() // 60)
         self._active_unique_client_ids: set[str] = set()
+        self._active_daily_unique_client_day = _current_day_key()
+        self._active_daily_unique_client_ids: set[str] = set()
+        self._last_daily_unique_emit_bucket = self._active_unique_client_bucket - 1
 
     def start(self) -> None:
         if not self._enabled:
@@ -149,7 +156,9 @@ class InfluxMetricsClient:
 
         with self._unique_client_lock:
             self._flush_completed_unique_client_buckets_locked(int(time.time() // 60))
+            self._rotate_daily_unique_client_day_locked(_current_day_key())
             self._active_unique_client_ids.add(client_id)
+            self._active_daily_unique_client_ids.add(client_id)
 
     def record_upstream_request(
         self,
@@ -243,13 +252,39 @@ class InfluxMetricsClient:
             timestamp_ns=bucket * NANOSECONDS_PER_MINUTE,
         )
 
+    def _rotate_daily_unique_client_day_locked(self, current_day: str) -> None:
+        if self._active_daily_unique_client_day == current_day:
+            return
+
+        self._active_daily_unique_client_day = current_day
+        self._active_daily_unique_client_ids = set()
+
+    def _write_daily_unique_client_count_locked(self, bucket: int) -> None:
+        self.write_point(
+            "unique_client_sessions_daily",
+            tags={
+                "host": HOST,
+                "day": self._active_daily_unique_client_day,
+            },
+            fields={
+                "count": len(self._active_daily_unique_client_ids),
+                "port": int(PORT),
+            },
+            timestamp_ns=bucket * NANOSECONDS_PER_MINUTE,
+        )
+
     def _flush_due_unique_client_metrics(self, *, finalize_current_bucket: bool = False) -> None:
         if not self._enabled:
             return
 
         with self._unique_client_lock:
             current_bucket = int(time.time() // 60)
+            current_day = _current_day_key()
             self._flush_completed_unique_client_buckets_locked(current_bucket)
+            self._rotate_daily_unique_client_day_locked(current_day)
+            while self._last_daily_unique_emit_bucket < current_bucket:
+                self._last_daily_unique_emit_bucket += 1
+                self._write_daily_unique_client_count_locked(self._last_daily_unique_emit_bucket)
             if finalize_current_bucket and self._active_unique_client_ids:
                 self._write_unique_client_bucket_locked(self._active_unique_client_bucket)
                 self._active_unique_client_bucket = current_bucket + 1

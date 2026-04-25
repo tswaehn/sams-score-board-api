@@ -308,6 +308,24 @@ metrics:
     fields:
       - count
       - port
+  unique_client_sessions_daily:
+    measurement: unique_client_sessions_daily
+    emitted_by: client-api/metrics.py
+    cadence: once per minute
+    source: cumulative unique client_id query parameter values seen since local-day rollover
+    runtime_behavior:
+      - tracked in memory per local calendar day and emitted once per minute to show daily growth over time
+      - resets server-side when the local day changes
+      - exported through the normal Influx write queue so request metric batching stays unchanged
+    privacy:
+      - raw client identifiers are not written to InfluxDB
+      - only aggregated count is exported
+    tags:
+      - host
+      - day
+    fields:
+      - count
+      - port
 
 web_frontend_requirements:
   compatibility:
