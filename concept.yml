@@ -21,7 +21,7 @@ document:
       - treat as the latest high-level concept source for client-api
       - reconcile with source files if implementation and this document diverge
   last_updated:
-    date: 2026-04-03
+    date: 2026-04-25
     author: Codex
 
 subproject:
@@ -70,6 +70,8 @@ files:
       role: CompetitionListStore class maintains the aggregated competition list and lock, updates it per season using direct upstream fetches, exposes get() for copied reads, derives currentSeason mutability from the loaded season, and runs a background updater thread
     - path: client-api/live_endpoint.py
       role: live snapshot fetch plus websocket update loop for /api/live/{competition_id}
+    - path: client-api/metrics.py
+      role: optional InfluxDB metrics exporter for per-request HTTP metrics, upstream request metrics, and aggregated per-minute unique client-session counts
     - path: client-api/warm_cache.py
       role: fetches unique season records via competition season links and reports season date ranges for cache TTL analysis
     - path: client-api/test.py
@@ -132,6 +134,13 @@ http_behavior:
         request_header: X-Request-Id
         generated_when_missing: true
         response_header: X-Request-Id
+    - name: anonymous-client-session-id
+      details:
+        request_query_param: client_id
+        legacy_request_header: X-Client-Id
+        generated_by: web client via localStorage-backed browser session identifier with stable in-memory fallback when storage is unavailable
+        persisted_server_side: false
+        metrics_usage: aggregated into per-minute unique client-session counts only
     - name: response-hardening
       details:
         cache_control: no-store
@@ -257,6 +266,58 @@ environment:
       used_by:
         - client-api/sams_api_client.py
       purpose: authenticate requests to the upstream SAMS REST API
+
+metrics:
+  http_requests:
+    measurement: http_requests
+    emitted_by: client-api/server.py middleware
+    tags:
+      - method
+      - path
+      - status_code
+      - host
+    fields:
+      - count
+      - duration_ms
+      - port
+  upstream_requests:
+    measurement: upstream_requests
+    emitted_by: client-api/sams_api_client.py
+    tags:
+      - method
+      - endpoint
+      - status_code
+      - success
+    fields:
+      - count
+      - duration_ms
+      - page
+  unique_client_sessions:
+    measurement: unique_client_sessions
+    emitted_by: client-api/metrics.py
+    cadence: once per minute
+    source: unique client_id query parameter values seen during the minute
+    runtime_behavior:
+      - tracked in memory and flushed by a dedicated minute-level metrics thread
+      - exported through the normal Influx write queue so request metric batching stays unchanged
+    privacy:
+      - raw client identifiers are not written to InfluxDB
+      - only aggregated count is exported
+    tags:
+      - host
+    fields:
+      - count
+      - port
+
+web_frontend_requirements:
+  compatibility:
+    primary_target:
+      - older TV devices used as scoreboard displays
+      - older JavaScript engines commonly found on embedded TV browsers
+    engineering_guidance:
+      - treat compatibility with older TV browsers as a core frontend requirement
+      - prefer conservative browser APIs and graceful fallbacks over the newest syntax or platform features
+      - review frontend changes for runtime compatibility, not just desktop browser correctness
 
 upstream_integrations:
   ssvb_rest_api:

@@ -1,4 +1,4 @@
-import { getApiBaseUrl, getTeamShortName } from "./api.js";
+import { getApiBaseUrl, getTeamShortName, withClientSessionId } from "./api.js";
 import { getEntityFromPath } from "../entities/entity.js";
 
 const fetchTimeoutMs = 60000;
@@ -49,7 +49,7 @@ async function fetchWithTimeout(url) {
   const timeoutId = window.setTimeout(() => controller.abort(), fetchTimeoutMs);
 
   try {
-    return await fetch(url, { signal: controller.signal });
+    return await fetch(withClientSessionId(url), { signal: controller.signal });
   } catch (error) {
     if (error.name === "AbortError") {
       throw new Error(`Request timed out after ${fetchTimeoutMs}ms: ${url}`);

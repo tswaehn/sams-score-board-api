@@ -22,6 +22,7 @@ from server_config import (
 
 
 LOGGER = logging.getLogger("api.metrics")
+NANOSECONDS_PER_MINUTE = 60 * 1_000_000_000
 
 
 def _escape_key(value: str) -> str:
@@ -77,7 +78,12 @@ class InfluxMetricsClient:
         )
         self._queue: queue.Queue[str | None] = queue.Queue()
         self._thread: threading.Thread | None = None
+        self._unique_client_thread: threading.Thread | None = None
+        self._stop_event = threading.Event()
         self._warned_unconfigured = False
+        self._unique_client_lock = threading.Lock()
+        self._active_unique_client_bucket = int(time.time() // 60)
+        self._active_unique_client_ids: set[str] = set()
 
     def start(self) -> None:
         if not self._enabled:
@@ -89,32 +95,30 @@ class InfluxMetricsClient:
         if self._thread is not None and self._thread.is_alive():
             return
 
+        self._stop_event.clear()
         self._thread = threading.Thread(
             target=self._run,
             name="influxdb-metrics",
             daemon=True,
         )
         self._thread.start()
+        self._unique_client_thread = threading.Thread(
+            target=self._run_unique_client_metrics,
+            name="influxdb-unique-client-metrics",
+            daemon=True,
+        )
+        self._unique_client_thread.start()
 
     def stop(self) -> None:
         if not self._enabled:
             return
 
+        self._stop_event.set()
         self._queue.put(None)
         if self._thread is not None:
             self._thread.join(timeout=2)
-
-    def write_point(
-        self,
-        measurement: str,
-        *,
-        tags: dict[str, str] | None = None,
-        fields: dict[str, Any],
-    ) -> None:
-        if not self._enabled:
-            return
-
-        self._queue.put(_format_line(measurement, tags=tags, fields=fields))
+        if self._unique_client_thread is not None:
+            self._unique_client_thread.join(timeout=2)
 
     def record_http_request(
         self,
@@ -138,6 +142,14 @@ class InfluxMetricsClient:
                 "port": int(PORT),
             },
         )
+
+    def record_unique_client_session(self, client_id: str | None) -> None:
+        if not self._enabled or not client_id:
+            return
+
+        with self._unique_client_lock:
+            self._flush_completed_unique_client_buckets_locked(int(time.time() // 60))
+            self._active_unique_client_ids.add(client_id)
 
     def record_upstream_request(
         self,
@@ -205,6 +217,56 @@ class InfluxMetricsClient:
                 response.raise_for_status()
             except Exception as exc:
                 LOGGER.warning("Failed to write metrics to InfluxDB: %s", exc)
+
+    def _run_unique_client_metrics(self) -> None:
+        while not self._stop_event.wait(timeout=1.0):
+            self._flush_due_unique_client_metrics()
+
+        self._flush_due_unique_client_metrics(finalize_current_bucket=True)
+
+    def _flush_completed_unique_client_buckets_locked(self, target_bucket: int) -> None:
+        while self._active_unique_client_bucket < target_bucket:
+            self._write_unique_client_bucket_locked(self._active_unique_client_bucket)
+            self._active_unique_client_bucket += 1
+            self._active_unique_client_ids = set()
+
+    def _write_unique_client_bucket_locked(self, bucket: int) -> None:
+        self.write_point(
+            "unique_client_sessions",
+            tags={
+                "host": HOST,
+            },
+            fields={
+                "count": len(self._active_unique_client_ids),
+                "port": int(PORT),
+            },
+            timestamp_ns=bucket * NANOSECONDS_PER_MINUTE,
+        )
+
+    def _flush_due_unique_client_metrics(self, *, finalize_current_bucket: bool = False) -> None:
+        if not self._enabled:
+            return
+
+        with self._unique_client_lock:
+            current_bucket = int(time.time() // 60)
+            self._flush_completed_unique_client_buckets_locked(current_bucket)
+            if finalize_current_bucket and self._active_unique_client_ids:
+                self._write_unique_client_bucket_locked(self._active_unique_client_bucket)
+                self._active_unique_client_bucket = current_bucket + 1
+                self._active_unique_client_ids = set()
+
+    def write_point(
+        self,
+        measurement: str,
+        *,
+        tags: dict[str, str] | None = None,
+        fields: dict[str, Any],
+        timestamp_ns: int | None = None,
+    ) -> None:
+        if not self._enabled:
+            return
+
+        self._queue.put(_format_line(measurement, tags=tags, fields=fields, timestamp_ns=timestamp_ns))
 
 
 METRICS = InfluxMetricsClient()

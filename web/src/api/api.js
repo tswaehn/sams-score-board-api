@@ -2,9 +2,54 @@ import { useMediaQuery } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 
 const defaultApiBaseUrl = "http://localhost:8000/api";
+const clientSessionStorageKey = "sams-scoreboard-client-id";
+let inMemoryClientSessionId = null;
 
 export function getApiBaseUrl() {
   return window.__APP_CONFIG__?.apiBaseUrl ?? defaultApiBaseUrl;
+}
+
+function createClientSessionId() {
+  const timestamp = Date.now().toString(36);
+  const randomPart = Math.random().toString(36).slice(2, 12);
+
+  return `client-${timestamp}-${randomPart}`;
+}
+
+export function getClientSessionId() {
+    let storedClientId = null;
+
+  try {
+    storedClientId = window.localStorage.getItem(clientSessionStorageKey);
+  } catch (error) {
+    storedClientId = null;
+  }
+
+  if (storedClientId) {
+    inMemoryClientSessionId = storedClientId;
+    return storedClientId;
+  }
+
+  if (inMemoryClientSessionId) {
+    return inMemoryClientSessionId;
+  }
+
+  const nextClientId = createClientSessionId();
+  inMemoryClientSessionId = nextClientId;
+
+  try {
+    window.localStorage.setItem(clientSessionStorageKey, nextClientId);
+  } catch (error) {
+    return nextClientId;
+  }
+
+  return nextClientId;
+}
+
+export function withClientSessionId(url) {
+  const trackedUrl = new URL(url, window.location.origin);
+  trackedUrl.searchParams.set("client_id", getClientSessionId());
+  return trackedUrl.toString();
 }
 
 export function getTeamShortName(name, shortName, maxLength = 25) {

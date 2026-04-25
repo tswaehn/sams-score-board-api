@@ -60,7 +60,9 @@ app.add_middleware(
 async def attach_request_id(request: Request, call_next):
     started_at = time.perf_counter()
     request_id = request.headers.get("X-Request-Id") or str(uuid4())
+    client_id = request.query_params.get("client_id") or request.headers.get("X-Client-Id")
     request.state.request_id = request_id
+    METRICS.record_unique_client_session(client_id)
 
     try:
         response = await call_next(request)
