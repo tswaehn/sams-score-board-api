@@ -8,6 +8,26 @@
   <body>
     <div id="root"></div>
     <script src="/app-config.js"></script>
+    <script>
+      (function () {
+        if (!Array.prototype.flatMap) {
+          Array.prototype.flatMap = function (callback, thisArg) {
+            return Array.prototype.concat.apply(
+              [],
+              Array.prototype.map.call(this, callback, thisArg)
+            );
+          };
+        }
+
+        if (!Object.values) {
+          Object.values = function (obj) {
+            return Object.keys(obj).map(function (key) {
+              return obj[key];
+            });
+          };
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
