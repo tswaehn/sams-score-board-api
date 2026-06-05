@@ -59,8 +59,9 @@ export async function fetchUpcomingMatchUuids(seriesUuid) {
 
   const payload = await fetchLiveJson({ seriesUuid });
   const now = Date.now();
+  const matchDays = Array.isArray(payload?.matchDays) ? payload.matchDays : [];
 
-  return payload.matchDays
+  return matchDays
     .flatMap((matchDay) => matchDay.matches ?? [])
     .filter((match) => Number(match.date) >= now)
     .sort((left, right) => left.date - right.date)
@@ -73,8 +74,9 @@ export async function fetchMatchesBySeriesUuid(seriesUuid) {
   }
 
   const payload = await fetchLiveJson({ seriesUuid });
+  const matchDays = Array.isArray(payload?.matchDays) ? payload.matchDays : [];
 
-  return payload.matchDays
+  return matchDays
     .flatMap((matchDay) => matchDay.matches ?? [])
     .sort((left, right) => left.date - right.date)
     .map((match) => ({
