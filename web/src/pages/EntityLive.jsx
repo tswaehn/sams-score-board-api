@@ -280,6 +280,7 @@ export default function EntityLive({ expectedEntityType }) {
   const filteredLiveMatches = filterMatchesByTeam(liveMatches);
   const filteredUpcomingMatches = filterMatchesByTeam(upcomingMatches);
   const filteredFinishedMatches = filterMatchesByTeam(finishedMatches);
+  const hasLiveData = matches.length > 0;
 
   return (
     <Box sx={{ display: "grid", gap: layout.gap.page }}>
@@ -292,63 +293,81 @@ export default function EntityLive({ expectedEntityType }) {
 
       {!loading && !error && (
         <Box sx={{ display: "grid", gap: layout.gap.page }}>
-          <Paper
-            elevation={0}
-            sx={{
-              p: layout.padding.surface,
-              borderRadius: layout.radius.surface,
-              border: "1px solid rgba(20, 17, 15, 0.08)",
-              bgcolor: "#ffffff"
-            }}
-          >
-            <Stack spacing={layout.gap.surface} alignItems="center">
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                Wähle dein Team
+          {hasLiveData ? (
+            <>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: layout.padding.surface,
+                  borderRadius: layout.radius.surface,
+                  border: "1px solid rgba(20, 17, 15, 0.08)",
+                  bgcolor: "#ffffff"
+                }}
+              >
+                <Stack spacing={layout.gap.surface} alignItems="center">
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    Wähle dein Team
+                  </Typography>
+                  <FormControl size="small" sx={{ minWidth: 240, width: "100%", maxWidth: 360 }}>
+                    <InputLabel id="live-team-filter-label">Team</InputLabel>
+                    <Select
+                      labelId="live-team-filter-label"
+                      value={selectedTeamId}
+                      label="Team"
+                      onChange={(event) => setSelectedTeamId(event.target.value)}
+                      sx={{ bgcolor: "#ffffff" }}
+                    >
+                      <MenuItem value="all">All teams</MenuItem>
+                      {teams.map((team) => (
+                        <MenuItem key={team.id} value={team.id}>
+                          {team.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Stack>
+              </Paper>
+
+              <MatchSection
+                title="Live"
+                matches={filteredLiveMatches}
+                emptyText={
+                  entityType === "competition"
+                    ? "No matches are currently in progress."
+                    : "No league matches are currently in progress."
+                }
+                renderMatch={(match) => <CompetitionMatchRow key={match.id} match={match} isMobile={isMobile} />}
+              />
+
+              <MatchSection
+                title="Upcoming Matches"
+                matches={filteredUpcomingMatches}
+                emptyText="No upcoming matches found."
+                renderMatch={(match) => <CompetitionMatchRow key={match.id} match={match} isMobile={isMobile} />}
+              />
+
+              <MatchSection
+                title="Finished Matches"
+                matches={filteredFinishedMatches}
+                emptyText="No finished matches found."
+                renderMatch={(match) => <CompetitionMatchRow key={match.id} match={match} isMobile={isMobile} />}
+              />
+            </>
+          ) : (
+            <Paper
+              elevation={0}
+              sx={{
+                p: layout.padding.surface,
+                borderRadius: layout.radius.surface,
+                border: "1px solid rgba(20, 17, 15, 0.08)",
+                bgcolor: "background.paper"
+              }}
+            >
+              <Typography color="text.secondary">
+                No live data is currently available for this series.
               </Typography>
-              <FormControl size="small" sx={{ minWidth: 240, width: "100%", maxWidth: 360 }}>
-                <InputLabel id="live-team-filter-label">Team</InputLabel>
-                <Select
-                  labelId="live-team-filter-label"
-                  value={selectedTeamId}
-                  label="Team"
-                  onChange={(event) => setSelectedTeamId(event.target.value)}
-                  sx={{ bgcolor: "#ffffff" }}
-                >
-                  <MenuItem value="all">All teams</MenuItem>
-                  {teams.map((team) => (
-                    <MenuItem key={team.id} value={team.id}>
-                      {team.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Stack>
-          </Paper>
-
-          <MatchSection
-            title="Live"
-            matches={filteredLiveMatches}
-            emptyText={
-              entityType === "competition"
-                ? "No matches are currently in progress."
-                : "No league matches are currently in progress."
-            }
-            renderMatch={(match) => <CompetitionMatchRow key={match.id} match={match} isMobile={isMobile} />}
-          />
-
-          <MatchSection
-            title="Upcoming Matches"
-            matches={filteredUpcomingMatches}
-            emptyText="No upcoming matches found."
-            renderMatch={(match) => <CompetitionMatchRow key={match.id} match={match} isMobile={isMobile} />}
-          />
-
-          <MatchSection
-            title="Finished Matches"
-            matches={filteredFinishedMatches}
-            emptyText="No finished matches found."
-            renderMatch={(match) => <CompetitionMatchRow key={match.id} match={match} isMobile={isMobile} />}
-          />
+            </Paper>
+          )}
         </Box>
       )}
     </Box>
