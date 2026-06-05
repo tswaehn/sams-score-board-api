@@ -3,20 +3,13 @@ import { Box, Typography } from "@mui/material";
 import { useLocation } from "react-router-dom";
 import { fetchJson, useIsMobile } from "../api/api.js";
 import FullScreenRanking from "../components/FullScreenRanking.jsx";
+import {
+  buildRankingRowsFromMatches,
+  getRankingRows
+} from "../components/ranking.js";
 
 const VIEW_SWAP_PERIOD_MS = 25000;
 const PROGRESS_UPDATE_MS = 250;
-
-function getRankingRows(rankings, rankingName) {
-  const groupRankings = rankings[rankingName] ?? {};
-
-  return Object.entries(groupRankings)
-    .sort(([left], [right]) => Number(left) - Number(right))
-    .map(([rank, entry]) => ({
-      rank,
-      ...entry
-    }));
-}
 
 function getSortedMatches(group) {
   return Object.values(group?.matches ?? {}).sort((left, right) => {
@@ -107,10 +100,18 @@ export default function FullScreenCompetition() {
   const stageRankings = useMemo(() => {
     return matchGroups.map((group) => ({
       group,
-      rankingRows: getRankingRows(rankings, group.name),
       matches: getSortedMatches(group)
+    })).map(({ group, matches }) => ({
+      group,
+      matches,
+      rankingRows: (() => {
+        const rankingRows = getRankingRows(rankings, group.name);
+        return rankingRows.length > 0
+          ? rankingRows
+          : buildRankingRowsFromMatches(matches, teamByUuid);
+      })()
     }));
-  }, [matchGroups, rankings]);
+  }, [matchGroups, rankings, teamByUuid]);
 
   const stageRankingRows = useMemo(() => {
     if (stageRankings.length >= 8) {
