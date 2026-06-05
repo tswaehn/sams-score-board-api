@@ -9,7 +9,7 @@ from uuid import UUID
 import requests
 from requests import RequestException
 from metrics import METRICS
-from server_config import SSVB_API_KEY
+from server_config import SSVB_API_KEY, SSVB_API_URL
 
 LOGGER = logging.getLogger("api")
 
@@ -33,7 +33,7 @@ def build_url(endpoint: str) -> str:
     normalized_endpoint = endpoint.strip("/")
     if not normalized_endpoint:
         raise RuntimeError("Endpoint must not be empty")
-    return f"{API_BASE_URL}/{normalized_endpoint}"
+    return f"{SSVB_API_URL}/{normalized_endpoint}"
 
 
 def extract_endpoint_from_url(url: str) -> str:

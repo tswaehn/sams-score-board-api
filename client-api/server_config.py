@@ -7,12 +7,13 @@ from pathlib import Path
 from typing import Any
 
 
-SERVER_CONFIG_PATH = os.getenv("SERVER_CONFIG_PATH")
+DEFAULT_SERVER_CONFIG_PATH = "config/server_config.json"
+SERVER_CONFIG_PATH = os.getenv("SERVER_CONFIG_PATH", DEFAULT_SERVER_CONFIG_PATH)
 
 
 def _load_config_file(config_path: str | None) -> dict[str, Any]:
     if not config_path:
-        raise RuntimeError("SERVER_CONFIG_PATH is required")
+        raise RuntimeError("SERVER_CONFIG_PATH must not be empty")
 
     config_file = Path(config_path)
     if not config_file.exists():
@@ -116,6 +117,7 @@ HOST = str(_config_value(CONFIG_FILE, "host", "0.0.0.0"))
 PORT = int(_config_value(CONFIG_FILE, "port", 8000))
 LOG_LEVEL = str(_config_value(CONFIG_FILE, "log_level", "info")).lower()
 SSVB_API_KEY = str(_require_config_value(CONFIG_FILE, "ssvb_api_key"))
+SSVB_API_URL = str(_require_config_value(CONFIG_FILE, "ssvb_api_url")).rstrip("/")
 LIVE_API_URLS = _normalize_live_api_urls(
     _require_config_value(CONFIG_FILE, "live_api_urls")
 )

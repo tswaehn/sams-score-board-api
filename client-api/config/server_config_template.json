@@ -13,6 +13,7 @@
     "timeout_seconds": 1.0
   },
   "ssvb_api_key": "replace-with-api-key",
+  "ssvb_api_url": "https://example.invalid/api/v2",
   "live_api_urls": [
     "https://example.invalid/live/indoor/tickers/source-a",
     "https://example.invalid/live/indoor/tickers/source-b"
