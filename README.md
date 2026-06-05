@@ -91,9 +91,9 @@ uvicorn server:app --host 0.0.0.0 --port 8000
 
 Runtime configuration:
 
-* `SERVER_CONFIG_PATH` is required and must point to the JSON config file used by `client-api`
+* `SERVER_CONFIG_PATH` defaults to `/app/config/server_config.json` and can be overridden when needed
 * startup fails immediately if the config file is missing, invalid JSON, or missing required keys
-* the config file contains `host`, `port`, `log_level`, `tz`, `write_raw_cache`, `influxdb`, `ssvb_api_key`, `live_api_urls`, and `live_api_snapshot_refresh_seconds`
+* the config file contains `host`, `port`, `log_level`, `tz`, `write_raw_cache`, `influxdb`, `ssvb_api_key`, `ssvb_api_url`, `live_api_urls`, and `live_api_snapshot_refresh_seconds`
 * `influxdb` is a nested object with `enabled`, `url`, `org`, `bucket`, `token`, and `timeout_seconds`
 * defaults still apply for `host`, `port`, `log_level`, `write_raw_cache`, `influxdb.enabled`, `influxdb.timeout_seconds`, and `live_api_snapshot_refresh_seconds` when omitted from the file
 
@@ -105,7 +105,7 @@ Configuration files:
 * the config file supports `tz`, which is applied as the process timezone
 * `write_raw_cache` controls whether `*-raw.json` cache files are written; it defaults to `false`
 * the InfluxDB config is optional; when enabled, `client-api` writes best-effort request metrics without affecting API responses if InfluxDB is unavailable
-* required config keys are `ssvb_api_key` and `live_api_urls`
+* required config keys are `ssvb_api_key`, `ssvb_api_url`, and `live_api_urls`
 * `API_BASE_URL` for the `web` container must be a browser-reachable URL, not an internal Docker service hostname, because it is injected into client-side JavaScript
 
 Endpoints:
