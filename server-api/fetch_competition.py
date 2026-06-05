@@ -4,12 +4,12 @@ from pathlib import Path
 import sys
 import time
 from urllib.parse import urlparse
+from typing import Any
 
 import requests
 from requests import RequestException
 
 
-API_BASE_URL = "https://www.ssvb.org/api/v2"
 DEFAULT_HEADERS = {
     "Accept": "*/*",
     "Connection": "close",
@@ -22,13 +22,44 @@ DEFAULT_HEADERS = {
 PAGE_SIZE = 100
 PAGE_DELAY_SECONDS = 0.3
 LAST_REQUEST_COMPLETED_AT = 0.0
+DEFAULT_SERVER_CONFIG_PATH = "/app/config/server_config.json"
+
+
+def load_server_config() -> dict[str, Any]:
+    config_path = os.getenv("SERVER_CONFIG_PATH", DEFAULT_SERVER_CONFIG_PATH)
+    if not config_path:
+        raise RuntimeError("SERVER_CONFIG_PATH must not be empty")
+
+    config_file = Path(config_path)
+    if not config_file.exists():
+        raise RuntimeError(f"Configured SERVER_CONFIG_PATH does not exist: {config_path}")
+
+    try:
+        payload = json.loads(config_file.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"Failed to parse server config JSON: {config_path}") from exc
+
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"Server config must be a JSON object: {config_path}")
+
+    return payload
+
+
+def get_api_base_url() -> str:
+    config = load_server_config()
+    api_base_url = config.get("ssvb_api_url")
+
+    if not isinstance(api_base_url, str) or not api_base_url.strip():
+        raise RuntimeError("Missing required config key: ssvb_api_url")
+
+    return api_base_url.rstrip("/")
 
 
 def build_url(endpoint: str) -> str:
     normalized_endpoint = endpoint.strip("/")
     if not normalized_endpoint:
         raise RuntimeError("Endpoint must not be empty")
-    return f"{API_BASE_URL}/{normalized_endpoint}"
+    return f"{get_api_base_url()}/{normalized_endpoint}"
 
 
 def build_output_path(endpoint: str) -> Path:
