@@ -24,6 +24,10 @@ import {
   useIsMobile
 } from "../api/api.js";
 import { layout } from "../components/layout.js";
+import {
+  buildRankingRowsFromMatches,
+  getRankingRows
+} from "../components/ranking.js";
 import { MatchResultCard } from "../components/matchResultCard.jsx";
 import {
   getPlannedGroupStatusChip,
@@ -31,23 +35,25 @@ import {
   StatusChip
 } from "../components/stateChip.jsx";
 
-function getRankingRows(rankings, rankingName) {
-  const groupRankings = rankings[rankingName] ?? {};
-
-  return Object.entries(groupRankings)
-    .sort(([left], [right]) => Number(left) - Number(right))
-    .map(([rank, entry]) => ({
-      rank,
-      ...entry
-    }));
-}
-
 function getSortedMatches(group) {
   return Object.values(group?.matches ?? {}).sort((left, right) => {
     const leftDateTime = `${left.date ?? ""}T${left.time ?? "00:00"}`;
     const rightDateTime = `${right.date ?? ""}T${right.time ?? "00:00"}`;
 
     return leftDateTime.localeCompare(rightDateTime);
+  });
+}
+
+function markEmptyGroupsAsFinished(groups) {
+  return groups.map((group) => {
+    if (Object.keys(group?.matches ?? {}).length > 0) {
+      return group;
+    }
+
+    return {
+      ...group,
+      finished: true
+    };
   });
 }
 
@@ -165,7 +171,7 @@ function GroupTabs({ activeGroupId, groups, onChange }) {
   );
 }
 
-function RankingTable({ activeGroup, rankingRows, teamByName }) {
+function RankingTable({ activeGroup, rankingRows, teamByName, isVirtual = false }) {
   return (
     <Paper
       elevation={0}
@@ -179,7 +185,7 @@ function RankingTable({ activeGroup, rankingRows, teamByName }) {
       <Table size="small">
         <TableHead sx={{ bgcolor: "teamInfo.main" }}>
           <TableRow>
-            <TableCell>Rank</TableCell>
+            <TableCell>{isVirtual ? "Rank*" : "Rank"}</TableCell>
             <TableCell>Team</TableCell>
             <TableCell align="right">Matches</TableCell>
             <TableCell align="right">W/L</TableCell>
@@ -350,13 +356,15 @@ export default function EntityPlan({ expectedEntityType }) {
           }
 
           const nextGroups =
-            nextEntityType === "league" ? data.matchDays ?? [] : data.matchGroups ?? [];
+            nextEntityType === "league"
+              ? markEmptyGroupsAsFinished(data.matchDays ?? [])
+              : markEmptyGroupsAsFinished(data.matchGroups ?? []);
           setEntityType(nextEntityType);
           setEntity(data.entity);
           setAssociation(data.association);
           setSeason(data.season);
-          setMatchGroups(data.matchGroups ?? []);
-          setMatchDays(data.matchDays ?? []);
+          setMatchGroups(markEmptyGroupsAsFinished(data.matchGroups ?? []));
+          setMatchDays(markEmptyGroupsAsFinished(data.matchDays ?? []));
           setRankings(data.rankings);
           setTeams(data.teams);
           setActiveGroupId((current) =>
@@ -409,10 +417,18 @@ export default function EntityPlan({ expectedEntityType }) {
   }, [teams]);
 
   const activeGroup = groups.find((group) => group.uuid === activeGroupId) ?? null;
+  const matchRows = activeGroup ? getSortedMatches(activeGroup) : [];
   const rankingKey =
     entityType === "league" ? Object.keys(rankings)[0] ?? "" : activeGroup?.name ?? "";
-  const rankingRows = rankingKey ? getRankingRows(rankings, rankingKey) : [];
-  const matchRows = activeGroup ? getSortedMatches(activeGroup) : [];
+  const apiRankingRows = rankingKey ? getRankingRows(rankings, rankingKey) : [];
+  const isVirtualRanking = apiRankingRows.length === 0 && entityType !== "league";
+  const rankingRows = (() => {
+    if (apiRankingRows.length > 0 || entityType === "league") {
+      return apiRankingRows;
+    }
+
+    return buildRankingRowsFromMatches(matchRows, teamByUuid);
+  })();
   const filteredMatchRows = matchRows.filter((match) => {
     if (selectedTeamUuid === "all") {
       return true;
@@ -499,6 +515,7 @@ export default function EntityPlan({ expectedEntityType }) {
                   activeGroup={activeGroup ?? { uuid: "league-ranking" }}
                   rankingRows={rankingRows}
                   teamByName={teamByName}
+                  isVirtual={isVirtualRanking}
                 />
               )}
             </Paper>
@@ -565,6 +582,7 @@ export default function EntityPlan({ expectedEntityType }) {
                     activeGroup={activeGroup}
                     rankingRows={rankingRows}
                     teamByName={teamByName}
+                    isVirtual={isVirtualRanking}
                   />
                 )
               )}
