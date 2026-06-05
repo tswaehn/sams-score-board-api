@@ -101,16 +101,17 @@ export default function FullScreenCompetition() {
     return matchGroups.map((group) => ({
       group,
       matches: getSortedMatches(group)
-    })).map(({ group, matches }) => ({
-      group,
-      matches,
-      rankingRows: (() => {
-        const rankingRows = getRankingRows(rankings, group.name);
-        return rankingRows.length > 0
+    })).map(({ group, matches }) => {
+      const rankingRows = getRankingRows(rankings, group.name);
+
+      return {
+        group,
+        matches,
+        rankingRows: rankingRows.length > 0
           ? rankingRows
-          : buildRankingRowsFromMatches(matches, teamByUuid);
-      })()
-    }));
+          : buildRankingRowsFromMatches(matches, teamByUuid)
+      };
+    });
   }, [matchGroups, rankings, teamByUuid]);
 
   const stageRankingRows = useMemo(() => {
