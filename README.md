@@ -1,6 +1,8 @@
 # how to use it
 
-Example `docker-compose.yml`:
+## API 1.0 Docker Compose example
+
+Example `docker-compose.yml` for API 1.0, InfluxDB, and the web frontend:
 
 ```yaml
 services:
@@ -169,6 +171,24 @@ pip install -r requirements.txt
 cp config/server_config_template.json config/server_config.local.json
 # Set ssvb_api_key in config/server_config.local.json.
 SERVER_CONFIG_PATH=config/server_config.local.json python server.py
+```
+
+### API 2.0 Docker Compose starter
+
+Create `api-2.0/config/server_config.local.json` from the template and set its
+`ssvb_api_key`. This minimal Compose setup persists SQLite at
+`./data/sams-database` on the host.
+
+```yaml
+services:
+  api-2.0:
+    build:
+      context: ./api-2.0
+    ports:
+      - "127.0.0.1:8001:8001"
+    volumes:
+      - ./api-2.0/config/server_config.local.json:/app/config/server_config.json:ro
+      - ./data:/app/data
 ```
 
 The first synchronization imports every season, then competitions by season, followed
