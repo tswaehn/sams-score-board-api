@@ -29,10 +29,17 @@ class InternalLogWriter:
         if self._thread:
             self._thread.join(timeout=5)
 
-    def record_slow_request(self, request_url: str, duration_ms: float) -> None:
+    def record_request_time(self, request_url: str, duration_ms: float, success: bool) -> None:
+        is_slow = duration_ms > 5_000
         self._entries.put((
-            "error",
-            f"Upstream request exceeded 5 seconds (durationMs={duration_ms:.1f})",
+            "error" if is_slow or not success else "info",
+            (
+                f"Upstream request exceeded 5 seconds (durationMs={duration_ms:.1f})"
+                if is_slow
+                else f"Upstream request failed (durationMs={duration_ms:.1f})"
+                if not success
+                else f"Upstream request completed (durationMs={duration_ms:.1f})"
+            ),
             request_url,
             duration_ms,
         ))

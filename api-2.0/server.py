@@ -32,7 +32,7 @@ UPSTREAM = UpstreamQueue(
     SSVB_API_KEY,
     min_delay_seconds=UPSTREAM_MIN_DELAY_SECONDS,
     max_retries=UPSTREAM_MAX_RETRIES,
-    slow_request_logger=INTERNAL_LOG.record_slow_request,
+    request_time_logger=INTERNAL_LOG.record_request_time,
 )
 SYNC = HistoricalSync(DATABASE, UPSTREAM, repeat_after_seconds=HISTORICAL_SYNC_INTERVAL_SECONDS)
 

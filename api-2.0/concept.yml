@@ -67,12 +67,14 @@ storage:
     - league_rankings
     - internal_logs
   internal_logging:
-    slow_upstream_request:
-      threshold_seconds: 5
-      severity: error
+    upstream_request_times:
       fields:
         - full request URL
         - duration_ms
+      severity:
+        under_or_equal_to_5_seconds: info
+        over_5_seconds: error
+        failed_request: error
   payload_policy: Store normalized lookup columns and the upstream JSON payload enriched with currentSeason for competitions and leagues.
   latest_upstream_update:
     columns:
