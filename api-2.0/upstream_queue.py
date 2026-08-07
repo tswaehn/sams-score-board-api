@@ -13,12 +13,13 @@ import logging
 import queue
 import threading
 import time
-from typing import Any
+from typing import Any, Callable
 
 import requests
 
 
 LOGGER = logging.getLogger("api2.upstream")
+REQUEST_TIMEOUT_SECONDS = 10
 DEFAULT_HEADERS = {
     "Accept": "*/*",
     # SAMS may close reused keep-alive connections without a response.  Request a
@@ -47,11 +48,13 @@ class UpstreamQueue:
         *,
         min_delay_seconds: float = 0.3,
         max_retries: int = 3,
+        slow_request_logger: Callable[[str, float], None] | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.min_delay_seconds = min_delay_seconds
         self.max_retries = max(0, max_retries)
+        self.slow_request_logger = slow_request_logger
         self._requests: queue.PriorityQueue[UpstreamRequest] = queue.PriorityQueue()
         self._sequence = itertools.count()
         self._stop = threading.Event()
@@ -93,6 +96,7 @@ class UpstreamQueue:
                 continue
             try:
                 time.sleep(max(0.0, next_request_at - time.monotonic()))
+                started_at = time.monotonic()
                 payload = self._request_with_retries(request.endpoint)
                 request.future.set_result(payload)
             except RuntimeError as exc:
@@ -100,6 +104,11 @@ class UpstreamQueue:
             except Exception as exc:
                 request.future.set_exception(RuntimeError(f"Upstream request failed for {request.endpoint}: {exc}"))
             finally:
+                duration_ms = (time.monotonic() - started_at) * 1000.0
+                if duration_ms > 5_000 and self.slow_request_logger is not None:
+                    self.slow_request_logger(
+                        f"{self.base_url}/{request.endpoint}", duration_ms
+                    )
                 next_request_at = time.monotonic() + self.min_delay_seconds
 
     def _request_with_retries(self, endpoint: str) -> dict[str, Any] | list[Any]:
@@ -112,7 +121,7 @@ class UpstreamQueue:
                     response = session.get(
                         url,
                         headers={**DEFAULT_HEADERS, "X-Api-Key": self.api_key},
-                        timeout=30,
+                        timeout=REQUEST_TIMEOUT_SECONDS,
                     )
                 response.raise_for_status()
                 payload = response.json()

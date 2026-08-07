@@ -19,17 +19,20 @@ from config import (
     UPSTREAM_MIN_DELAY_SECONDS,
 )
 from database import Database
+from internal_log import InternalLogWriter
 from sync import HistoricalSync
 from upstream_queue import UpstreamQueue
 
 
 logging.basicConfig(level=LOG_LEVEL.upper(), format="%(asctime)s %(levelname)s %(name)s %(message)s")
 DATABASE = Database(DATABASE_PATH)
+INTERNAL_LOG = InternalLogWriter(DATABASE)
 UPSTREAM = UpstreamQueue(
     SSVB_API_URL,
     SSVB_API_KEY,
     min_delay_seconds=UPSTREAM_MIN_DELAY_SECONDS,
     max_retries=UPSTREAM_MAX_RETRIES,
+    slow_request_logger=INTERNAL_LOG.record_slow_request,
 )
 SYNC = HistoricalSync(DATABASE, UPSTREAM, repeat_after_seconds=HISTORICAL_SYNC_INTERVAL_SECONDS)
 
@@ -37,11 +40,13 @@ SYNC = HistoricalSync(DATABASE, UPSTREAM, repeat_after_seconds=HISTORICAL_SYNC_I
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     DATABASE.initialize()
+    INTERNAL_LOG.start()
     UPSTREAM.start()
     SYNC.start()
     yield
     SYNC.stop()
     UPSTREAM.stop()
+    INTERNAL_LOG.stop()
 
 
 app = FastAPI(title="SAMS historical mirror API", version="2.0.0", lifespan=lifespan)

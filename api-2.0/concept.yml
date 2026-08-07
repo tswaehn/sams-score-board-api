@@ -29,6 +29,7 @@ architecture:
       - configured inter-request pacing
       - pagination also uses the same queue
       - page size is 100, the maximum documented by SAMS REST API v2.1
+      - upstream HTTP request timeout is 10 seconds
   related_entity_reuse:
     - seasons are refreshed before child-entity imports and resolved locally while importing them
     - an already stored team is reused rather than refetched
@@ -64,6 +65,14 @@ storage:
     - league_matches
     - league_match_results
     - league_rankings
+    - internal_logs
+  internal_logging:
+    slow_upstream_request:
+      threshold_seconds: 5
+      severity: error
+      fields:
+        - full request URL
+        - duration_ms
   payload_policy: Store normalized lookup columns and the upstream JSON payload enriched with currentSeason for competitions and leagues.
   latest_upstream_update:
     columns:

@@ -126,6 +126,10 @@ class Database:
               uuid TEXT PRIMARY KEY, league_uuid TEXT NOT NULL REFERENCES leagues(uuid) ON DELETE CASCADE,
               rank INTEGER, team_name TEXT, payload_json TEXT NOT NULL, synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
+            CREATE TABLE IF NOT EXISTS internal_logs (
+              id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              severity TEXT NOT NULL, message TEXT NOT NULL, request_url TEXT, duration_ms REAL
+            );
             CREATE INDEX IF NOT EXISTS competitions_season_idx ON competitions(season_uuid);
             CREATE INDEX IF NOT EXISTS leagues_season_idx ON leagues(season_uuid);
             CREATE INDEX IF NOT EXISTS match_groups_competition_idx ON match_groups(competition_uuid);
@@ -292,6 +296,16 @@ class Database:
           (item.uuid, item.league_uuid, item.rank, item.team_name, self._payload(item.payload)))
         self._commit_if_needed()
 
+    def insert_internal_log(
+        self, *, severity: str, message: str, request_url: str | None, duration_ms: float | None
+    ) -> None:
+        self.connection().execute(
+            """INSERT INTO internal_logs (severity, message, request_url, duration_ms)
+            VALUES (?, ?, ?, ?)""",
+            (severity, message, request_url, duration_ms),
+        )
+        self._commit_if_needed()
+
     def list_entities(self, entity: str, season_uuid: str | None = None) -> list[dict[str, Any]]:
         table = "competitions" if entity == "competition" else "leagues"
         query = f"SELECT payload_json FROM {table}"
@@ -321,4 +335,4 @@ class Database:
 
     def status(self) -> dict[str, int]:
         return {table: self.connection().execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-                for table in ("seasons", "competitions", "leagues", "teams", "associations", "match_groups", "competition_matches", "competition_match_results", "competition_match_group_rankings", "league_match_days", "league_matches", "league_match_results", "league_rankings")}
+                for table in ("seasons", "competitions", "leagues", "teams", "associations", "match_groups", "competition_matches", "competition_match_results", "competition_match_group_rankings", "league_match_days", "league_matches", "league_match_results", "league_rankings", "internal_logs")}
