@@ -25,8 +25,8 @@ class FakeUpstream:
     def fetch(self, endpoint: str, *, priority: int):
         self.calls.append(endpoint)
         base = endpoint.split("?", 1)[0]
-        if base == "seasons":
-            return {"content": [{"uuid": HISTORIC, "name": "Past", "currentSeason": False}, {"uuid": CURRENT, "name": "Now", "currentSeason": True}]}
+        if base == f"seasons/{HISTORIC}":
+            return {"uuid": HISTORIC, "name": "Past", "currentSeason": False}
         if base == "competitions":
             return {"content": [{"uuid": COMPETITION}]}
         if base == "leagues":
@@ -45,19 +45,26 @@ class FakeUpstream:
 
 
 class HistoricalSyncTest(unittest.TestCase):
-    def test_syncs_seasons_before_historic_entities_and_skips_current_season(self) -> None:
+    def test_syncs_primary_entities_then_fetches_missing_dependencies(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             database = Database(str(Path(directory) / "mirror.sqlite3"))
             database.initialize()
             upstream = FakeUpstream()
             HistoricalSync(database, upstream).sync_once()
 
-            self.assertTrue(upstream.calls[0].startswith("seasons?"))
-            self.assertTrue(any(call.startswith(f"competitions?season={HISTORIC}") for call in upstream.calls))
-            self.assertFalse(any(CURRENT in call for call in upstream.calls[1:]))
-            self.assertEqual([COMPETITION], [item["uuid"] for item in database.list_entities("competition")])
+            self.assertTrue(upstream.calls[0].startswith("competitions?"))
+            self.assertIn(f"seasons/{HISTORIC}", upstream.calls)
+            competitions = database.list_entities("competition")
+            self.assertEqual([COMPETITION], [item["uuid"] for item in competitions])
+            self.assertFalse(competitions[0]["currentSeason"])
             self.assertEqual([LEAGUE], [item["uuid"] for item in database.list_entities("league")])
-            self.assertEqual({"seasons": 2, "competitions": 1, "leagues": 1, "teams": 1, "associations": 1}, database.status())
+            self.assertEqual({"seasons": 1, "competitions": 1, "leagues": 1, "teams": 1, "associations": 1}, database.status())
+
+            upstream.calls.clear()
+            HistoricalSync(database, upstream).sync_once()
+            self.assertNotIn(f"teams/{TEAM}", upstream.calls)
+            self.assertNotIn(f"associations/{ASSOCIATION}", upstream.calls)
+            self.assertNotIn(f"seasons/{HISTORIC}", upstream.calls)
 
 
 if __name__ == "__main__":

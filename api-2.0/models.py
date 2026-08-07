@@ -39,6 +39,7 @@ class Team:
 class Competition:
     uuid: str
     season_uuid: str
+    is_current: bool
     association_uuid: str | None
     name: str | None
     gender: str | None
@@ -49,6 +50,7 @@ class Competition:
 class League:
     uuid: str
     season_uuid: str
+    is_current: bool
     association_uuid: str | None
     name: str | None
     shortname: str | None

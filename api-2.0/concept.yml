@@ -1,17 +1,17 @@
 document:
   name: API 2.0 historical mirror
   updated: 2026-08-07
-  purpose: Two-stage API that serves historic SAMS data from a local SQLite mirror.
+  purpose: Two-stage API that serves SAMS data from a local SQLite mirror.
 
 architecture:
   stage_1_sync:
     owner: sync.HistoricalSync
     order:
-      - fetch and persist all seasons
-      - select every season where currentSeason is false
-      - fetch that season's competitions and leagues
-      - fetch each entity's association and attached teams
-      - fetch each attached team's association
+      - fetch and persist all competitions
+      - fetch and persist all leagues
+      - for every referenced season, fetch it only when absent locally
+      - propagate the local season currentSeason flag to each imported competition and league
+      - for every referenced association or attached team, fetch it only when absent locally
     cadence: HISTORICAL_SYNC_INTERVAL_SECONDS (default: 86400)
     rule: Public API request handlers never enqueue or make upstream REST requests.
   upstream_transport:
@@ -22,6 +22,11 @@ architecture:
       - serial requests
       - configured inter-request pacing
       - pagination also uses the same queue
+      - page size is 100, the maximum documented by SAMS REST API v2.1
+  related_entity_reuse:
+    - seasons are resolved locally and fetched only when absent while importing child entities
+    - an already stored team is reused rather than refetched
+    - an already stored association is reused rather than refetched
   stage_2_read_api:
     owner: server.py
     source: SQLite only
@@ -29,7 +34,7 @@ architecture:
 
 storage:
   engine: SQLite
-  default_path: data/historical.sqlite3
+  default_path: data/sams-database
   journal_mode: WAL
   tables:
     - seasons
@@ -39,7 +44,7 @@ storage:
     - leagues
     - competition_teams
     - league_teams
-  payload_policy: Store normalized lookup columns and the full upstream JSON payload for forward compatibility.
+  payload_policy: Store normalized lookup columns and the upstream JSON payload enriched with currentSeason for competitions and leagues.
 
 environment:
   SERVER_CONFIG_PATH:

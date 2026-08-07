@@ -159,8 +159,8 @@ BASE_URL=http://127.0.0.1:8000 COMPETITION_ID=<uuid> SLEEP_SECONDS=0.2 k6 run lo
 
 ## api-2.0
 
-`api-2.0` is a two-stage historical-data service. A background synchronizer mirrors
-non-current seasons into SQLite; its HTTP routes read only from that local database.
+`api-2.0` is a two-stage SAMS-data service. A background synchronizer mirrors every
+season into SQLite; its HTTP routes read only from that local database.
 This prevents a user request from triggering a chain of upstream SAMS calls.
 
 ```bash
@@ -171,8 +171,9 @@ cp config/server_config_template.json config/server_config.local.json
 SERVER_CONFIG_PATH=config/server_config.local.json python server.py
 ```
 
-The first synchronization imports seasons, then the competitions and leagues of all
-historic seasons, followed by each entity's teams and associations. See
+The first synchronization imports competitions and leagues. It then fetches a
+referenced season, team, or association only when it is not already in SQLite. Each
+competition and league receives its season's `currentSeason` flag. See
 [`api-2.0/concept.yml`](./api-2.0/concept.yml) for the persistence model, lifecycle,
 and environment variables.
 

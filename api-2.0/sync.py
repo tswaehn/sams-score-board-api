@@ -1,8 +1,7 @@
-"""Historical mirror synchronizer.
+"""SAMS mirror synchronizer.
 
-The sequence is intentional: seasons are durable first; only non-current season
-children are then scheduled.  This keeps the current season available for a future
-live/short-TTL stage without repeatedly re-importing it here.
+The synchronizer starts with competitions and leagues.  Seasons, associations, and
+teams are dependencies and are fetched only if they are absent from SQLite.
 """
 
 from __future__ import annotations
@@ -11,7 +10,7 @@ import logging
 import threading
 import time
 from typing import Any
-from urllib.parse import quote_plus, urlparse
+from urllib.parse import urlparse
 from uuid import UUID
 
 from database import Database
@@ -20,6 +19,7 @@ from upstream_queue import UpstreamQueue
 
 
 LOGGER = logging.getLogger("api2.sync")
+UPSTREAM_PAGE_SIZE = 100
 
 
 def _items(payload: dict[str, Any] | list[Any]) -> list[dict[str, Any]]:
@@ -77,12 +77,8 @@ class HistoricalSync:
         # without weakening a later scheduled refresh.
         self._synced_association_uuids = set()
         self._synced_team_uuids = set()
-        seasons = self._sync_seasons()
-        for season in seasons:
-            if season.current:
-                continue
-            self._sync_season_entities("competition", season.uuid)
-            self._sync_season_entities("league", season.uuid)
+        self._sync_entities("competition")
+        self._sync_entities("league")
 
     def _run(self) -> None:
         while not self._stop.is_set():
@@ -98,48 +94,64 @@ class HistoricalSync:
     def _fetch_collection(self, endpoint: str, *, priority: int) -> list[dict[str, Any]]:
         # SAMS uses Spring pagination.  Every page still travels through the one queue.
         separator = "&" if "?" in endpoint else "?"
-        first = self.upstream.fetch(f"{endpoint}{separator}page=0&size=9999", priority=priority)
+        first = self.upstream.fetch(
+            f"{endpoint}{separator}page=0&size={UPSTREAM_PAGE_SIZE}",
+            priority=priority,
+        )
         result = _items(first)
         total_pages = first.get("totalPages", 1) if isinstance(first, dict) else 1
         if not isinstance(total_pages, int):
             total_pages = 1
         for page in range(1, total_pages):
-            result.extend(_items(self.upstream.fetch(f"{endpoint}{separator}page={page}&size=9999", priority=priority)))
+            result.extend(
+                _items(
+                    self.upstream.fetch(
+                        f"{endpoint}{separator}page={page}&size={UPSTREAM_PAGE_SIZE}",
+                        priority=priority,
+                    )
+                )
+            )
         return result
 
-    def _sync_seasons(self) -> list[Season]:
-        seasons: list[Season] = []
-        for payload in self._fetch_collection("seasons", priority=0):
-            uuid = payload.get("uuid")
-            if not isinstance(uuid, str):
-                continue
-            season = Season(uuid, payload.get("name"), payload.get("startDate"), payload.get("endDate"), bool(payload.get("currentSeason")), payload)
-            self.database.upsert_season(season)
-            seasons.append(season)
-        return seasons
-
-    def _sync_season_entities(self, entity: str, season_uuid: str) -> None:
-        endpoint = f"{entity}s?season={quote_plus(season_uuid)}"
-        for summary in self._fetch_collection(endpoint, priority=10):
+    def _sync_entities(self, entity: str) -> None:
+        for summary in self._fetch_collection(f"{entity}s", priority=10):
             uuid = summary.get("uuid")
             if not isinstance(uuid, str):
                 continue
             detail = self.upstream.fetch(f"{entity}s/{uuid}", priority=10)
             payload = detail if isinstance(detail, dict) else summary
-            self._store_entity(entity, payload, season_uuid)
+            self._store_entity(entity, payload)
             self._sync_entity_association(payload)
             self._sync_entity_teams(entity, uuid)
 
-    def _store_entity(self, entity: str, payload: dict[str, Any], fallback_season_uuid: str) -> None:
+    def _store_entity(self, entity: str, payload: dict[str, Any]) -> None:
         uuid = payload.get("uuid")
         if not isinstance(uuid, str):
             return
-        season_uuid = payload.get("seasonUuid") or _linked_uuid(payload, "season") or fallback_season_uuid
+        season_uuid = payload.get("seasonUuid") or _linked_uuid(payload, "season")
+        if not isinstance(season_uuid, str):
+            raise RuntimeError(f"Entity {uuid} does not contain a season UUID")
+        season = self._get_or_sync_season(season_uuid)
         association_uuid = payload.get("associationUuid") or _linked_uuid(payload, "association")
+        # This is intentionally an enriched local payload. The upstream object is
+        # preserved except for the locally propagated season state.
+        enriched_payload = {**payload, "currentSeason": season.current}
         if entity == "competition":
-            self.database.upsert_competition(Competition(uuid, season_uuid, association_uuid, payload.get("name"), payload.get("gender"), payload))
+            self.database.upsert_competition(Competition(uuid, season.uuid, season.current, association_uuid, payload.get("name"), payload.get("gender"), enriched_payload))
         else:
-            self.database.upsert_league(League(uuid, season_uuid, association_uuid, payload.get("name"), payload.get("shortName"), payload.get("gender"), payload))
+            self.database.upsert_league(League(uuid, season.uuid, season.current, association_uuid, payload.get("name"), payload.get("shortName"), payload.get("gender"), enriched_payload))
+
+    def _get_or_sync_season(self, uuid: str) -> Season:
+        payload = self.database.get_payload("seasons", uuid)
+        if payload is None:
+            fetched = self.upstream.fetch(f"seasons/{uuid}", priority=20)
+            if not isinstance(fetched, dict):
+                raise RuntimeError(f"Expected a season object for {uuid}")
+            payload = fetched
+            self.database.upsert_season(
+                Season(uuid, payload.get("name"), payload.get("startDate"), payload.get("endDate"), bool(payload.get("currentSeason")), payload)
+            )
+        return Season(uuid, payload.get("name"), payload.get("startDate"), payload.get("endDate"), bool(payload.get("currentSeason")), payload)
 
     def _sync_entity_association(self, payload: dict[str, Any]) -> None:
         uuid = payload.get("associationUuid") or _linked_uuid(payload, "association")
@@ -148,6 +160,9 @@ class HistoricalSync:
 
     def _sync_association(self, uuid: str) -> None:
         if uuid in self._synced_association_uuids:
+            return
+        if self.database.get_payload("associations", uuid) is not None:
+            self._synced_association_uuids.add(uuid)
             return
         payload = self.upstream.fetch(f"associations/{uuid}", priority=20)
         if not isinstance(payload, dict):
@@ -163,6 +178,14 @@ class HistoricalSync:
             if not isinstance(uuid, str):
                 continue
             if uuid not in self._synced_team_uuids:
+                cached_team = self.database.get_payload("teams", uuid)
+                if cached_team is not None:
+                    association_uuid = cached_team.get("associationUuid") or _linked_uuid(cached_team, "association")
+                    if isinstance(association_uuid, str):
+                        self._sync_association(association_uuid)
+                    self._synced_team_uuids.add(uuid)
+                    team_uuids.append(uuid)
+                    continue
                 detail = self.upstream.fetch(f"teams/{uuid}", priority=20)
                 payload = detail if isinstance(detail, dict) else summary
                 team = Team(uuid, payload.get("name"), payload.get("shortName") or payload.get("shortname"), payload.get("associationUuid") or _linked_uuid(payload, "association"), payload)
