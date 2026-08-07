@@ -119,6 +119,17 @@ class Database:
         connection.executemany(f"INSERT OR IGNORE INTO {table} ({column}, team_uuid) VALUES (?, ?)", ((entity_uuid, uuid) for uuid in team_uuids))
         connection.commit()
 
+    def get_entity_team_uuids(self, entity: str, entity_uuid: str) -> list[str]:
+        table = "competition_teams" if entity == "competition" else "league_teams"
+        column = f"{entity}_uuid"
+        return [
+            row["team_uuid"]
+            for row in self.connection().execute(
+                f"SELECT team_uuid FROM {table} WHERE {column} = ? ORDER BY team_uuid",
+                (entity_uuid,),
+            )
+        ]
+
     def list_entities(self, entity: str, season_uuid: str | None = None) -> list[dict[str, Any]]:
         table = "competitions" if entity == "competition" else "leagues"
         query = f"SELECT payload_json FROM {table}"

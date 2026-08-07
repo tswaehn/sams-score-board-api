@@ -27,6 +27,7 @@ architecture:
     - seasons are resolved locally and fetched only when absent while importing child entities
     - an already stored team is reused rather than refetched
     - an already stored association is reused rather than refetched
+    - stored competition/team and league/team links are reused rather than refetching entity team lists
   stage_2_read_api:
     owner: server.py
     source: SQLite only

@@ -65,6 +65,8 @@ class HistoricalSyncTest(unittest.TestCase):
             self.assertNotIn(f"teams/{TEAM}", upstream.calls)
             self.assertNotIn(f"associations/{ASSOCIATION}", upstream.calls)
             self.assertNotIn(f"seasons/{HISTORIC}", upstream.calls)
+            self.assertNotIn(f"competitions/{COMPETITION}/teams?page=0&size=100", upstream.calls)
+            self.assertNotIn(f"leagues/{LEAGUE}/teams?page=0&size=100", upstream.calls)
 
 
 if __name__ == "__main__":

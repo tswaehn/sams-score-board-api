@@ -118,11 +118,12 @@ class HistoricalSync:
             uuid = summary.get("uuid")
             if not isinstance(uuid, str):
                 continue
+            already_synced = self.database.get_entity(entity, uuid) is not None
             detail = self.upstream.fetch(f"{entity}s/{uuid}", priority=10)
             payload = detail if isinstance(detail, dict) else summary
             self._store_entity(entity, payload)
             self._sync_entity_association(payload)
-            self._sync_entity_teams(entity, uuid)
+            self._sync_entity_teams(entity, uuid, already_synced=already_synced)
 
     def _store_entity(self, entity: str, payload: dict[str, Any]) -> None:
         uuid = payload.get("uuid")
@@ -170,13 +171,21 @@ class HistoricalSync:
         self.database.upsert_association(Association(uuid, payload.get("name"), payload.get("shortname"), payload.get("level"), payload.get("parentUuid"), payload))
         self._synced_association_uuids.add(uuid)
 
-    def _sync_entity_teams(self, entity: str, entity_uuid: str) -> None:
-        teams = self._fetch_collection(f"{entity}s/{entity_uuid}/teams", priority=20)
-        team_uuids: list[str] = []
-        for summary in teams:
-            uuid = summary.get("uuid")
-            if not isinstance(uuid, str):
-                continue
+    def _sync_entity_teams(self, entity: str, entity_uuid: str, *, already_synced: bool) -> None:
+        if already_synced:
+            # The relationship itself is persisted.  Reusing it avoids both the
+            # remote team-list request and per-team detail requests on later runs.
+            team_uuids = self.database.get_entity_team_uuids(entity, entity_uuid)
+        else:
+            teams = self._fetch_collection(f"{entity}s/{entity_uuid}/teams", priority=20)
+            team_uuids = []
+            for summary in teams:
+                uuid = summary.get("uuid")
+                if not isinstance(uuid, str):
+                    continue
+                team_uuids.append(uuid)
+
+        for uuid in team_uuids:
             if uuid not in self._synced_team_uuids:
                 cached_team = self.database.get_payload("teams", uuid)
                 if cached_team is not None:
@@ -184,14 +193,15 @@ class HistoricalSync:
                     if isinstance(association_uuid, str):
                         self._sync_association(association_uuid)
                     self._synced_team_uuids.add(uuid)
-                    team_uuids.append(uuid)
                     continue
                 detail = self.upstream.fetch(f"teams/{uuid}", priority=20)
-                payload = detail if isinstance(detail, dict) else summary
+                if not isinstance(detail, dict):
+                    raise RuntimeError(f"Expected a team object for {uuid}")
+                payload = detail
                 team = Team(uuid, payload.get("name"), payload.get("shortName") or payload.get("shortname"), payload.get("associationUuid") or _linked_uuid(payload, "association"), payload)
                 self.database.upsert_team(team)
                 if team.association_uuid:
                     self._sync_association(team.association_uuid)
                 self._synced_team_uuids.add(uuid)
-            team_uuids.append(uuid)
-        self.database.replace_entity_teams(entity, entity_uuid, team_uuids)
+        if not already_synced:
+            self.database.replace_entity_teams(entity, entity_uuid, team_uuids)
