@@ -357,20 +357,27 @@ class HistoricalSync:
                     competition_uuid,
                     result if isinstance(result, dict) else None,
                 )
-        rankings = self._fetch_collection(
-            f"competitions/{competition_uuid}/rankings", priority=20
-        )
-        for ranking_payload in rankings:
-            ranking_uuid = ranking_payload.get("uuid")
-            if not isinstance(ranking_uuid, str):
-                continue
-            self.database.upsert_competition_match_group_ranking(
-                CompetitionMatchGroupRanking(
-                    ranking_uuid,
-                    competition_uuid,
-                    ranking_payload.get("matchGroupName") if isinstance(ranking_payload.get("matchGroupName"), str) else None,
-                    ranking_payload,
+        try:
+            rankings = self._fetch_collection(
+                f"competitions/{competition_uuid}/rankings", priority=20
+            )
+            for ranking_payload in rankings:
+                ranking_uuid = ranking_payload.get("uuid")
+                if not isinstance(ranking_uuid, str):
+                    continue
+                self.database.upsert_competition_match_group_ranking(
+                    CompetitionMatchGroupRanking(
+                        ranking_uuid,
+                        competition_uuid,
+                        ranking_payload.get("matchGroupName") if isinstance(ranking_payload.get("matchGroupName"), str) else None,
+                        ranking_payload,
+                    )
                 )
+        except RuntimeError as exc:
+            print(
+                "ERROR: competition ranking sync failed after upstream retries "
+                f"competition={competition_uuid}: {exc}",
+                flush=True,
             )
 
     def _sync_league_match_data(self, league_uuid: str) -> None:
