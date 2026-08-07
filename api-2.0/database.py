@@ -9,7 +9,7 @@ import threading
 from pathlib import Path
 from typing import Any, Iterable
 
-from models import Association, Competition, CompetitionMatch, League, MatchGroup, Season, Team
+from models import Association, Competition, CompetitionMatch, League, LeagueMatch, LeagueMatchDay, MatchGroup, Season, Team
 
 
 class Database:
@@ -103,10 +103,27 @@ class Database:
               competition_uuid TEXT NOT NULL REFERENCES competitions(uuid) ON DELETE CASCADE,
               payload_json TEXT NOT NULL, synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
+            CREATE TABLE IF NOT EXISTS league_match_days (
+              uuid TEXT PRIMARY KEY, league_uuid TEXT NOT NULL REFERENCES leagues(uuid) ON DELETE CASCADE,
+              season_uuid TEXT, name TEXT, match_date TEXT, payload_json TEXT NOT NULL,
+              synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS league_matches (
+              uuid TEXT PRIMARY KEY, league_uuid TEXT NOT NULL REFERENCES leagues(uuid) ON DELETE CASCADE,
+              match_day_uuid TEXT REFERENCES league_match_days(uuid) ON DELETE SET NULL, season_uuid TEXT,
+              match_date TEXT, verified INTEGER, payload_json TEXT NOT NULL, synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS league_match_results (
+              match_uuid TEXT PRIMARY KEY REFERENCES league_matches(uuid) ON DELETE CASCADE,
+              league_uuid TEXT NOT NULL REFERENCES leagues(uuid) ON DELETE CASCADE,
+              payload_json TEXT NOT NULL, synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
             CREATE INDEX IF NOT EXISTS competitions_season_idx ON competitions(season_uuid);
             CREATE INDEX IF NOT EXISTS leagues_season_idx ON leagues(season_uuid);
             CREATE INDEX IF NOT EXISTS match_groups_competition_idx ON match_groups(competition_uuid);
             CREATE INDEX IF NOT EXISTS competition_matches_competition_idx ON competition_matches(competition_uuid);
+            CREATE INDEX IF NOT EXISTS league_match_days_league_idx ON league_match_days(league_uuid);
+            CREATE INDEX IF NOT EXISTS league_matches_league_idx ON league_matches(league_uuid);
             """
         )
         # Existing API 2.0 databases are migrated in place.
@@ -215,6 +232,38 @@ class Database:
               (match_uuid, competition_uuid, self._payload(payload)))
         self._commit_if_needed()
 
+    def upsert_league_match_day(self, item: LeagueMatchDay) -> None:
+        self.connection().execute("""INSERT INTO league_match_days
+          (uuid, league_uuid, season_uuid, name, match_date, payload_json, synced_at)
+          VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(uuid) DO UPDATE SET league_uuid=excluded.league_uuid,season_uuid=excluded.season_uuid,
+          name=excluded.name,match_date=excluded.match_date,payload_json=excluded.payload_json,synced_at=CURRENT_TIMESTAMP""",
+          (item.uuid, item.league_uuid, item.season_uuid, item.name, item.match_date, self._payload(item.payload)))
+        self._commit_if_needed()
+
+    def upsert_league_match(self, item: LeagueMatch) -> None:
+        self.connection().execute("""INSERT INTO league_matches
+          (uuid, league_uuid, match_day_uuid, season_uuid, match_date, verified, payload_json, synced_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(uuid) DO UPDATE SET league_uuid=excluded.league_uuid,match_day_uuid=excluded.match_day_uuid,
+          season_uuid=excluded.season_uuid,match_date=excluded.match_date,verified=excluded.verified,
+          payload_json=excluded.payload_json,synced_at=CURRENT_TIMESTAMP""",
+          (item.uuid, item.league_uuid, item.match_day_uuid, item.season_uuid, item.match_date,
+           None if item.verified is None else int(item.verified), self._payload(item.payload)))
+        self._commit_if_needed()
+
+    def upsert_league_match_result(self, match_uuid: str, league_uuid: str, payload: dict[str, Any] | None) -> None:
+        connection = self.connection()
+        if payload is None:
+            connection.execute("DELETE FROM league_match_results WHERE match_uuid = ?", (match_uuid,))
+        else:
+            connection.execute("""INSERT INTO league_match_results
+              (match_uuid, league_uuid, payload_json, synced_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+              ON CONFLICT(match_uuid) DO UPDATE SET league_uuid=excluded.league_uuid,
+              payload_json=excluded.payload_json,synced_at=CURRENT_TIMESTAMP""",
+              (match_uuid, league_uuid, self._payload(payload)))
+        self._commit_if_needed()
+
     def list_entities(self, entity: str, season_uuid: str | None = None) -> list[dict[str, Any]]:
         table = "competitions" if entity == "competition" else "leagues"
         query = f"SELECT payload_json FROM {table}"
@@ -244,4 +293,4 @@ class Database:
 
     def status(self) -> dict[str, int]:
         return {table: self.connection().execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-                for table in ("seasons", "competitions", "leagues", "teams", "associations", "match_groups", "competition_matches", "competition_match_results")}
+                for table in ("seasons", "competitions", "leagues", "teams", "associations", "match_groups", "competition_matches", "competition_match_results", "league_match_days", "league_matches", "league_match_results")}

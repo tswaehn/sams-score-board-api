@@ -16,7 +16,7 @@ from urllib.parse import quote_plus, urlparse
 from uuid import UUID
 
 from database import Database
-from models import Association, Competition, CompetitionMatch, League, MatchGroup, Season, Team
+from models import Association, Competition, CompetitionMatch, League, LeagueMatch, LeagueMatchDay, MatchGroup, Season, Team
 from upstream_queue import UpstreamQueue
 
 
@@ -104,8 +104,8 @@ class HistoricalSync:
         # Seasons are few and quick to write, so one short transaction is enough.
         with self.database.transaction():
             seasons = self._sync_seasons()
-        for season in seasons:
-            self._sync_entities_for_season("competition", season, force=force)
+        #for season in seasons:
+        #    self._sync_entities_for_season("competition", season, force=force)
         for season in seasons:
             self._sync_entities_for_season("league", season, force=force)
 
@@ -205,6 +205,8 @@ class HistoricalSync:
                     self._sync_entity_teams(entity, uuid, already_synced=already_synced)
                     if entity == "competition":
                         self._sync_competition_match_data(uuid)
+                    elif entity == "league":
+                        self._sync_league_match_data(uuid)
                     imported += 1
             position = min(batch_start + len(batch), total)
             if position % WRITE_BATCH_SIZE == 0 or position == total:
@@ -353,5 +355,53 @@ class HistoricalSync:
                 self.database.upsert_competition_match_result(
                     match_uuid,
                     competition_uuid,
+                    result if isinstance(result, dict) else None,
+                )
+
+    def _sync_league_match_data(self, league_uuid: str) -> None:
+        match_days = self._fetch_collection(
+            f"leagues/{league_uuid}/match-days", priority=20
+        )
+        LOGGER.info(
+            "Syncing league match data league=%s matchDays=%s",
+            league_uuid,
+            len(match_days),
+        )
+        for day_payload in match_days:
+            day_uuid = day_payload.get("uuid")
+            if not isinstance(day_uuid, str):
+                continue
+            self.database.upsert_league_match_day(
+                LeagueMatchDay(
+                    day_uuid,
+                    league_uuid,
+                    day_payload.get("seasonUuid") if isinstance(day_payload.get("seasonUuid"), str) else None,
+                    day_payload.get("name"),
+                    day_payload.get("matchdate") if isinstance(day_payload.get("matchdate"), str) else None,
+                    day_payload,
+                )
+            )
+            matches = self._fetch_collection(
+                f"match-days/{day_uuid}/league-matches", priority=20
+            )
+            for match_payload in matches:
+                match_uuid = match_payload.get("uuid")
+                if not isinstance(match_uuid, str):
+                    continue
+                self.database.upsert_league_match(
+                    LeagueMatch(
+                        match_uuid,
+                        league_uuid,
+                        match_payload.get("matchDayUuid") if isinstance(match_payload.get("matchDayUuid"), str) else day_uuid,
+                        match_payload.get("seasonUuid") if isinstance(match_payload.get("seasonUuid"), str) else None,
+                        match_payload.get("date") if isinstance(match_payload.get("date"), str) else None,
+                        match_payload.get("verified") if isinstance(match_payload.get("verified"), bool) else None,
+                        match_payload,
+                    )
+                )
+                result = match_payload.get("results")
+                self.database.upsert_league_match_result(
+                    match_uuid,
+                    league_uuid,
                     result if isinstance(result, dict) else None,
                 )

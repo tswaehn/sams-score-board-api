@@ -79,3 +79,24 @@ class CompetitionMatch:
     match_date: str | None
     verified: bool | None
     payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class LeagueMatchDay:
+    uuid: str
+    league_uuid: str
+    season_uuid: str | None
+    name: str | None
+    match_date: str | None
+    payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class LeagueMatch:
+    uuid: str
+    league_uuid: str
+    match_day_uuid: str | None
+    season_uuid: str | None
+    match_date: str | None
+    verified: bool | None
+    payload: dict[str, Any]
