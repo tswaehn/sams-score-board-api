@@ -16,7 +16,7 @@ from urllib.parse import quote_plus, urlparse
 from uuid import UUID
 
 from database import Database
-from models import Association, Competition, League, Season, Team
+from models import Association, Competition, CompetitionMatch, League, MatchGroup, Season, Team
 from upstream_queue import UpstreamQueue
 
 
@@ -203,6 +203,8 @@ class HistoricalSync:
                     self._store_entity(entity, payload, season)
                     self._sync_entity_association(payload)
                     self._sync_entity_teams(entity, uuid, already_synced=already_synced)
+                    if entity == "competition":
+                        self._sync_competition_match_data(uuid)
                     imported += 1
             position = min(batch_start + len(batch), total)
             if position % WRITE_BATCH_SIZE == 0 or position == total:
@@ -305,3 +307,51 @@ class HistoricalSync:
                 self._synced_team_uuids.add(uuid)
         if not already_synced:
             self.database.replace_entity_teams(entity, entity_uuid, team_uuids)
+
+    def _sync_competition_match_data(self, competition_uuid: str) -> None:
+        match_groups = self._fetch_collection(
+            f"competitions/{competition_uuid}/match-groups", priority=20
+        )
+        LOGGER.info(
+            "Syncing match data competition=%s matchGroups=%s",
+            competition_uuid,
+            len(match_groups),
+        )
+        for group_payload in match_groups:
+            group_uuid = group_payload.get("uuid")
+            if not isinstance(group_uuid, str):
+                continue
+            self.database.upsert_match_group(
+                MatchGroup(
+                    group_uuid,
+                    competition_uuid,
+                    group_payload.get("seasonUuid") if isinstance(group_payload.get("seasonUuid"), str) else None,
+                    group_payload.get("name"),
+                    group_payload.get("tourneyLevel") if isinstance(group_payload.get("tourneyLevel"), int) else None,
+                    group_payload,
+                )
+            )
+            matches = self._fetch_collection(
+                f"match-groups/{group_uuid}/competition-matches", priority=20
+            )
+            for match_payload in matches:
+                match_uuid = match_payload.get("uuid")
+                if not isinstance(match_uuid, str):
+                    continue
+                self.database.upsert_competition_match(
+                    CompetitionMatch(
+                        match_uuid,
+                        competition_uuid,
+                        match_payload.get("matchGroupUuid") if isinstance(match_payload.get("matchGroupUuid"), str) else group_uuid,
+                        match_payload.get("seasonUuid") if isinstance(match_payload.get("seasonUuid"), str) else None,
+                        match_payload.get("date") if isinstance(match_payload.get("date"), str) else None,
+                        match_payload.get("verified") if isinstance(match_payload.get("verified"), bool) else None,
+                        match_payload,
+                    )
+                )
+                result = match_payload.get("results")
+                self.database.upsert_competition_match_result(
+                    match_uuid,
+                    competition_uuid,
+                    result if isinstance(result, dict) else None,
+                )

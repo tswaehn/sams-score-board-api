@@ -14,6 +14,8 @@ COMPETITION = "00000000-0000-0000-0000-000000000003"
 LEAGUE = "00000000-0000-0000-0000-000000000004"
 ASSOCIATION = "00000000-0000-0000-0000-000000000005"
 TEAM = "00000000-0000-0000-0000-000000000006"
+MATCH_GROUP = "00000000-0000-0000-0000-000000000007"
+MATCH = "00000000-0000-0000-0000-000000000008"
 
 
 class FakeUpstream:
@@ -37,6 +39,10 @@ class FakeUpstream:
             return {"content": [{"uuid": LEAGUE}]}
         if base == f"competitions/{COMPETITION}":
             return {"uuid": COMPETITION, "name": "Cup", "gender": "M", "latestResultUpdate": "2025-01-01T12:00:00Z", "latestStructuralUpdate": "2025-01-02T12:00:00Z", "_links": {"season": {"href": f"https://x/api/v2/seasons/{HISTORIC}"}, "association": {"href": f"https://x/api/v2/associations/{ASSOCIATION}"}}}
+        if base == f"competitions/{COMPETITION}/match-groups":
+            return {"content": [{"uuid": MATCH_GROUP, "name": "Group A", "seasonUuid": HISTORIC, "competitionUuid": COMPETITION, "tourneyLevel": 1}]}
+        if base == f"match-groups/{MATCH_GROUP}/competition-matches":
+            return {"content": [{"uuid": MATCH, "competitionUuid": COMPETITION, "matchGroupUuid": MATCH_GROUP, "seasonUuid": HISTORIC, "date": "2025-01-05T12:00:00Z", "verified": True, "results": {"sets": [{"team1": 3, "team2": 1}]}}]}
         if base == f"leagues/{LEAGUE}":
             return {"uuid": LEAGUE, "name": "League", "seasonUuid": HISTORIC, "associationUuid": ASSOCIATION, "latestResultUpdate": "2025-01-03T12:00:00Z", "latestStructuralUpdate": "2025-01-02T12:00:00Z"}
         if base in {f"competitions/{COMPETITION}/teams", f"leagues/{LEAGUE}/teams"}:
@@ -75,7 +81,11 @@ class HistoricalSyncTest(unittest.TestCase):
                 "2025-01-03T12:00:00Z",
                 database.connection().execute("SELECT latest_upstream_update FROM leagues WHERE uuid = ?", (LEAGUE,)).fetchone()[0],
             )
-            self.assertEqual({"seasons": 2, "competitions": 1, "leagues": 1, "teams": 1, "associations": 1}, database.status())
+            self.assertEqual({"seasons": 2, "competitions": 1, "leagues": 1, "teams": 1, "associations": 1, "match_groups": 1, "competition_matches": 1, "competition_match_results": 1}, database.status())
+            self.assertEqual(
+                '{"sets":[{"team1":3,"team2":1}]}',
+                database.connection().execute("SELECT payload_json FROM competition_match_results WHERE match_uuid = ?", (MATCH,)).fetchone()[0],
+            )
 
             upstream.calls.clear()
             HistoricalSync(database, upstream).sync_once()

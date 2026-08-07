@@ -13,6 +13,7 @@ architecture:
       - for each season, fetch and persist leagues using the season query parameter
       - propagate the refreshed local season currentSeason flag to each imported competition and league
       - for every referenced association or attached team, fetch it only when absent locally
+      - for each imported competition, sync match groups, their matches, and embedded match results
     refresh_behavior:
       default: Existing competition and league UUIDs are skipped after their season list is read.
       force: Calling sync_once(force=True) refreshes existing competition and league UUIDs.
@@ -54,6 +55,9 @@ storage:
     - leagues
     - competition_teams
     - league_teams
+    - match_groups
+    - competition_matches
+    - competition_match_results
   payload_policy: Store normalized lookup columns and the upstream JSON payload enriched with currentSeason for competitions and leagues.
   latest_upstream_update:
     columns:

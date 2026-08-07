@@ -58,3 +58,24 @@ class League:
     shortname: str | None
     gender: str | None
     payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class MatchGroup:
+    uuid: str
+    competition_uuid: str
+    season_uuid: str | None
+    name: str | None
+    tourney_level: int | None
+    payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class CompetitionMatch:
+    uuid: str
+    competition_uuid: str
+    match_group_uuid: str | None
+    season_uuid: str | None
+    match_date: str | None
+    verified: bool | None
+    payload: dict[str, Any]
