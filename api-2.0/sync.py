@@ -16,13 +16,13 @@ from urllib.parse import quote_plus, urlparse
 from uuid import UUID
 
 from database import Database
-from models import Association, Competition, CompetitionMatch, League, LeagueMatch, LeagueMatchDay, MatchGroup, Season, Team
+from models import Association, Competition, CompetitionMatch, CompetitionMatchGroupRanking, League, LeagueMatch, LeagueMatchDay, MatchGroup, Season, Team
 from upstream_queue import UpstreamQueue
 
 
 LOGGER = logging.getLogger("api2.sync")
 UPSTREAM_PAGE_SIZE = 100
-WRITE_BATCH_SIZE = 25
+WRITE_BATCH_SIZE = 5
 
 
 def _items(payload: dict[str, Any] | list[Any]) -> list[dict[str, Any]]:
@@ -357,6 +357,21 @@ class HistoricalSync:
                     competition_uuid,
                     result if isinstance(result, dict) else None,
                 )
+        rankings = self._fetch_collection(
+            f"competitions/{competition_uuid}/rankings", priority=20
+        )
+        for ranking_payload in rankings:
+            ranking_uuid = ranking_payload.get("uuid")
+            if not isinstance(ranking_uuid, str):
+                continue
+            self.database.upsert_competition_match_group_ranking(
+                CompetitionMatchGroupRanking(
+                    ranking_uuid,
+                    competition_uuid,
+                    ranking_payload.get("matchGroupName") if isinstance(ranking_payload.get("matchGroupName"), str) else None,
+                    ranking_payload,
+                )
+            )
 
     def _sync_league_match_data(self, league_uuid: str) -> None:
         match_days = self._fetch_collection(

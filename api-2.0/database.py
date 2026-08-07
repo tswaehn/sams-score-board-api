@@ -9,7 +9,7 @@ import threading
 from pathlib import Path
 from typing import Any, Iterable
 
-from models import Association, Competition, CompetitionMatch, League, LeagueMatch, LeagueMatchDay, MatchGroup, Season, Team
+from models import Association, Competition, CompetitionMatch, CompetitionMatchGroupRanking, League, LeagueMatch, LeagueMatchDay, MatchGroup, Season, Team
 
 
 class Database:
@@ -103,6 +103,10 @@ class Database:
               competition_uuid TEXT NOT NULL REFERENCES competitions(uuid) ON DELETE CASCADE,
               payload_json TEXT NOT NULL, synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
+            CREATE TABLE IF NOT EXISTS competition_match_group_rankings (
+              uuid TEXT PRIMARY KEY, competition_uuid TEXT NOT NULL REFERENCES competitions(uuid) ON DELETE CASCADE,
+              match_group_name TEXT, payload_json TEXT NOT NULL, synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
             CREATE TABLE IF NOT EXISTS league_match_days (
               uuid TEXT PRIMARY KEY, league_uuid TEXT NOT NULL REFERENCES leagues(uuid) ON DELETE CASCADE,
               season_uuid TEXT, name TEXT, match_date TEXT, payload_json TEXT NOT NULL,
@@ -122,6 +126,7 @@ class Database:
             CREATE INDEX IF NOT EXISTS leagues_season_idx ON leagues(season_uuid);
             CREATE INDEX IF NOT EXISTS match_groups_competition_idx ON match_groups(competition_uuid);
             CREATE INDEX IF NOT EXISTS competition_matches_competition_idx ON competition_matches(competition_uuid);
+            CREATE INDEX IF NOT EXISTS competition_rankings_competition_idx ON competition_match_group_rankings(competition_uuid);
             CREATE INDEX IF NOT EXISTS league_match_days_league_idx ON league_match_days(league_uuid);
             CREATE INDEX IF NOT EXISTS league_matches_league_idx ON league_matches(league_uuid);
             """
@@ -232,6 +237,15 @@ class Database:
               (match_uuid, competition_uuid, self._payload(payload)))
         self._commit_if_needed()
 
+    def upsert_competition_match_group_ranking(self, item: CompetitionMatchGroupRanking) -> None:
+        self.connection().execute("""INSERT INTO competition_match_group_rankings
+          (uuid, competition_uuid, match_group_name, payload_json, synced_at)
+          VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(uuid) DO UPDATE SET competition_uuid=excluded.competition_uuid,
+          match_group_name=excluded.match_group_name,payload_json=excluded.payload_json,synced_at=CURRENT_TIMESTAMP""",
+          (item.uuid, item.competition_uuid, item.match_group_name, self._payload(item.payload)))
+        self._commit_if_needed()
+
     def upsert_league_match_day(self, item: LeagueMatchDay) -> None:
         self.connection().execute("""INSERT INTO league_match_days
           (uuid, league_uuid, season_uuid, name, match_date, payload_json, synced_at)
@@ -293,4 +307,4 @@ class Database:
 
     def status(self) -> dict[str, int]:
         return {table: self.connection().execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-                for table in ("seasons", "competitions", "leagues", "teams", "associations", "match_groups", "competition_matches", "competition_match_results", "league_match_days", "league_matches", "league_match_results")}
+                for table in ("seasons", "competitions", "leagues", "teams", "associations", "match_groups", "competition_matches", "competition_match_results", "competition_match_group_rankings", "league_match_days", "league_matches", "league_match_results")}

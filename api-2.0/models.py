@@ -82,6 +82,14 @@ class CompetitionMatch:
 
 
 @dataclass(frozen=True)
+class CompetitionMatchGroupRanking:
+    uuid: str
+    competition_uuid: str
+    match_group_name: str | None
+    payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
 class LeagueMatchDay:
     uuid: str
     league_uuid: str
