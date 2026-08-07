@@ -33,6 +33,7 @@ UPSTREAM = UpstreamQueue(
     min_delay_seconds=UPSTREAM_MIN_DELAY_SECONDS,
     max_retries=UPSTREAM_MAX_RETRIES,
     request_time_logger=INTERNAL_LOG.record_request_time,
+    timeout_logger=INTERNAL_LOG.record_request_timeout,
 )
 SYNC = HistoricalSync(DATABASE, UPSTREAM, repeat_after_seconds=HISTORICAL_SYNC_INTERVAL_SECONDS)
 

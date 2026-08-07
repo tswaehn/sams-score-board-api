@@ -44,6 +44,16 @@ class InternalLogWriter:
             duration_ms,
         ))
 
+    def record_request_timeout(
+        self, request_url: str, duration_ms: float, attempt: int, max_attempts: int
+    ) -> None:
+        self._entries.put((
+            "error",
+            f"Upstream request timed out (durationMs={duration_ms:.1f}, attempt={attempt}/{max_attempts})",
+            request_url,
+            duration_ms,
+        ))
+
     def _run(self) -> None:
         try:
             with self.path.open("a", encoding="utf-8") as log_file:

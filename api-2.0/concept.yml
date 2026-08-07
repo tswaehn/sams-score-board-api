@@ -75,6 +75,7 @@ storage:
         under_or_equal_to_5_seconds: info
         over_5_seconds: error
         failed_request: error
+        timeout_attempt: error
   payload_policy: Store normalized lookup columns and the upstream JSON payload enriched with currentSeason for competitions and leagues.
   latest_upstream_update:
     columns:

@@ -49,12 +49,14 @@ class UpstreamQueue:
         min_delay_seconds: float = 0.3,
         max_retries: int = 3,
         request_time_logger: Callable[[str, float, bool], None] | None = None,
+        timeout_logger: Callable[[str, float, int, int], None] | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.min_delay_seconds = min_delay_seconds
         self.max_retries = max(0, max_retries)
         self.request_time_logger = request_time_logger
+        self.timeout_logger = timeout_logger
         self._requests: queue.PriorityQueue[UpstreamRequest] = queue.PriorityQueue()
         self._sequence = itertools.count()
         self._stop = threading.Event()
@@ -118,6 +120,7 @@ class UpstreamQueue:
         url = f"{self.base_url}/{endpoint}"
         last_error: Exception | None = None
         for attempt in range(self.max_retries + 1):
+            attempt_started_at = time.monotonic()
             try:
                 # A new session avoids reusing a socket that the upstream has closed.
                 with requests.Session() as session:
@@ -131,6 +134,27 @@ class UpstreamQueue:
                 if not isinstance(payload, (dict, list)):
                     raise RuntimeError("Upstream response was not a JSON object or array")
                 return payload
+            except requests.Timeout as exc:
+                last_error = exc
+                if self.timeout_logger is not None:
+                    self.timeout_logger(
+                        url,
+                        (time.monotonic() - attempt_started_at) * 1000.0,
+                        attempt + 1,
+                        self.max_retries + 1,
+                    )
+                if attempt == self.max_retries:
+                    break
+                delay = min(2.0, 0.5 * (2 ** attempt))
+                LOGGER.warning(
+                    "Upstream request timed out endpoint=%s attempt=%s/%s; retrying in %.1fs: %s",
+                    endpoint,
+                    attempt + 1,
+                    self.max_retries + 1,
+                    delay,
+                    exc,
+                )
+                time.sleep(delay)
             except (requests.RequestException, ValueError, RuntimeError) as exc:
                 last_error = exc
                 if attempt == self.max_retries:
