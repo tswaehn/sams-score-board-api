@@ -104,8 +104,8 @@ class HistoricalSync:
         # Seasons are few and quick to write, so one short transaction is enough.
         with self.database.transaction():
             seasons = self._sync_seasons()
-        #for season in seasons:
-        #    self._sync_entities_for_season("competition", season, force=force)
+        for season in seasons:
+            self._sync_entities_for_season("competition", season, force=force)
         for season in seasons:
             self._sync_entities_for_season("league", season, force=force)
 
