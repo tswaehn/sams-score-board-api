@@ -1,11 +1,11 @@
 document:
   name: concept.yml
   purpose:
-    - canonical machine-readable concept/context file for the client-api subproject
-    - warm-up context for new Codex sessions before making changes in client-api
-    - continuously maintained summary that must be updated when client-api behavior, structure, or constraints change
+    - canonical machine-readable concept/context file for the api-1.0 subproject
+    - warm-up context for new Codex sessions before making changes in api-1.0
+    - continuously maintained summary that must be updated when api-1.0 behavior, structure, or constraints change
   scope:
-    primary_subproject: client-api
+    primary_subproject: api-1.0
     repository_root: /home/tswaehn/src/metagons-software.de/sams-scoreboard-api
   maintenance_policy:
     update_required_when:
@@ -14,28 +14,28 @@ document:
       - runtime behavior changes
       - caching behavior changes
       - websocket/live behavior changes
-      - file structure or ownership in client-api changes
+      - file structure or ownership in api-1.0 changes
       - operational constraints or known risks change
     intended_usage:
       - read first when starting a fresh Codex context
-      - treat as the latest high-level concept source for client-api
+      - treat as the latest high-level concept source for api-1.0
       - reconcile with source files if implementation and this document diverge
   last_updated:
-    date: 2026-04-25
+    date: 2026-08-07
     author: Codex
 
 subproject:
-  name: client-api
+  name: api-1.0
   type: python-service
   runtime:
     language: Python
     container_base: python:3.13-slim
-    entrypoint_file: client-api/server.py
+    entrypoint_file: api-1.0/server.py
     container_command:
       - python
       - server.py
   dependencies:
-    file: client-api/requirements.txt
+    file: api-1.0/requirements.txt
     packages:
       - requests
       - fastapi
@@ -44,41 +44,41 @@ subproject:
 
 files:
   root:
-    - path: client-api/server.py
+    - path: api-1.0/server.py
       role: FastAPI application, routing, middleware, exception shaping, uvicorn bootstrap
-    - path: client-api/sams_api_client.py
+    - path: api-1.0/sams_api_client.py
       role: upstream SSVB API client, pagination, rate limiting, direct upstream fetch helper used by the service runtime, and shared URL/UUID extraction helpers
-    - path: client-api/shared/fetch_association.py
+    - path: api-1.0/shared/fetch_association.py
       role: Association class with in-process association store, update_all() preload, get(uuid) lookup using direct upstream fetches, and a background updater thread
-    - path: client-api/shared/fetch_season.py
+    - path: api-1.0/shared/fetch_season.py
       role: Season class with in-process season store, update_all() preload, get(uuid) lookup using direct upstream fetches, and a background updater thread
-    - path: client-api/shared/fetch_teams.py
+    - path: api-1.0/shared/fetch_teams.py
       role: Teams class with an in-process global team store keyed by team uuid, update_all() via /teams, get(uuid) via direct upstream fetches, and a background updater thread
-    - path: client-api/competition/fetch_competition_team.py
+    - path: api-1.0/competition/fetch_competition_team.py
       role: CompetitionTeams class using the shared updater/store base with a competition-uuid-keyed team-list store, get(competition_uuid), and update_all() that refreshes competition-scoped teams by iterating competitions
-    - path: client-api/competition/fetch_competition_match_group.py
+    - path: api-1.0/competition/fetch_competition_match_group.py
       role: MatchGroup class using the shared updater/store base with persisted raw competition-scoped match-group storage and get(competition_uuid, current_season) returning the normalized competition match-group shape including normalized matches
-    - path: client-api/competition/fetch_competition_matches.py
+    - path: api-1.0/competition/fetch_competition_matches.py
       role: CompetitionMatch class using the shared updater/store base with persisted raw competition-match storage, get(uuid), and get_by_match_group_uuid() returning normalized competition matches
-    - path: client-api/competition/fetch_competition_ranking.py
+    - path: api-1.0/competition/fetch_competition_ranking.py
       role: CompetitionRanking class using the shared updater/store base with persisted normalized competition-ranking storage, get(competition_uuid), and update_all() that refreshes rankings by iterating competitions with direct endpoint fetches
-    - path: client-api/periodic_updater.py
+    - path: api-1.0/periodic_updater.py
       role: shared base class for daemon updater threads that run on startup only when the persisted store TTL has expired and then nightly at local time 01:00, for the primary in-memory store plus lock used by derived store classes, and for pretty-printed persisted JSON snapshots plus raw reference dumps with timestamps
-    - path: client-api/competition/fetch_competition.py
+    - path: api-1.0/competition/fetch_competition.py
       role: Competition class with in-process raw competition store, update_all() preload, get(uuid) lookup using direct upstream fetches, and a composition helper that builds the full competition payload from multiple endpoint-backed stores
-    - path: client-api/competition/fetch_competition_list.py
+    - path: api-1.0/competition/fetch_competition_list.py
       role: CompetitionListStore class maintains the aggregated competition list and lock, updates it per season using direct upstream fetches, exposes get() for copied reads, derives currentSeason mutability from the loaded season, and runs a background updater thread
-    - path: client-api/live_endpoint.py
+    - path: api-1.0/live_endpoint.py
       role: live snapshot fetch plus websocket update loop for /api/live/{competition_id}
-    - path: client-api/metrics.py
+    - path: api-1.0/metrics.py
       role: optional InfluxDB metrics exporter for per-request HTTP metrics, upstream request metrics, and aggregated per-minute unique client-session counts
-    - path: client-api/warm_cache.py
+    - path: api-1.0/warm_cache.py
       role: fetches unique season records via competition season links and reports season date ranges for cache TTL analysis
-    - path: client-api/test.py
+    - path: api-1.0/test.py
       role: ad hoc manual script for dumping cached payloads and warming cache
-    - path: client-api/Dockerfile
+    - path: api-1.0/Dockerfile
       role: container build definition
-    - path: client-api/cache/
+    - path: api-1.0/cache/
       role: persistent on-disk cache directory; large and expected as part of runtime behavior
 
 api_surface:
@@ -178,99 +178,99 @@ environment:
       required: false
       default: 0.0.0.0
       used_by:
-        - client-api/server.py
+        - api-1.0/server.py
     - name: PORT
       required: false
       default: "8000"
       used_by:
-        - client-api/server.py
+        - api-1.0/server.py
     - name: LOG_LEVEL
       required: false
       default: info
       used_by:
-        - client-api/server.py
+        - api-1.0/server.py
     - name: TZ
       required: false
       used_by:
-        - client-api/server_config.py
+        - api-1.0/server_config.py
       purpose: set the process timezone, mainly for daily refresh scheduling based on datetime.now()
     - name: SSVB_API_KEY
       required: true
       used_by:
-        - client-api/sams_api_client.py
+        - api-1.0/sams_api_client.py
       purpose: authenticate requests against https://www.ssvb.org/api/v2
     - name: LIVE_API_URLS
       required: true_for_live_route
       used_by:
-        - client-api/live_endpoint.py
+        - api-1.0/live_endpoint.py
       format: comma-separated list of LIVE_API_URL-compatible values
       purpose: configure one or more upstream live sources whose payloads are merged before serving
     - name: LIVE_API_SNAPSHOT_REFRESH_SECONDS
       required: false
       default: 60
       used_by:
-        - client-api/live_endpoint.py
+        - api-1.0/live_endpoint.py
       purpose: periodically refresh the full live snapshot inside the live updater so matchDays and matchSeries stay aligned with upstream while websocket deltas update match state
     - name: WRITE_RAW_CACHE
       required: false
       default: false
       used_by:
-        - client-api/server_config.py
-        - client-api/periodic_updater.py
+        - api-1.0/server_config.py
+        - api-1.0/periodic_updater.py
       purpose: enable or disable writing raw upstream cache dump files alongside normalized cache stores
     - name: INFLUXDB_ENABLED
       required: false
       default: false
       used_by:
-        - client-api/server_config.py
-        - client-api/metrics.py
+        - api-1.0/server_config.py
+        - api-1.0/metrics.py
       purpose: enable or disable optional InfluxDB metrics export
     - name: INFLUXDB_URL
       required: false
       used_by:
-        - client-api/server_config.py
-        - client-api/metrics.py
+        - api-1.0/server_config.py
+        - api-1.0/metrics.py
       purpose: base URL of the InfluxDB server for metrics export
     - name: INFLUXDB_ORG
       required: false
       used_by:
-        - client-api/server_config.py
-        - client-api/metrics.py
+        - api-1.0/server_config.py
+        - api-1.0/metrics.py
       purpose: InfluxDB organization name used for metrics writes
     - name: INFLUXDB_BUCKET
       required: false
       used_by:
-        - client-api/server_config.py
-        - client-api/metrics.py
+        - api-1.0/server_config.py
+        - api-1.0/metrics.py
       purpose: InfluxDB bucket used for metrics writes
     - name: INFLUXDB_TOKEN
       required: false
       used_by:
-        - client-api/server_config.py
-        - client-api/metrics.py
+        - api-1.0/server_config.py
+        - api-1.0/metrics.py
       purpose: InfluxDB token used for authenticated metrics writes
     - name: INFLUXDB_TIMEOUT_SECONDS
       required: false
       default: 1.0
       used_by:
-        - client-api/server_config.py
-        - client-api/metrics.py
+        - api-1.0/server_config.py
+        - api-1.0/metrics.py
       purpose: timeout for best-effort InfluxDB write calls
     - name: SERVER_CONFIG_PATH
-      required: true_for_client_api_startup
+      required: true_for_api_1_0_startup
       used_by:
-        - client-api/server_config.py
-      purpose: point to a JSON file that defines the client-api runtime configuration
+        - api-1.0/server_config.py
+      purpose: point to a JSON file that defines the api-1.0 runtime configuration
     - name: SSVB_API_KEY
       required: true_for_upstream_rest_requests
       used_by:
-        - client-api/sams_api_client.py
+        - api-1.0/sams_api_client.py
       purpose: authenticate requests to the upstream SAMS REST API
 
 metrics:
   http_requests:
     measurement: http_requests
-    emitted_by: client-api/server.py middleware
+    emitted_by: api-1.0/server.py middleware
     tags:
       - method
       - path
@@ -282,7 +282,7 @@ metrics:
       - port
   upstream_requests:
     measurement: upstream_requests
-    emitted_by: client-api/sams_api_client.py
+    emitted_by: api-1.0/sams_api_client.py
     tags:
       - method
       - endpoint
@@ -294,7 +294,7 @@ metrics:
       - page
   unique_client_sessions:
     measurement: unique_client_sessions
-    emitted_by: client-api/metrics.py
+    emitted_by: api-1.0/metrics.py
     cadence: once per minute
     source: unique client_id query parameter values seen during the minute
     runtime_behavior:
@@ -310,7 +310,7 @@ metrics:
       - port
   unique_client_sessions_daily:
     measurement: unique_client_sessions_daily
-    emitted_by: client-api/metrics.py
+    emitted_by: api-1.0/metrics.py
     cadence: once per minute
     source: cumulative unique client_id query parameter values seen since local-day rollover
     runtime_behavior:
@@ -368,7 +368,7 @@ upstream_integrations:
       source_env: LIVE_API_SNAPSHOT_REFRESH_SECONDS
 
 caching:
-  primary_module: client-api/periodic_updater.py
+  primary_module: api-1.0/periodic_updater.py
   model:
     base_class: PeriodicUpdater
     rule: updater-backed stores persist normalized data to disk and decide freshness from store-level or item-level timestamps
@@ -379,7 +379,7 @@ caching:
     type:
       - in-memory updater-backed dictionaries
       - on-disk JSON store snapshots for updater-backed stores
-    directory: client-api/cache
+    directory: api-1.0/cache
     updater_store_snapshot_shape:
       file_pattern: cache/*-store.json
       top_level_keys:
@@ -421,7 +421,7 @@ caching:
       - competition-api.league-ranking
 
 live_state_model:
-  module: client-api/live_endpoint.py
+  module: api-1.0/live_endpoint.py
   owner:
     classes:
       source_updater: LiveStateUpdater
@@ -453,7 +453,7 @@ live_state_model:
     - GET /api/live/{competition_id} filters matchDays, matchStates, matchStats, and matchSeries server-side to the requested competition while preserving the live payload shape
 
 configuration_model:
-  module: client-api/server_config.py
+  module: api-1.0/server_config.py
   source_precedence:
     - JSON file referenced by SERVER_CONFIG_PATH
     - hard-coded defaults
@@ -600,19 +600,19 @@ operational_notes:
     - project uses plain module imports rather than a packaged Python module structure
     - the global /teams endpoint does not expose competition UUIDs in TeamDto, so competition-scoped team lists need a separate store backed by /competitions/{uuid}/teams
   verified_in_current_context:
-    - python3 -m py_compile client-api/*.py succeeded on 2026-04-03
+    - python3 -m py_compile api-1.0/*.py succeeded on 2026-04-03
   local_environment_note:
     - shell environment had python3 available, but not python on PATH during verification
 
 codex_warmup_guidance:
   read_order:
     - concept.yml
-    - client-api/server.py
-    - client-api/periodic_updater.py
-    - client-api/sams_api_client.py
-    - client-api/competition/fetch_competition.py
-    - client-api/live_endpoint.py
+    - api-1.0/server.py
+    - api-1.0/periodic_updater.py
+    - api-1.0/sams_api_client.py
+    - api-1.0/competition/fetch_competition.py
+    - api-1.0/live_endpoint.py
   focus_assumption:
-    - unless stated otherwise, ongoing work should prioritize the client-api subproject
+    - unless stated otherwise, ongoing work should prioritize the api-1.0 subproject
   update_instruction:
-    - whenever client-api changes materially, update this document in the same workstream
+    - whenever api-1.0 changes materially, update this document in the same workstream

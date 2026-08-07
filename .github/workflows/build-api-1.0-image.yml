@@ -1,4 +1,4 @@
-name: Build And Push Client API Image
+name: Build And Push API 1.0 Image
 
 on:
   workflow_dispatch:
@@ -7,15 +7,16 @@ on:
       - develop
       - master
     paths:
-      - client-api/**
-      - .github/workflows/build-client-api-image.yml
+      - api-1.0/**
+      - .github/workflows/build-api-1.0-image.yml
 
 permissions:
   contents: read
   packages: write
 
 jobs:
-  build-and-push:
+  build-and-push-api-1-0:
+    name: Build and push API 1.0 image
     runs-on: ubuntu-latest
 
     steps:
@@ -24,7 +25,7 @@ jobs:
 
       - name: Normalize image name
         id: image
-        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}-client-api" >> "$GITHUB_OUTPUT"
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}-api-1.0" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -49,8 +50,8 @@ jobs:
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
-          context: ./client-api
-          file: ./client-api/Dockerfile
+          context: ./api-1.0
+          file: ./api-1.0/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

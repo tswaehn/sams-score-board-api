@@ -8,7 +8,7 @@
     "enabled": false,
     "url": "http://influxdb:8086",
     "org": "sams-scoreboard",
-    "bucket": "client-api",
+    "bucket": "api-1.0",
     "token": "replace-with-influxdb-token",
     "timeout_seconds": 1.0
   },

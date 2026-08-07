@@ -13,14 +13,14 @@ services:
       DOCKER_INFLUXDB_INIT_USERNAME: admin
       DOCKER_INFLUXDB_INIT_PASSWORD: replace-with-influxdb-password
       DOCKER_INFLUXDB_INIT_ORG: sams-scoreboard
-      DOCKER_INFLUXDB_INIT_BUCKET: client-api
+      DOCKER_INFLUXDB_INIT_BUCKET: api-1.0
       DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: replace-with-influxdb-token
     volumes:
       - ./influxdb/data:/var/lib/influxdb2
 
-  client-api:
+  api-1.0:
     build:
-      context: ./client-api
+      context: ./api-1.0
     depends_on:
       - influxdb
     ports:
@@ -28,14 +28,14 @@ services:
     environment:
       SERVER_CONFIG_PATH: /app/config/server_config.json
     volumes:
-      - ./client-api/config/server_config.local.json:/app/config/server_config.json:ro
-      - ./client-api/cache:/app/cache
+      - ./api-1.0/config/server_config.local.json:/app/config/server_config.json:ro
+      - ./api-1.0/cache:/app/cache
 
   web:
     build:
       context: ./web
     depends_on:
-      - client-api
+      - api-1.0
     ports:
       - "127.0.0.1:8080:80"
     environment:
@@ -64,27 +64,27 @@ server {
 
 
 # modules provided by this repo
-## client-api
+## api-1.0
 
-The `client-api` directory contains a FastAPI server for exposing competition data from the upstream SAMS API.
+The `api-1.0` directory contains a FastAPI server for exposing competition data from the upstream SAMS API.
 
 Context warm-up and maintenance:
 
-* Read [`conecept.yml`](./conecept.yml) before starting work on `client-api` in a fresh Codex context
-* Treat [`conecept.yml`](./conecept.yml) as the canonical high-level concept file for `client-api`
-* Whenever `client-api` structure, behavior, environment variables, caching, live integration, or operational constraints change, update [`conecept.yml`](./conecept.yml) in the same workstream
+* Read [`concept.yml`](./api-1.0/concept.yml) before starting work on `api-1.0` in a fresh Codex context
+* Treat [`concept.yml`](./api-1.0/concept.yml) as the canonical high-level concept file for `api-1.0`
+* Whenever `api-1.0` structure, behavior, environment variables, caching, live integration, or operational constraints change, update [`concept.yml`](./api-1.0/concept.yml) in the same workstream
 
 Install dependencies:
 
 ```bash
-cd client-api
+cd api-1.0
 pip install -r requirements.txt
 ```
 
 Run the API server:
 
 ```bash
-cd client-api
+cd api-1.0
 SERVER_CONFIG_PATH=./config/server_config.local.json \
 uvicorn server:app --host 0.0.0.0 --port 8000
 ```
@@ -99,12 +99,12 @@ Runtime configuration:
 
 Configuration files:
 
-* [`client-api/config/server_config_template.json`](./client-api/config/server_config_template.json) contains the full anonymous config schema for `client-api`
-* create a real config file such as `client-api/config/server_config.local.json` from that template and point `SERVER_CONFIG_PATH` at it
-* [`docker-compose.yml.example`](./docker-compose.yml.example) contains the same `influxdb`, `client-api`, and `web` example
+* [`api-1.0/config/server_config_template.json`](./api-1.0/config/server_config_template.json) contains the full anonymous config schema for `api-1.0`
+* create a real config file such as `api-1.0/config/server_config.local.json` from that template and point `SERVER_CONFIG_PATH` at it
+* [`docker-compose.yml.example`](./docker-compose.yml.example) contains the same `influxdb`, `api-1.0`, and `web` example
 * the config file supports `tz`, which is applied as the process timezone
 * `write_raw_cache` controls whether `*-raw.json` cache files are written; it defaults to `false`
-* the InfluxDB config is optional; when enabled, `client-api` writes best-effort request metrics without affecting API responses if InfluxDB is unavailable
+* the InfluxDB config is optional; when enabled, `api-1.0` writes best-effort request metrics without affecting API responses if InfluxDB is unavailable
 * required config keys are `ssvb_api_key`, `ssvb_api_url`, and `live_api_urls`
 * `API_BASE_URL` for the `web` container must be a browser-reachable URL, not an internal Docker service hostname, because it is injected into client-side JavaScript
 

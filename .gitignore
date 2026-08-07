@@ -3,5 +3,5 @@ web/dist
 web/.idea
 .idea/
 .env
-client-api/cache/
-client-api/config/server_config.json
+api-1.0/cache/
+api-1.0/config/server_config.json
