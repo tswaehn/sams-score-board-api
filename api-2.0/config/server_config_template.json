@@ -1,0 +1,11 @@
+{
+  "host": "0.0.0.0",
+  "port": 8001,
+  "log_level": "info",
+  "database_path": "data/historical.sqlite3",
+  "ssvb_api_url": "https://www.ssvb.org/api/v2",
+  "ssvb_api_key": "replace-with-api-key",
+  "upstream_min_delay_seconds": 0.3,
+  "upstream_max_retries": 3,
+  "historical_sync_interval_seconds": 86400
+}

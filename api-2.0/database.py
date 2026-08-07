@@ -1,0 +1,134 @@
+"""SQLite persistence and read models.  All writes happen in the sync stage."""
+
+from __future__ import annotations
+
+import json
+import sqlite3
+import threading
+from pathlib import Path
+from typing import Any, Iterable
+
+from models import Association, Competition, League, Season, Team
+
+
+class Database:
+    def __init__(self, path: str) -> None:
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._local = threading.local()
+
+    def connection(self) -> sqlite3.Connection:
+        connection = getattr(self._local, "connection", None)
+        if connection is None:
+            connection = sqlite3.connect(self.path, timeout=30, check_same_thread=False)
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON")
+            connection.execute("PRAGMA journal_mode = WAL")
+            self._local.connection = connection
+        return connection
+
+    def initialize(self) -> None:
+        self.connection().executescript(
+            """
+            CREATE TABLE IF NOT EXISTS seasons (
+              uuid TEXT PRIMARY KEY, name TEXT, start_date TEXT, end_date TEXT,
+              is_current INTEGER NOT NULL, payload_json TEXT NOT NULL, synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS associations (
+              uuid TEXT PRIMARY KEY, name TEXT, shortname TEXT, level TEXT, parent_uuid TEXT,
+              payload_json TEXT NOT NULL, synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS teams (
+              uuid TEXT PRIMARY KEY, name TEXT, shortname TEXT, association_uuid TEXT,
+              payload_json TEXT NOT NULL, synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS competitions (
+              uuid TEXT PRIMARY KEY, season_uuid TEXT NOT NULL REFERENCES seasons(uuid), association_uuid TEXT,
+              name TEXT, gender TEXT, payload_json TEXT NOT NULL, synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS leagues (
+              uuid TEXT PRIMARY KEY, season_uuid TEXT NOT NULL REFERENCES seasons(uuid), association_uuid TEXT,
+              name TEXT, shortname TEXT, gender TEXT, payload_json TEXT NOT NULL, synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS competition_teams (
+              competition_uuid TEXT NOT NULL REFERENCES competitions(uuid) ON DELETE CASCADE,
+              team_uuid TEXT NOT NULL REFERENCES teams(uuid), PRIMARY KEY (competition_uuid, team_uuid)
+            );
+            CREATE TABLE IF NOT EXISTS league_teams (
+              league_uuid TEXT NOT NULL REFERENCES leagues(uuid) ON DELETE CASCADE,
+              team_uuid TEXT NOT NULL REFERENCES teams(uuid), PRIMARY KEY (league_uuid, team_uuid)
+            );
+            CREATE INDEX IF NOT EXISTS competitions_season_idx ON competitions(season_uuid);
+            CREATE INDEX IF NOT EXISTS leagues_season_idx ON leagues(season_uuid);
+            """
+        )
+        self.connection().commit()
+
+    @staticmethod
+    def _payload(payload: dict[str, Any]) -> str:
+        return json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
+
+    def upsert_season(self, item: Season) -> None:
+        self.connection().execute("""INSERT INTO seasons VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(uuid) DO UPDATE SET name=excluded.name,start_date=excluded.start_date,end_date=excluded.end_date,
+          is_current=excluded.is_current,payload_json=excluded.payload_json,synced_at=CURRENT_TIMESTAMP""",
+          (item.uuid, item.name, item.start_date, item.end_date, int(item.current), self._payload(item.payload)))
+        self.connection().commit()
+
+    def upsert_association(self, item: Association) -> None:
+        self.connection().execute("""INSERT INTO associations VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(uuid) DO UPDATE SET name=excluded.name,shortname=excluded.shortname,level=excluded.level,
+          parent_uuid=excluded.parent_uuid,payload_json=excluded.payload_json,synced_at=CURRENT_TIMESTAMP""",
+          (item.uuid, item.name, item.shortname, item.level, item.parent_uuid, self._payload(item.payload)))
+        self.connection().commit()
+
+    def upsert_team(self, item: Team) -> None:
+        self.connection().execute("""INSERT INTO teams VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(uuid) DO UPDATE SET name=excluded.name,shortname=excluded.shortname,association_uuid=excluded.association_uuid,
+          payload_json=excluded.payload_json,synced_at=CURRENT_TIMESTAMP""",
+          (item.uuid, item.name, item.shortname, item.association_uuid, self._payload(item.payload)))
+        self.connection().commit()
+
+    def upsert_competition(self, item: Competition) -> None:
+        self.connection().execute("""INSERT INTO competitions VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(uuid) DO UPDATE SET season_uuid=excluded.season_uuid,association_uuid=excluded.association_uuid,name=excluded.name,
+          gender=excluded.gender,payload_json=excluded.payload_json,synced_at=CURRENT_TIMESTAMP""",
+          (item.uuid, item.season_uuid, item.association_uuid, item.name, item.gender, self._payload(item.payload)))
+        self.connection().commit()
+
+    def upsert_league(self, item: League) -> None:
+        self.connection().execute("""INSERT INTO leagues VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(uuid) DO UPDATE SET season_uuid=excluded.season_uuid,association_uuid=excluded.association_uuid,name=excluded.name,
+          shortname=excluded.shortname,gender=excluded.gender,payload_json=excluded.payload_json,synced_at=CURRENT_TIMESTAMP""",
+          (item.uuid, item.season_uuid, item.association_uuid, item.name, item.shortname, item.gender, self._payload(item.payload)))
+        self.connection().commit()
+
+    def replace_entity_teams(self, entity: str, entity_uuid: str, team_uuids: Iterable[str]) -> None:
+        table = "competition_teams" if entity == "competition" else "league_teams"
+        column = f"{entity}_uuid"
+        connection = self.connection()
+        connection.execute(f"DELETE FROM {table} WHERE {column} = ?", (entity_uuid,))
+        connection.executemany(f"INSERT OR IGNORE INTO {table} ({column}, team_uuid) VALUES (?, ?)", ((entity_uuid, uuid) for uuid in team_uuids))
+        connection.commit()
+
+    def list_entities(self, entity: str, season_uuid: str | None = None) -> list[dict[str, Any]]:
+        table = "competitions" if entity == "competition" else "leagues"
+        query = f"SELECT payload_json FROM {table}"
+        params: tuple[str, ...] = ()
+        if season_uuid:
+            query += " WHERE season_uuid = ?"
+            params = (season_uuid,)
+        query += " ORDER BY name COLLATE NOCASE"
+        return [json.loads(row["payload_json"]) for row in self.connection().execute(query, params)]
+
+    def get_entity(self, entity: str, uuid: str) -> dict[str, Any] | None:
+        table = "competitions" if entity == "competition" else "leagues"
+        row = self.connection().execute(f"SELECT payload_json FROM {table} WHERE uuid = ?", (uuid,)).fetchone()
+        return json.loads(row["payload_json"]) if row else None
+
+    def list_seasons(self) -> list[dict[str, Any]]:
+        return [json.loads(row["payload_json"]) for row in self.connection().execute("SELECT payload_json FROM seasons ORDER BY start_date DESC")]
+
+    def status(self) -> dict[str, int]:
+        return {table: self.connection().execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                for table in ("seasons", "competitions", "leagues", "teams", "associations")}

@@ -1,0 +1,69 @@
+document:
+  name: API 2.0 historical mirror
+  updated: 2026-08-07
+  purpose: Two-stage API that serves historic SAMS data from a local SQLite mirror.
+
+architecture:
+  stage_1_sync:
+    owner: sync.HistoricalSync
+    order:
+      - fetch and persist all seasons
+      - select every season where currentSeason is false
+      - fetch that season's competitions and leagues
+      - fetch each entity's association and attached teams
+      - fetch each attached team's association
+    cadence: HISTORICAL_SYNC_INTERVAL_SECONDS (default: 86400)
+    rule: Public API request handlers never enqueue or make upstream REST requests.
+  upstream_transport:
+    owner: upstream_queue.UpstreamQueue
+    rule: The process has exactly one queue and one worker for all upstream calls.
+    properties:
+      - FIFO within each priority level
+      - serial requests
+      - configured inter-request pacing
+      - pagination also uses the same queue
+  stage_2_read_api:
+    owner: server.py
+    source: SQLite only
+    behavior: Returns 404 for records that have not yet been imported rather than falling back to SAMS.
+
+storage:
+  engine: SQLite
+  default_path: data/historical.sqlite3
+  journal_mode: WAL
+  tables:
+    - seasons
+    - associations
+    - teams
+    - competitions
+    - leagues
+    - competition_teams
+    - league_teams
+  payload_policy: Store normalized lookup columns and the full upstream JSON payload for forward compatibility.
+
+environment:
+  SERVER_CONFIG_PATH:
+    required: true_for_startup
+    default: config/server_config.json
+    purpose: Path to the JSON runtime configuration.
+configuration:
+  template: config/server_config_template.json
+  required_keys:
+    - ssvb_api_url
+    - ssvb_api_key
+  optional_keys:
+    - host
+    - port
+    - log_level
+    - database_path
+    - upstream_min_delay_seconds
+    - upstream_max_retries
+    - historical_sync_interval_seconds
+
+routes:
+  - GET /api/healthz
+  - GET /api/seasons
+  - GET /api/competition-list?season_id=<uuid>
+  - GET /api/league-list?season_id=<uuid>
+  - GET /api/competition/<uuid>
+  - GET /api/league/<uuid>
