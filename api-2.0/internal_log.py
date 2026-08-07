@@ -1,20 +1,20 @@
-"""Asynchronous persistence for internal operational logs."""
+"""Asynchronous append-only file logging for internal operational events."""
 
 from __future__ import annotations
 
 import logging
 import queue
 import threading
-
-from database import Database
-
+from datetime import datetime, timezone
+from pathlib import Path
 
 LOGGER = logging.getLogger("api2.internal-log")
 
 
 class InternalLogWriter:
-    def __init__(self, database: Database) -> None:
-        self.database = database
+    def __init__(self, path: str | Path) -> None:
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
         self._entries: queue.Queue[tuple[str, str, str | None, float | None] | None] = queue.Queue()
         self._thread: threading.Thread | None = None
 
@@ -45,17 +45,18 @@ class InternalLogWriter:
         ))
 
     def _run(self) -> None:
-        while True:
-            entry = self._entries.get()
-            if entry is None:
-                return
-            severity, message, request_url, duration_ms = entry
-            try:
-                self.database.insert_internal_log(
-                    severity=severity,
-                    message=message,
-                    request_url=request_url,
-                    duration_ms=duration_ms,
-                )
-            except Exception:
-                LOGGER.exception("Failed to persist internal log entry")
+        try:
+            with self.path.open("a", encoding="utf-8") as log_file:
+                while True:
+                    entry = self._entries.get()
+                    if entry is None:
+                        return
+                    severity, message, request_url, duration_ms = entry
+                    timestamp = datetime.now(timezone.utc).isoformat()
+                    log_file.write(
+                        f"{timestamp} severity={severity} durationMs={duration_ms:.1f} "
+                        f"url={request_url} message={message}\n"
+                    )
+                    log_file.flush()
+        except OSError:
+            LOGGER.exception("Failed to write internal log file: %s", self.path)

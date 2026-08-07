@@ -26,7 +26,7 @@ from upstream_queue import UpstreamQueue
 
 logging.basicConfig(level=LOG_LEVEL.upper(), format="%(asctime)s %(levelname)s %(name)s %(message)s")
 DATABASE = Database(DATABASE_PATH)
-INTERNAL_LOG = InternalLogWriter(DATABASE)
+INTERNAL_LOG = InternalLogWriter(DATABASE.path.parent / "internal.log")
 UPSTREAM = UpstreamQueue(
     SSVB_API_URL,
     SSVB_API_KEY,

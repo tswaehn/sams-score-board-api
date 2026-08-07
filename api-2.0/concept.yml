@@ -65,8 +65,8 @@ storage:
     - league_matches
     - league_match_results
     - league_rankings
-    - internal_logs
   internal_logging:
+    path: data/internal.log
     upstream_request_times:
       fields:
         - full request URL

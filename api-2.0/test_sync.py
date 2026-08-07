@@ -93,7 +93,7 @@ class HistoricalSyncTest(unittest.TestCase):
                 "2025-01-03T12:00:00Z",
                 database.connection().execute("SELECT latest_upstream_update FROM leagues WHERE uuid = ?", (LEAGUE,)).fetchone()[0],
             )
-            self.assertEqual({"seasons": 2, "competitions": 1, "leagues": 1, "teams": 1, "associations": 1, "match_groups": 1, "competition_matches": 1, "competition_match_results": 1, "competition_match_group_rankings": 1, "league_match_days": 1, "league_matches": 1, "league_match_results": 1, "league_rankings": 1, "internal_logs": 0}, database.status())
+            self.assertEqual({"seasons": 2, "competitions": 1, "leagues": 1, "teams": 1, "associations": 1, "match_groups": 1, "competition_matches": 1, "competition_match_results": 1, "competition_match_group_rankings": 1, "league_match_days": 1, "league_matches": 1, "league_match_results": 1, "league_rankings": 1}, database.status())
             self.assertEqual(
                 '{"sets":[{"team1":3,"team2":1}]}',
                 database.connection().execute("SELECT payload_json FROM competition_match_results WHERE match_uuid = ?", (MATCH,)).fetchone()[0],
