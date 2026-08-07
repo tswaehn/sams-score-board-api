@@ -40,6 +40,7 @@ class Competition:
     uuid: str
     season_uuid: str
     is_current: bool
+    latest_upstream_update: str | None
     association_uuid: str | None
     name: str | None
     gender: str | None
@@ -51,6 +52,7 @@ class League:
     uuid: str
     season_uuid: str
     is_current: bool
+    latest_upstream_update: str | None
     association_uuid: str | None
     name: str | None
     shortname: str | None

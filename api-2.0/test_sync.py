@@ -36,9 +36,9 @@ class FakeUpstream:
         if base == "leagues":
             return {"content": [{"uuid": LEAGUE}]}
         if base == f"competitions/{COMPETITION}":
-            return {"uuid": COMPETITION, "name": "Cup", "gender": "M", "_links": {"season": {"href": f"https://x/api/v2/seasons/{HISTORIC}"}, "association": {"href": f"https://x/api/v2/associations/{ASSOCIATION}"}}}
+            return {"uuid": COMPETITION, "name": "Cup", "gender": "M", "latestResultUpdate": "2025-01-01T12:00:00Z", "latestStructuralUpdate": "2025-01-02T12:00:00Z", "_links": {"season": {"href": f"https://x/api/v2/seasons/{HISTORIC}"}, "association": {"href": f"https://x/api/v2/associations/{ASSOCIATION}"}}}
         if base == f"leagues/{LEAGUE}":
-            return {"uuid": LEAGUE, "name": "League", "seasonUuid": HISTORIC, "associationUuid": ASSOCIATION}
+            return {"uuid": LEAGUE, "name": "League", "seasonUuid": HISTORIC, "associationUuid": ASSOCIATION, "latestResultUpdate": "2025-01-03T12:00:00Z", "latestStructuralUpdate": "2025-01-02T12:00:00Z"}
         if base in {f"competitions/{COMPETITION}/teams", f"leagues/{LEAGUE}/teams"}:
             return {"content": [{"uuid": TEAM}]}
         if base == f"teams/{TEAM}":
@@ -67,6 +67,14 @@ class HistoricalSyncTest(unittest.TestCase):
             self.assertEqual([COMPETITION], [item["uuid"] for item in competitions])
             self.assertFalse(competitions[0]["currentSeason"])
             self.assertEqual([LEAGUE], [item["uuid"] for item in database.list_entities("league")])
+            self.assertEqual(
+                "2025-01-02T12:00:00Z",
+                database.connection().execute("SELECT latest_upstream_update FROM competitions WHERE uuid = ?", (COMPETITION,)).fetchone()[0],
+            )
+            self.assertEqual(
+                "2025-01-03T12:00:00Z",
+                database.connection().execute("SELECT latest_upstream_update FROM leagues WHERE uuid = ?", (LEAGUE,)).fetchone()[0],
+            )
             self.assertEqual({"seasons": 2, "competitions": 1, "leagues": 1, "teams": 1, "associations": 1}, database.status())
 
             upstream.calls.clear()

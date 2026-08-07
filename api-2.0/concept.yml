@@ -41,6 +41,11 @@ storage:
   engine: SQLite
   default_path: data/sams-database
   journal_mode: WAL
+  performance:
+    - NORMAL synchronous mode balances durability and bulk-insert performance
+    - temporary tables and intermediate operations use memory
+    - a 64 MiB SQLite page cache is held in process memory per connection
+    - seasons are written in one short transaction; competitions and leagues commit in batches of 25 entities
   tables:
     - seasons
     - associations
@@ -50,6 +55,11 @@ storage:
     - competition_teams
     - league_teams
   payload_policy: Store normalized lookup columns and the upstream JSON payload enriched with currentSeason for competitions and leagues.
+  latest_upstream_update:
+    columns:
+      - competitions.latest_upstream_update
+      - leagues.latest_upstream_update
+    value: Later timestamp of latestResultUpdate and latestStructuralUpdate from the upstream payload.
 
 environment:
   SERVER_CONFIG_PATH:

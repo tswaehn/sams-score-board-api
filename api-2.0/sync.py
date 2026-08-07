@@ -7,6 +7,7 @@ dependencies.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import logging
 import threading
 import time
@@ -21,6 +22,7 @@ from upstream_queue import UpstreamQueue
 
 LOGGER = logging.getLogger("api2.sync")
 UPSTREAM_PAGE_SIZE = 100
+WRITE_BATCH_SIZE = 25
 
 
 def _items(payload: dict[str, Any] | list[Any]) -> list[dict[str, Any]]:
@@ -43,6 +45,27 @@ def _linked_uuid(payload: dict[str, Any], name: str) -> str | None:
     links = payload.get("_links")
     link = links.get(name) if isinstance(links, dict) else None
     return _uuid_from_url(link.get("href")) if isinstance(link, dict) else None
+
+
+def _latest_upstream_update(payload: dict[str, Any]) -> str | None:
+    candidates = [
+        value
+        for value in (payload.get("latestResultUpdate"), payload.get("latestStructuralUpdate"))
+        if isinstance(value, str) and value.strip()
+    ]
+    if not candidates:
+        return None
+
+    def timestamp(value: str) -> float:
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.timestamp()
+        except ValueError:
+            return float("-inf")
+
+    return max(candidates, key=lambda value: (timestamp(value), value))
 
 
 class HistoricalSync:
@@ -78,7 +101,9 @@ class HistoricalSync:
         # without weakening a later scheduled refresh.
         self._synced_association_uuids = set()
         self._synced_team_uuids = set()
-        seasons = self._sync_seasons()
+        # Seasons are few and quick to write, so one short transaction is enough.
+        with self.database.transaction():
+            seasons = self._sync_seasons()
         for season in seasons:
             self._sync_entities_for_season("competition", season, force=force)
         for season in seasons:
@@ -147,18 +172,57 @@ class HistoricalSync:
 
     def _sync_entities_for_season(self, entity: str, season: Season, *, force: bool = False) -> None:
         endpoint = f"{entity}s?season={quote_plus(season.uuid)}"
-        for summary in self._fetch_collection(endpoint, priority=10):
-            uuid = summary.get("uuid")
-            if not isinstance(uuid, str):
-                continue
-            already_synced = self.database.get_entity(entity, uuid) is not None
-            if already_synced and not force:
-                continue
-            detail = self.upstream.fetch(f"{entity}s/{uuid}", priority=10)
-            payload = detail if isinstance(detail, dict) else summary
-            self._store_entity(entity, payload, season)
-            self._sync_entity_association(payload)
-            self._sync_entity_teams(entity, uuid, already_synced=already_synced)
+        summaries = self._fetch_collection(endpoint, priority=10)
+        total = len(summaries)
+        imported = 0
+        skipped = 0
+        LOGGER.info(
+            "Syncing %s for season=%s name=%r total=%s force=%s",
+            entity,
+            season.uuid,
+            season.name,
+            total,
+            force,
+        )
+        for batch_start in range(0, total, WRITE_BATCH_SIZE):
+            batch = summaries[batch_start:batch_start + WRITE_BATCH_SIZE]
+            # A failed batch rolls back at most 25 entities. This intentionally
+            # bounds SQLite write-lock time during long upstream syncs.
+            with self.database.transaction():
+                for summary in batch:
+                    uuid = summary.get("uuid")
+                    if not isinstance(uuid, str):
+                        skipped += 1
+                        continue
+                    already_synced = self.database.get_entity(entity, uuid) is not None
+                    if already_synced and not force:
+                        skipped += 1
+                        continue
+                    detail = self.upstream.fetch(f"{entity}s/{uuid}", priority=10)
+                    payload = detail if isinstance(detail, dict) else summary
+                    self._store_entity(entity, payload, season)
+                    self._sync_entity_association(payload)
+                    self._sync_entity_teams(entity, uuid, already_synced=already_synced)
+                    imported += 1
+            position = min(batch_start + len(batch), total)
+            if position % WRITE_BATCH_SIZE == 0 or position == total:
+                LOGGER.info(
+                    "Sync progress entity=%s season=%s processed=%s/%s imported=%s skipped=%s",
+                    entity,
+                    season.uuid,
+                    position,
+                    total,
+                    imported,
+                    skipped,
+                )
+        LOGGER.info(
+            "Sync complete entity=%s season=%s total=%s imported=%s skipped=%s",
+            entity,
+            season.uuid,
+            total,
+            imported,
+            skipped,
+        )
 
     def _store_entity(self, entity: str, payload: dict[str, Any], requested_season: Season) -> None:
         uuid = payload.get("uuid")
@@ -172,10 +236,11 @@ class HistoricalSync:
         # This is intentionally an enriched local payload. The upstream object is
         # preserved except for the locally propagated season state.
         enriched_payload = {**payload, "currentSeason": season.current}
+        latest_upstream_update = _latest_upstream_update(payload)
         if entity == "competition":
-            self.database.upsert_competition(Competition(uuid, season.uuid, season.current, association_uuid, payload.get("name"), payload.get("gender"), enriched_payload))
+            self.database.upsert_competition(Competition(uuid, season.uuid, season.current, latest_upstream_update, association_uuid, payload.get("name"), payload.get("gender"), enriched_payload))
         else:
-            self.database.upsert_league(League(uuid, season.uuid, season.current, association_uuid, payload.get("name"), payload.get("shortName"), payload.get("gender"), enriched_payload))
+            self.database.upsert_league(League(uuid, season.uuid, season.current, latest_upstream_update, association_uuid, payload.get("name"), payload.get("shortName"), payload.get("gender"), enriched_payload))
 
     def _get_or_sync_season(self, uuid: str) -> Season:
         payload = self.database.get_payload("seasons", uuid)
