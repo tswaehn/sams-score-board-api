@@ -1,7 +1,8 @@
 """SAMS mirror synchronizer.
 
-The synchronizer starts with competitions and leagues.  Seasons, associations, and
-teams are dependencies and are fetched only if they are absent from SQLite.
+The synchronizer refreshes all seasons first. It then imports competitions by season,
+followed by leagues by season. Associations and teams remain database-first
+dependencies.
 """
 
 from __future__ import annotations
@@ -10,7 +11,7 @@ import logging
 import threading
 import time
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import quote_plus, urlparse
 from uuid import UUID
 
 from database import Database
@@ -72,13 +73,16 @@ class HistoricalSync:
         return {"running": bool(self._thread and self._thread.is_alive()), "lastError": self._last_error,
                 "lastCompletedAt": self._last_completed_at, "queuedRequests": self.upstream.pending_count}
 
-    def sync_once(self) -> None:
+    def sync_once(self, *, force: bool = False) -> None:
         # Entities frequently share teams and associations.  Dedupe them per run
         # without weakening a later scheduled refresh.
         self._synced_association_uuids = set()
         self._synced_team_uuids = set()
-        self._sync_entities("competition")
-        self._sync_entities("league")
+        seasons = self._sync_seasons()
+        for season in seasons:
+            self._sync_entities_for_season("competition", season, force=force)
+        for season in seasons:
+            self._sync_entities_for_season("league", season, force=force)
 
     def _run(self) -> None:
         while not self._stop.is_set():
@@ -113,23 +117,54 @@ class HistoricalSync:
             )
         return result
 
-    def _sync_entities(self, entity: str) -> None:
-        for summary in self._fetch_collection(f"{entity}s", priority=10):
+    def _sync_seasons(self) -> list[Season]:
+        seasons: list[Season] = []
+        for payload in self._fetch_collection("seasons", priority=0):
+            uuid = payload.get("uuid")
+            if not isinstance(uuid, str):
+                continue
+            season = Season(
+                uuid,
+                payload.get("name"),
+                payload.get("startDate"),
+                payload.get("endDate"),
+                bool(payload.get("currentSeason")),
+                payload,
+            )
+            self.database.upsert_season(season)
+            seasons.append(season)
+        # ISO-8601 dates sort lexicographically.  End date and UUID make ordering
+        # deterministic for incomplete or equal season records.
+        return sorted(
+            seasons,
+            key=lambda season: (
+                season.start_date or "",
+                season.end_date or "",
+                season.uuid,
+            ),
+            reverse=True,
+        )
+
+    def _sync_entities_for_season(self, entity: str, season: Season, *, force: bool = False) -> None:
+        endpoint = f"{entity}s?season={quote_plus(season.uuid)}"
+        for summary in self._fetch_collection(endpoint, priority=10):
             uuid = summary.get("uuid")
             if not isinstance(uuid, str):
                 continue
             already_synced = self.database.get_entity(entity, uuid) is not None
+            if already_synced and not force:
+                continue
             detail = self.upstream.fetch(f"{entity}s/{uuid}", priority=10)
             payload = detail if isinstance(detail, dict) else summary
-            self._store_entity(entity, payload)
+            self._store_entity(entity, payload, season)
             self._sync_entity_association(payload)
             self._sync_entity_teams(entity, uuid, already_synced=already_synced)
 
-    def _store_entity(self, entity: str, payload: dict[str, Any]) -> None:
+    def _store_entity(self, entity: str, payload: dict[str, Any], requested_season: Season) -> None:
         uuid = payload.get("uuid")
         if not isinstance(uuid, str):
             return
-        season_uuid = payload.get("seasonUuid") or _linked_uuid(payload, "season")
+        season_uuid = payload.get("seasonUuid") or _linked_uuid(payload, "season") or requested_season.uuid
         if not isinstance(season_uuid, str):
             raise RuntimeError(f"Entity {uuid} does not contain a season UUID")
         season = self._get_or_sync_season(season_uuid)
