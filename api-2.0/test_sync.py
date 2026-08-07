@@ -19,6 +19,7 @@ MATCH = "00000000-0000-0000-0000-000000000008"
 MATCH_DAY = "00000000-0000-0000-0000-000000000009"
 LEAGUE_MATCH = "00000000-0000-0000-0000-000000000010"
 RANKING = "00000000-0000-0000-0000-000000000011"
+LEAGUE_RANKING = "00000000-0000-0000-0000-000000000012"
 
 
 class FakeUpstream:
@@ -54,6 +55,8 @@ class FakeUpstream:
             return {"content": [{"uuid": MATCH_DAY, "name": "Day 1", "seasonUuid": HISTORIC, "leagueUuid": LEAGUE, "matchdate": "2025-01-06T12:00:00Z"}]}
         if base == f"match-days/{MATCH_DAY}/league-matches":
             return {"content": [{"uuid": LEAGUE_MATCH, "leagueUuid": LEAGUE, "matchDayUuid": MATCH_DAY, "seasonUuid": HISTORIC, "date": "2025-01-06T12:00:00Z", "verified": True, "results": {"sets": [{"team1": 3, "team2": 0}]}}]}
+        if base == f"leagues/{LEAGUE}/rankings":
+            return {"content": [{"uuid": LEAGUE_RANKING, "rank": 1, "teamName": "Team"}]}
         if base in {f"competitions/{COMPETITION}/teams", f"leagues/{LEAGUE}/teams"}:
             return {"content": [{"uuid": TEAM}]}
         if base == f"teams/{TEAM}":
@@ -90,7 +93,7 @@ class HistoricalSyncTest(unittest.TestCase):
                 "2025-01-03T12:00:00Z",
                 database.connection().execute("SELECT latest_upstream_update FROM leagues WHERE uuid = ?", (LEAGUE,)).fetchone()[0],
             )
-            self.assertEqual({"seasons": 2, "competitions": 1, "leagues": 1, "teams": 1, "associations": 1, "match_groups": 1, "competition_matches": 1, "competition_match_results": 1, "competition_match_group_rankings": 1, "league_match_days": 1, "league_matches": 1, "league_match_results": 1}, database.status())
+            self.assertEqual({"seasons": 2, "competitions": 1, "leagues": 1, "teams": 1, "associations": 1, "match_groups": 1, "competition_matches": 1, "competition_match_results": 1, "competition_match_group_rankings": 1, "league_match_days": 1, "league_matches": 1, "league_match_results": 1, "league_rankings": 1}, database.status())
             self.assertEqual(
                 '{"sets":[{"team1":3,"team2":1}]}',
                 database.connection().execute("SELECT payload_json FROM competition_match_results WHERE match_uuid = ?", (MATCH,)).fetchone()[0],

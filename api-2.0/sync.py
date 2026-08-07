@@ -16,7 +16,7 @@ from urllib.parse import quote_plus, urlparse
 from uuid import UUID
 
 from database import Database
-from models import Association, Competition, CompetitionMatch, CompetitionMatchGroupRanking, League, LeagueMatch, LeagueMatchDay, MatchGroup, Season, Team
+from models import Association, Competition, CompetitionMatch, CompetitionMatchGroupRanking, League, LeagueMatch, LeagueMatchDay, LeagueRanking, MatchGroup, Season, Team
 from upstream_queue import UpstreamQueue
 
 
@@ -420,3 +420,17 @@ class HistoricalSync:
                     league_uuid,
                     result if isinstance(result, dict) else None,
                 )
+        rankings = self._fetch_collection(f"leagues/{league_uuid}/rankings", priority=20)
+        for ranking_payload in rankings:
+            ranking_uuid = ranking_payload.get("uuid")
+            if not isinstance(ranking_uuid, str):
+                continue
+            self.database.upsert_league_ranking(
+                LeagueRanking(
+                    ranking_uuid,
+                    league_uuid,
+                    ranking_payload.get("rank") if isinstance(ranking_payload.get("rank"), int) else None,
+                    ranking_payload.get("teamName") if isinstance(ranking_payload.get("teamName"), str) else None,
+                    ranking_payload,
+                )
+            )

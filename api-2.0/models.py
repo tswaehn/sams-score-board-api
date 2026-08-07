@@ -108,3 +108,12 @@ class LeagueMatch:
     match_date: str | None
     verified: bool | None
     payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class LeagueRanking:
+    uuid: str
+    league_uuid: str
+    rank: int | None
+    team_name: str | None
+    payload: dict[str, Any]
