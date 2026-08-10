@@ -8,18 +8,24 @@ from __future__ import annotations
 
 from concurrent.futures import Future
 from dataclasses import dataclass, field
+import hashlib
+import json
 import itertools
 import logging
 import queue
+import re
 import threading
 import time
+from pathlib import Path
 from typing import Any, Callable
+from urllib.parse import urlsplit
 
 import requests
 
 
 LOGGER = logging.getLogger("api2.upstream")
 REQUEST_TIMEOUT_SECONDS = 10
+REQUEST_CACHE_DIR = Path(__file__).with_name("data") / "request-cache"
 DEFAULT_HEADERS = {
     "Accept": "*/*",
     # SAMS may close reused keep-alive connections without a response.  Request a
@@ -31,6 +37,7 @@ DEFAULT_HEADERS = {
         "Chrome/127.0.0.0 Safari/537.36"
     ),
 }
+
 
 @dataclass(order=True)
 class UpstreamRequest:
@@ -124,15 +131,25 @@ class UpstreamQueue:
             try:
                 # A new session avoids reusing a socket that the upstream has closed.
                 with requests.Session() as session:
+                    request_headers = {**DEFAULT_HEADERS, "X-Api-Key": self.api_key}
                     response = session.get(
                         url,
-                        headers={**DEFAULT_HEADERS, "X-Api-Key": self.api_key},
+                        headers=request_headers,
                         timeout=REQUEST_TIMEOUT_SECONDS,
                     )
                 response.raise_for_status()
                 payload = response.json()
                 if not isinstance(payload, (dict, list)):
                     raise RuntimeError("Upstream response was not a JSON object or array")
+                self._write_request_cache(
+                    url,
+                    {
+                        "method": "GET",
+                        "url": url,
+                        "headers": request_headers,
+                        "timeout_seconds": REQUEST_TIMEOUT_SECONDS,
+                    },
+                )
                 return payload
             except requests.Timeout as exc:
                 last_error = exc
@@ -170,3 +187,31 @@ class UpstreamQueue:
                 )
                 time.sleep(delay)
         raise RuntimeError(f"Upstream request failed for {endpoint} after {self.max_retries + 1} attempts: {last_error}")
+
+    def _write_request_cache(self, request_url: str, request: dict[str, Any]) -> None:
+        try:
+            REQUEST_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            cache_file = REQUEST_CACHE_DIR / f"{_sanitize_request_cache_name(request_url)}.json"
+            cache_file.write_text(
+                json.dumps({"request": request}, indent=2, sort_keys=True),
+                encoding="utf-8",
+            )
+        except OSError:
+            LOGGER.exception("Failed to write request cache file for %s", request_url)
+
+
+def _sanitize_request_cache_name(request_url: str) -> str:
+    parsed = urlsplit(request_url.strip())
+    raw_name = "_".join(
+        part for part in (parsed.scheme, parsed.netloc, parsed.path, parsed.query, parsed.fragment) if part
+    )
+    sanitized = re.sub(r"[^A-Za-z0-9._-]+", "_", raw_name)
+    sanitized = re.sub(r"_+", "_", sanitized).strip("._-")
+    if not sanitized:
+        sanitized = "request"
+
+    if len(sanitized) > 180:
+        digest = hashlib.sha1(request_url.encode("utf-8")).hexdigest()[:12]
+        sanitized = f"{sanitized[:160].rstrip('._-')}_{digest}"
+
+    return sanitized
