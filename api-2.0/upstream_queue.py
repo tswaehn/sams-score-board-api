@@ -141,15 +141,7 @@ class UpstreamQueue:
                 payload = response.json()
                 if not isinstance(payload, (dict, list)):
                     raise RuntimeError("Upstream response was not a JSON object or array")
-                self._write_request_cache(
-                    url,
-                    {
-                        "method": "GET",
-                        "url": url,
-                        "headers": request_headers,
-                        "timeout_seconds": REQUEST_TIMEOUT_SECONDS,
-                    },
-                )
+                self._write_response_cache(url, response.text)
                 return payload
             except requests.Timeout as exc:
                 last_error = exc
@@ -188,16 +180,13 @@ class UpstreamQueue:
                 time.sleep(delay)
         raise RuntimeError(f"Upstream request failed for {endpoint} after {self.max_retries + 1} attempts: {last_error}")
 
-    def _write_request_cache(self, request_url: str, request: dict[str, Any]) -> None:
+    def _write_response_cache(self, request_url: str, response_body: str) -> None:
         try:
             REQUEST_CACHE_DIR.mkdir(parents=True, exist_ok=True)
             cache_file = REQUEST_CACHE_DIR / f"{_sanitize_request_cache_name(request_url)}.json"
-            cache_file.write_text(
-                json.dumps({"request": request}, indent=2, sort_keys=True),
-                encoding="utf-8",
-            )
+            cache_file.write_text(response_body, encoding="utf-8")
         except OSError:
-            LOGGER.exception("Failed to write request cache file for %s", request_url)
+            LOGGER.exception("Failed to write response cache file for %s", request_url)
 
 
 def _sanitize_request_cache_name(request_url: str) -> str:
