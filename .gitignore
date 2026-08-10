@@ -3,6 +3,10 @@ web/dist
 web/.idea
 .idea/
 .env
+#deprecated
+client-api/
+
+#
 api-1.0/cache/
 api-1.0/config/server_config.json
 #
