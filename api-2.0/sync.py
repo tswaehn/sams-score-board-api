@@ -11,9 +11,11 @@ from datetime import datetime, timezone
 import logging
 import threading
 import time
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import quote_plus, urlparse
 from uuid import UUID
+
+import requests
 
 from database import Database
 from models import Association, Competition, CompetitionMatch, CompetitionMatchGroupRanking, League, LeagueMatch, LeagueMatchDay, LeagueRanking, MatchGroup, Season, Team
@@ -69,10 +71,18 @@ def _latest_upstream_update(payload: dict[str, Any]) -> str | None:
 
 
 class HistoricalSync:
-    def __init__(self, database: Database, upstream: UpstreamQueue, *, repeat_after_seconds: int = 24 * 60 * 60) -> None:
+    def __init__(
+        self,
+        database: Database,
+        upstream: UpstreamQueue,
+        *,
+        repeat_after_seconds: int = 24 * 60 * 60,
+        collection_failure_logger: Callable[[str, Exception], None] | None = None,
+    ) -> None:
         self.database = database
         self.upstream = upstream
         self.repeat_after_seconds = repeat_after_seconds
+        self.collection_failure_logger = collection_failure_logger
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._last_error: str | None = None
@@ -123,24 +133,34 @@ class HistoricalSync:
     def _fetch_collection(self, endpoint: str, *, priority: int) -> list[dict[str, Any]]:
         # SAMS uses Spring pagination.  Every page still travels through the one queue.
         separator = "&" if "?" in endpoint else "?"
-        first = self.upstream.fetch(
-            f"{endpoint}{separator}page=0&size={UPSTREAM_PAGE_SIZE}",
-            priority=priority,
-        )
-        result = _items(first)
-        total_pages = first.get("totalPages", 1) if isinstance(first, dict) else 1
-        if not isinstance(total_pages, int):
-            total_pages = 1
-        for page in range(1, total_pages):
-            result.extend(
-                _items(
-                    self.upstream.fetch(
-                        f"{endpoint}{separator}page={page}&size={UPSTREAM_PAGE_SIZE}",
-                        priority=priority,
+        try:
+            first = self.upstream.fetch(
+                f"{endpoint}{separator}page=0&size={UPSTREAM_PAGE_SIZE}",
+                priority=priority,
+            )
+            result = _items(first)
+            total_pages = first.get("totalPages", 1) if isinstance(first, dict) else 1
+            if not isinstance(total_pages, int):
+                total_pages = 1
+            for page in range(1, total_pages):
+                result.extend(
+                    _items(
+                        self.upstream.fetch(
+                            f"{endpoint}{separator}page={page}&size={UPSTREAM_PAGE_SIZE}",
+                            priority=priority,
+                        )
                     )
                 )
+            return result
+        except (requests.RequestException, RuntimeError) as exc:
+            LOGGER.warning(
+                "Unable to fetch upstream collection endpoint=%s; returning an empty result: %s",
+                endpoint,
+                exc,
             )
-        return result
+            if self.collection_failure_logger is not None:
+                self.collection_failure_logger(endpoint, exc)
+            return []
 
     def _sync_seasons(self) -> list[Season]:
         seasons: list[Season] = []

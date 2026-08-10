@@ -4,6 +4,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import requests
+
 from database import Database
 from sync import HistoricalSync
 
@@ -67,6 +69,28 @@ class FakeUpstream:
 
 
 class HistoricalSyncTest(unittest.TestCase):
+    def test_fetch_collection_returns_empty_result_and_logs_request_failure(self) -> None:
+        class FailingUpstream:
+            pending_count = 0
+
+            def fetch(self, endpoint: str, *, priority: int):
+                raise requests.ConnectionError("connection refused")
+
+        failures: list[tuple[str, Exception]] = []
+        sync = HistoricalSync(
+            Database(":memory:"),
+            FailingUpstream(),
+            collection_failure_logger=lambda endpoint, error: failures.append((endpoint, error)),
+        )
+
+        with self.assertLogs("api2.sync", level="WARNING") as logs:
+            self.assertEqual([], sync._fetch_collection("seasons", priority=0))
+
+        self.assertEqual(1, len(failures))
+        self.assertEqual("seasons", failures[0][0])
+        self.assertIsInstance(failures[0][1], requests.ConnectionError)
+        self.assertIn("returning an empty result", logs.output[0])
+
     def test_syncs_seasons_then_entities_by_season(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             database = Database(str(Path(directory) / "mirror.sqlite3"))

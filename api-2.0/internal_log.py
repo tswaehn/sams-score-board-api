@@ -54,6 +54,18 @@ class InternalLogWriter:
             duration_ms,
         ))
 
+    def record_collection_failure(self, endpoint: str, error: Exception) -> None:
+        """Record when sync deliberately falls back to an empty upstream collection."""
+        self._entries.put((
+            "error",
+            f"Upstream collection fetch failed; returning empty result (error={error})",
+            endpoint,
+            0.0,
+        ))
+
+    def record_startup(self) -> None:
+        self._entries.put(("info", "SAMS scoreboard API starting", None, 0.0))
+
     def _run(self) -> None:
         try:
             with self.path.open("a", encoding="utf-8") as log_file:

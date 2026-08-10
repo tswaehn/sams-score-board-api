@@ -25,6 +25,7 @@ from upstream_queue import UpstreamQueue
 
 
 logging.basicConfig(level=LOG_LEVEL.upper(), format="%(asctime)s %(levelname)s %(name)s %(message)s")
+LOGGER = logging.getLogger("api2.server")
 DATABASE = Database(DATABASE_PATH)
 INTERNAL_LOG = InternalLogWriter(DATABASE.path.parent / "internal.log")
 UPSTREAM = UpstreamQueue(
@@ -35,13 +36,20 @@ UPSTREAM = UpstreamQueue(
     request_time_logger=INTERNAL_LOG.record_request_time,
     timeout_logger=INTERNAL_LOG.record_request_timeout,
 )
-SYNC = HistoricalSync(DATABASE, UPSTREAM, repeat_after_seconds=HISTORICAL_SYNC_INTERVAL_SECONDS)
+SYNC = HistoricalSync(
+    DATABASE,
+    UPSTREAM,
+    repeat_after_seconds=HISTORICAL_SYNC_INTERVAL_SECONDS,
+    collection_failure_logger=INTERNAL_LOG.record_collection_failure,
+)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     DATABASE.initialize()
     INTERNAL_LOG.start()
+    LOGGER.info("Starting SAMS scoreboard API")
+    INTERNAL_LOG.record_startup()
     UPSTREAM.start()
     SYNC.start()
     yield
