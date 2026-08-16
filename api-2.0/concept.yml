@@ -77,7 +77,7 @@ storage:
         failed_request: error
         timeout_attempt: error
   upstream_request_cache:
-    path: data/sams-request-cache
+    path: data/sams-request-cache.sqlite3
     format: SQLite
     table: upstream_requests
     fields:

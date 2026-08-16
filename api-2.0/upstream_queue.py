@@ -25,7 +25,7 @@ import requests
 
 LOGGER = logging.getLogger("api2.upstream")
 REQUEST_TIMEOUT_SECONDS = 10
-REQUEST_CACHE_PATH = Path(__file__).with_name("data") / "sams-request-cache"
+REQUEST_CACHE_PATH = Path(__file__).with_name("data") / "sams-request-cache.sqlite3"
 LEGACY_REQUEST_CACHE_DIR = Path(__file__).with_name("data") / "request-cache"
 DEFAULT_HEADERS = {
     "Accept": "*/*",
