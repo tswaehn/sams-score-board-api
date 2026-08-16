@@ -29,6 +29,10 @@ class FakeUpstream:
 
     def __init__(self) -> None:
         self.calls: list[str] = []
+        self.cached_responses: dict[str, dict | list] = {}
+
+    def fetch_cached(self, endpoint: str):
+        return self.cached_responses.get(endpoint)
 
     def fetch(self, endpoint: str, *, priority: int):
         self.calls.append(endpoint)
@@ -69,9 +73,34 @@ class FakeUpstream:
 
 
 class HistoricalSyncTest(unittest.TestCase):
+    def test_uses_cached_responses_without_enqueuing_upstream_requests(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            upstream = FakeUpstream()
+            upstream.cached_responses["seasons?page=0&size=100"] = {"content": []}
+            sync = HistoricalSync(Database(str(Path(directory) / "mirror.sqlite3")), upstream)
+
+            with self.assertLogs("api2.upstream_sync", level="INFO") as logs:
+                sync.sync_once()
+
+            self.assertEqual([], upstream.calls)
+            self.assertIn("source=cache endpoint=seasons?page=0&size=100", logs.output[0])
+
+    def test_logs_when_a_response_comes_from_upstream(self) -> None:
+        upstream = FakeUpstream()
+        sync = HistoricalSync(Database(":memory:"), upstream)
+
+        with self.assertLogs("api2.upstream_sync", level="INFO") as logs:
+            sync._fetch("seasons?page=0&size=100", priority=0)
+
+        self.assertEqual(["seasons?page=0&size=100"], upstream.calls)
+        self.assertIn("source=upstream endpoint=seasons?page=0&size=100", logs.output[0])
+
     def test_fetch_collection_returns_empty_result_and_logs_request_failure(self) -> None:
         class FailingUpstream:
             pending_count = 0
+
+            def fetch_cached(self, endpoint: str):
+                return None
 
             def fetch(self, endpoint: str, *, priority: int):
                 raise requests.ConnectionError("connection refused")

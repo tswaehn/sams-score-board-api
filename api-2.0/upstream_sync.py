@@ -131,10 +131,10 @@ class HistoricalSync:
             self._stop.wait(self.repeat_after_seconds)
 
     def _fetch_collection(self, endpoint: str, *, priority: int) -> list[dict[str, Any]]:
-        # SAMS uses Spring pagination.  Every page still travels through the one queue.
+        # SAMS uses Spring pagination. Cached pages bypass the upstream queue.
         separator = "&" if "?" in endpoint else "?"
         try:
-            first = self.upstream.fetch(
+            first = self._fetch(
                 f"{endpoint}{separator}page=0&size={UPSTREAM_PAGE_SIZE}",
                 priority=priority,
             )
@@ -145,7 +145,7 @@ class HistoricalSync:
             for page in range(1, total_pages):
                 result.extend(
                     _items(
-                        self.upstream.fetch(
+                        self._fetch(
                             f"{endpoint}{separator}page={page}&size={UPSTREAM_PAGE_SIZE}",
                             priority=priority,
                         )
@@ -161,6 +161,15 @@ class HistoricalSync:
             if self.collection_failure_logger is not None:
                 self.collection_failure_logger(endpoint, exc)
             return []
+
+    def _fetch(self, endpoint: str, *, priority: int) -> dict[str, Any] | list[Any]:
+        cached = self.upstream.fetch_cached(endpoint)
+        if cached is not None:
+            LOGGER.info("Upstream request source=cache endpoint=%s", endpoint)
+            return cached
+        payload = self.upstream.fetch(endpoint, priority=priority)
+        LOGGER.info("Upstream request source=upstream endpoint=%s", endpoint)
+        return payload
 
     def _sync_seasons(self) -> list[Season]:
         seasons: list[Season] = []
@@ -218,7 +227,7 @@ class HistoricalSync:
                     if already_synced and not force:
                         skipped += 1
                         continue
-                    detail = self.upstream.fetch(f"{entity}s/{uuid}", priority=10)
+                    detail = self._fetch(f"{entity}s/{uuid}", priority=10)
                     payload = detail if isinstance(detail, dict) else summary
                     self._store_entity(entity, payload, season)
                     self._sync_entity_association(payload)
@@ -269,7 +278,7 @@ class HistoricalSync:
     def _get_or_sync_season(self, uuid: str) -> Season:
         payload = self.database.get_payload("seasons", uuid)
         if payload is None:
-            fetched = self.upstream.fetch(f"seasons/{uuid}", priority=20)
+            fetched = self._fetch(f"seasons/{uuid}", priority=20)
             if not isinstance(fetched, dict):
                 raise RuntimeError(f"Expected a season object for {uuid}")
             payload = fetched
@@ -289,7 +298,7 @@ class HistoricalSync:
         if self.database.get_payload("associations", uuid) is not None:
             self._synced_association_uuids.add(uuid)
             return
-        payload = self.upstream.fetch(f"associations/{uuid}", priority=20)
+        payload = self._fetch(f"associations/{uuid}", priority=20)
         if not isinstance(payload, dict):
             return
         self.database.upsert_association(Association(uuid, payload.get("name"), payload.get("shortname"), payload.get("level"), payload.get("parentUuid"), payload))
@@ -318,7 +327,7 @@ class HistoricalSync:
                         self._sync_association(association_uuid)
                     self._synced_team_uuids.add(uuid)
                     continue
-                detail = self.upstream.fetch(f"teams/{uuid}", priority=20)
+                detail = self._fetch(f"teams/{uuid}", priority=20)
                 if not isinstance(detail, dict):
                     raise RuntimeError(f"Expected a team object for {uuid}")
                 payload = detail

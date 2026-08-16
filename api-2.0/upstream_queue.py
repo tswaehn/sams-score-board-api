@@ -59,11 +59,17 @@ class SamsRequestCache:
                           url TEXT NOT NULL,
                           request TEXT NOT NULL,
                           response TEXT NOT NULL,
-                          logged_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                          logged_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                          last_access TEXT
                         );
                         CREATE INDEX IF NOT EXISTS upstream_requests_url_idx ON upstream_requests(url);
                         """
                     )
+                    columns = {
+                        row[1] for row in connection.execute("PRAGMA table_info(upstream_requests)")
+                    }
+                    if "last_access" not in columns:
+                        connection.execute("ALTER TABLE upstream_requests ADD COLUMN last_access TEXT")
             except (OSError, sqlite3.Error):
                 LOGGER.exception("Failed to initialize upstream request cache: %s", self.path)
                 return False
@@ -81,6 +87,34 @@ class SamsRequestCache:
                 )
         except sqlite3.Error:
             LOGGER.exception("Failed to write upstream request cache for %s", url)
+
+    def get(self, url: str) -> dict[str, Any] | list[Any] | None:
+        """Return the newest valid cached JSON response for an exact request URL."""
+        if not self.initialize():
+            return None
+        try:
+            with sqlite3.connect(self.path, timeout=30) as connection:
+                row = connection.execute(
+                    "SELECT id, response FROM upstream_requests WHERE url = ? ORDER BY id DESC LIMIT 1", (url,)
+                ).fetchone()
+        except sqlite3.Error:
+            LOGGER.exception("Failed to read upstream request cache for %s", url)
+            return None
+        if row is None:
+            return None
+        try:
+            payload = json.loads(row[1])
+        except json.JSONDecodeError:
+            LOGGER.warning("Ignoring invalid JSON in upstream request cache for %s", url)
+            return None
+        if not isinstance(payload, (dict, list)):
+            return None
+        try:
+            with sqlite3.connect(self.path, timeout=30) as connection:
+                connection.execute("UPDATE upstream_requests SET last_access = CURRENT_TIMESTAMP WHERE id = ?", (row[0],))
+        except sqlite3.Error:
+            LOGGER.exception("Failed to update upstream request cache access time for %s", url)
+        return payload
 
 def _serialize_request(request: requests.PreparedRequest) -> dict[str, Any]:
     """Return request metadata suitable for diagnostics without retaining the API key."""
@@ -149,6 +183,9 @@ class UpstreamQueue:
 
     def fetch(self, endpoint: str, *, priority: int = 10) -> dict[str, Any] | list[Any]:
         return self.request(endpoint, priority=priority).result()
+
+    def fetch_cached(self, endpoint: str) -> dict[str, Any] | list[Any] | None:
+        return self.request_cache.get(f"{self.base_url}/{endpoint.strip('/')}")
 
     @property
     def pending_count(self) -> int:

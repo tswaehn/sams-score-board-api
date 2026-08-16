@@ -85,6 +85,8 @@ storage:
       - request
       - response
       - logged_at
+      - last_access
+    read_behavior: Historical sync returns the newest exact-URL cache entry before enqueuing an upstream request and records its last_access timestamp.
   payload_policy: Store normalized lookup columns and the upstream JSON payload enriched with currentSeason for competitions and leagues.
   latest_upstream_update:
     columns:
