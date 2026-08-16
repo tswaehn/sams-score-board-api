@@ -22,7 +22,7 @@ from models import Association, Competition, CompetitionMatch, CompetitionMatchG
 from upstream_queue import UpstreamQueue
 
 
-LOGGER = logging.getLogger("api2.sync")
+LOGGER = logging.getLogger("api2.upstream_sync")
 UPSTREAM_PAGE_SIZE = 100
 WRITE_BATCH_SIZE = 5
 

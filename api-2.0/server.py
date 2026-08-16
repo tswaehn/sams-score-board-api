@@ -20,7 +20,7 @@ from config import (
 )
 from database import Database
 from internal_log import InternalLogWriter
-from sync import HistoricalSync
+from upstream_sync import HistoricalSync
 from upstream_queue import UpstreamQueue
 
 

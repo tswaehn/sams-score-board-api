@@ -5,7 +5,7 @@ document:
 
 architecture:
   stage_1_sync:
-    owner: sync.HistoricalSync
+    owner: upstream_sync.HistoricalSync
     order:
       - fetch and persist all seasons
       - process seasons from newest to oldest by start date

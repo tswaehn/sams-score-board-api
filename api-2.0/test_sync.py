@@ -7,7 +7,7 @@ from pathlib import Path
 import requests
 
 from database import Database
-from sync import HistoricalSync
+from upstream_sync import HistoricalSync
 
 
 HISTORIC = "00000000-0000-0000-0000-000000000001"
@@ -83,7 +83,7 @@ class HistoricalSyncTest(unittest.TestCase):
             collection_failure_logger=lambda endpoint, error: failures.append((endpoint, error)),
         )
 
-        with self.assertLogs("api2.sync", level="WARNING") as logs:
+        with self.assertLogs("api2.upstream_sync", level="WARNING") as logs:
             self.assertEqual([], sync._fetch_collection("seasons", priority=0))
 
         self.assertEqual(1, len(failures))
