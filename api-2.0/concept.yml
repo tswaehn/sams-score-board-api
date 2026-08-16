@@ -76,6 +76,16 @@ storage:
         over_5_seconds: error
         failed_request: error
         timeout_attempt: error
+  upstream_request_cache:
+    path: data/sams-request-cache
+    format: SQLite
+    table: upstream_requests
+    fields:
+      - url
+      - request
+      - response
+      - logged_at
+    migration: Imports existing data/request-cache/*.json files once, reconstructing the known upstream_sync request URLs from their sanitized legacy filenames.
   payload_policy: Store normalized lookup columns and the upstream JSON payload enriched with currentSeason for competitions and leagues.
   latest_upstream_update:
     columns:
