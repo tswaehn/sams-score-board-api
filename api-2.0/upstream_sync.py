@@ -118,6 +118,7 @@ class HistoricalSync:
             self._sync_entities_for_season("competition", season, force=force)
         for season in seasons:
             self._sync_entities_for_season("league", season, force=force)
+        LOGGER.info("Historical sync finished force=%s summary=%s", force, self.database.status())
 
     def _run(self) -> None:
         while not self._stop.is_set():
@@ -224,9 +225,6 @@ class HistoricalSync:
                         skipped += 1
                         continue
                     already_synced = self.database.get_entity(entity, uuid) is not None
-                    if already_synced and not force:
-                        skipped += 1
-                        continue
                     detail = self._fetch(f"{entity}s/{uuid}", priority=10)
                     payload = detail if isinstance(detail, dict) else summary
                     self._store_entity(entity, payload, season)

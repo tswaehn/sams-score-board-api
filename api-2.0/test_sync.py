@@ -77,13 +77,16 @@ class HistoricalSyncTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             upstream = FakeUpstream()
             upstream.cached_responses["seasons?page=0&size=100"] = {"content": []}
-            sync = HistoricalSync(Database(str(Path(directory) / "mirror.sqlite3")), upstream)
+            database = Database(str(Path(directory) / "mirror.sqlite3"))
+            database.initialize()
+            sync = HistoricalSync(database, upstream)
 
             with self.assertLogs("api2.upstream_sync", level="INFO") as logs:
                 sync.sync_once()
 
             self.assertEqual([], upstream.calls)
             self.assertIn("source=cache endpoint=seasons?page=0&size=100", logs.output[0])
+            self.assertIn("Historical sync finished", logs.output[-1])
 
     def test_logs_when_a_response_comes_from_upstream(self) -> None:
         upstream = FakeUpstream()
@@ -159,8 +162,8 @@ class HistoricalSyncTest(unittest.TestCase):
             self.assertNotIn(f"seasons/{HISTORIC}", upstream.calls)
             self.assertNotIn(f"competitions/{COMPETITION}/teams?page=0&size=100", upstream.calls)
             self.assertNotIn(f"leagues/{LEAGUE}/teams?page=0&size=100", upstream.calls)
-            self.assertNotIn(f"competitions/{COMPETITION}", upstream.calls)
-            self.assertNotIn(f"leagues/{LEAGUE}", upstream.calls)
+            self.assertIn(f"competitions/{COMPETITION}", upstream.calls)
+            self.assertIn(f"leagues/{LEAGUE}", upstream.calls)
 
             upstream.calls.clear()
             HistoricalSync(database, upstream).sync_once(force=True)

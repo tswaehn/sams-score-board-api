@@ -16,8 +16,8 @@ architecture:
       - for each imported competition, sync match groups, their matches, embedded match results, and per-match-group rankings
       - for each imported league, sync match days, their matches, embedded match results, and league-wide rankings
     refresh_behavior:
-      default: Existing competition and league UUIDs are skipped after their season list is read.
-      force: Calling sync_once(force=True) refreshes existing competition and league UUIDs.
+      default: Existing competition and league UUIDs are always refreshed after their season lists are read.
+      force: Calling sync_once(force=True) performs the same full refresh.
     cadence: HISTORICAL_SYNC_INTERVAL_SECONDS (default: 86400)
     rule: Public API request handlers never enqueue or make upstream REST requests.
   upstream_transport:
