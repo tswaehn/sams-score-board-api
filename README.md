@@ -2,7 +2,7 @@
 
 ## API 1.0 Docker Compose example
 
-Example `docker-compose.yml` for API 1.0, InfluxDB, and the web frontend:
+Example `docker-compose.yml` for API 1.0, InfluxDB, and the web 1.0 frontend:
 
 ```yaml
 services:
@@ -33,9 +33,9 @@ services:
       - ./api-1.0/config/server_config.local.json:/app/config/server_config.json:ro
       - ./api-1.0/cache:/app/cache
 
-  web:
+  web-1.0:
     build:
-      context: ./web
+      context: ./web-1.0
     depends_on:
       - api-1.0
     ports:
@@ -103,12 +103,12 @@ Configuration files:
 
 * [`api-1.0/config/server_config_template.json`](./api-1.0/config/server_config_template.json) contains the full anonymous config schema for `api-1.0`
 * create a real config file such as `api-1.0/config/server_config.local.json` from that template and point `SERVER_CONFIG_PATH` at it
-* [`docker-compose.yml.example`](./docker-compose.yml.example) contains the same `influxdb`, `api-1.0`, and `web` example
+* [`docker-compose.yml.example`](./docker-compose.yml.example) contains the same `influxdb`, `api-1.0`, and `web-1.0` example
 * the config file supports `tz`, which is applied as the process timezone
 * `write_raw_cache` controls whether `*-raw.json` cache files are written; it defaults to `false`
 * the InfluxDB config is optional; when enabled, `api-1.0` writes best-effort request metrics without affecting API responses if InfluxDB is unavailable
 * required config keys are `ssvb_api_key`, `ssvb_api_url`, and `live_api_urls`
-* `API_BASE_URL` for the `web` container must be a browser-reachable URL, not an internal Docker service hostname, because it is injected into client-side JavaScript
+* `API_BASE_URL` for the `web-1.0` container must be a browser-reachable URL, not an internal Docker service hostname, because it is injected into client-side JavaScript
 
 Endpoints:
 
@@ -198,28 +198,28 @@ not already in SQLite. Each competition and league receives its season's
 [`api-2.0/concept.yml`](./api-2.0/concept.yml) for the persistence model, lifecycle,
 and environment variables.
 
-## web
+## web-1.0
 
-The `web` directory contains the Vite frontend.
+The `web-1.0` directory contains the Vite frontend for API 1.0.
 
 Install dependencies:
 
 ```bash
-cd web
+cd web-1.0
 npm install
 ```
 
 Run the frontend:
 
 ```bash
-cd web
+cd web-1.0
 npm run dev
 ```
 
 Configure the frontend API base URL for local development with `VITE_API_BASE_URL`:
 
 ```bash
-cd web
+cd web-1.0
 VITE_API_BASE_URL=https://your-api.example/api npm run dev
 ```
 

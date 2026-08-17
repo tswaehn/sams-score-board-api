@@ -1,6 +1,6 @@
-web/node_modules
-web/dist
-web/.idea
+web-1.0/node_modules
+web-1.0/dist
+web-1.0/.idea
 .idea/
 .env
 #deprecated
