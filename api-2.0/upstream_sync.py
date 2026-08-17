@@ -89,6 +89,7 @@ class HistoricalSync:
         self._last_completed_at: float | None = None
         self._synced_association_uuids: set[str] = set()
         self._synced_team_uuids: set[str] = set()
+        self._failed_requests: list[tuple[str, Exception]] = []
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -111,6 +112,7 @@ class HistoricalSync:
         # without weakening a later scheduled refresh.
         self._synced_association_uuids = set()
         self._synced_team_uuids = set()
+        self._failed_requests = []
         # Seasons are few and quick to write, so one short transaction is enough.
         with self.database.transaction():
             seasons = self._sync_seasons()
@@ -118,7 +120,14 @@ class HistoricalSync:
             self._sync_entities_for_season("competition", season, force=force)
         for season in seasons:
             self._sync_entities_for_season("league", season, force=force)
-        LOGGER.info("Historical sync finished force=%s summary=%s", force, self.database.status())
+        if self._failed_requests:
+            LOGGER.warning(
+                "Historical sync failed requests count=%s requests=%s",
+                len(self._failed_requests),
+                [(endpoint, str(error)) for endpoint, error in self._failed_requests],
+            )
+        summary = {**self.database.status(), "failedRequests": len(self._failed_requests)}
+        LOGGER.info("Historical sync finished force=%s summary=%s", force, summary)
 
     def _run(self) -> None:
         while not self._stop.is_set():
@@ -168,7 +177,11 @@ class HistoricalSync:
         if cached is not None:
             LOGGER.info("Upstream request source=cache endpoint=%s", endpoint)
             return cached
-        payload = self.upstream.fetch(endpoint, priority=priority)
+        try:
+            payload = self.upstream.fetch(endpoint, priority=priority)
+        except (requests.RequestException, RuntimeError) as exc:
+            self._failed_requests.append((endpoint, exc))
+            raise
         LOGGER.info("Upstream request source=upstream endpoint=%s", endpoint)
         return payload
 

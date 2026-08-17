@@ -123,6 +123,27 @@ class HistoricalSyncTest(unittest.TestCase):
         self.assertIsInstance(failures[0][1], requests.ConnectionError)
         self.assertIn("returning an empty result", logs.output[0])
 
+    def test_sync_logs_failed_requests_before_a_summary_with_the_failed_count(self) -> None:
+        class FailingUpstream:
+            pending_count = 0
+
+            def fetch_cached(self, endpoint: str):
+                return None
+
+            def fetch(self, endpoint: str, *, priority: int):
+                raise requests.ConnectionError("connection refused")
+
+        database = Database(":memory:")
+        database.initialize()
+        sync = HistoricalSync(database, FailingUpstream())
+
+        with self.assertLogs("api2.upstream_sync", level="INFO") as logs:
+            sync.sync_once()
+
+        self.assertIn("Historical sync failed requests count=1", logs.output[-2])
+        self.assertIn("seasons?page=0&size=100", logs.output[-2])
+        self.assertIn("'failedRequests': 1", logs.output[-1])
+
     def test_syncs_seasons_then_entities_by_season(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             database = Database(str(Path(directory) / "mirror.sqlite3"))
