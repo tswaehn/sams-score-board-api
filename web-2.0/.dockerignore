@@ -1,0 +1,7 @@
+.git
+.gitignore
+.idea
+.codex
+node_modules/
+dist/
+npm-debug.log*

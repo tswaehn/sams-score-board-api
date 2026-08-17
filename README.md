@@ -229,6 +229,16 @@ If `VITE_API_BASE_URL` is not set during local development, the frontend default
 http://localhost:8000/api
 ```
 
+## web-2.0
+
+`web-2.0` is a Vite + React application for the API 2.0 frontend.
+
+```bash
+cd web-2.0
+npm install
+npm run dev
+```
+
 For Docker/runtime deployments, the frontend reads `API_BASE_URL` when the container starts and writes it into `/app-config.js`. The live feed is loaded from the same base URL at the `/live` endpoint. Example:
 
 ```bash
