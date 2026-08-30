@@ -16,7 +16,7 @@ function readFocus() {
 }
 
 function entityKey(entry) {
-  return [entry.shortname, entry.name].filter(Boolean).join("\u0000");
+  return [entry.shortname, entry.name].filter(Boolean).join("\u0000") || entry.uuid;
 }
 
 function SelectorPage({ type, onFocus }) {
@@ -86,7 +86,7 @@ function SelectorPage({ type, onFocus }) {
   const entityChoices = entries.filter((entry, index) => entries.findIndex((candidate) => entityKey(candidate) === entityKey(entry)) === index);
   const resultEntries = entries.filter((entry) => entityKey(entry) === selectedEntityKey);
   const applyFocus = (entry) => {
-    const nextFocus = { type, uuid: entry.uuid, name: entry.name || entry.shortname || entry.shortName || entry.uuid };
+    const nextFocus = { type, uuid: entry.uuid, name: entry.name || entry.shortname || entry.shortName || "Unnamed selection" };
     window.localStorage.setItem("sams-score-board:focus", JSON.stringify(nextFocus));
     onFocus(nextFocus);
   };
@@ -95,20 +95,20 @@ function SelectorPage({ type, onFocus }) {
     <Stack spacing={1} mb={4}>
       <Typography color="primary" fontWeight={700} variant="overline">Choose a focus</Typography>
       <Typography variant="h4" component="h1">Select a {typeLabels.singular}</Typography>
-      <Typography color="text.secondary" maxWidth={640}>Choose a season, association, and {typeLabels.singular}; then select its UUID as the focus for following scoreboard views.</Typography>
+      <Typography color="text.secondary" maxWidth={640}>Choose a season, association, and {typeLabels.singular}; then apply one of the matching entries as the focus for following scoreboard views.</Typography>
     </Stack>
     <Card variant="outlined" sx={{ mb: 3 }}><CardContent><Stack spacing={2}>
       <FormControl fullWidth disabled={seasonLoading || seasons.length === 0}>
         <InputLabel id="season-label">Season</InputLabel>
         <Select labelId="season-label" label="Season" value={seasonId} onChange={(event) => { setSeasonId(event.target.value); setAssociationId(""); setSelectedEntityKey(""); }}>
-          {seasons.map((season) => <MenuItem key={season.uuid} value={season.uuid}>{season.name || season.uuid}{(season.currentSeason || season.current) ? " (current)" : ""}</MenuItem>)}
+          {seasons.map((season) => <MenuItem key={season.uuid} value={season.uuid}>{season.name || "Unnamed season"}{(season.currentSeason || season.current) ? " (current)" : ""}</MenuItem>)}
         </Select>
       </FormControl>
       <FormControl fullWidth required disabled={!seasonId || associations.length === 0}>
         <InputLabel id="association-label">Association</InputLabel>
         <Select labelId="association-label" label="Association" value={associationId} onChange={(event) => { setAssociationId(event.target.value); setSelectedEntityKey(""); }}>
           {associations.map((association) => <MenuItem key={association.uuid} value={association.uuid} sx={{ pl: 2 + (association.depth ?? 0) * 3 }}>
-            {[association.shortname, association.name].filter(Boolean).join(" · ") || association.uuid}
+            {[association.shortname, association.name].filter(Boolean).join(" · ") || "Unnamed association"}
           </MenuItem>)}
         </Select>
       </FormControl>
@@ -117,16 +117,16 @@ function SelectorPage({ type, onFocus }) {
         <Select labelId="entity-label" label={typeLabels.plural} value={selectedEntityKey} onChange={(event) => setSelectedEntityKey(event.target.value)}>
           <MenuItem value=""><em>Select a {typeLabels.singular}</em></MenuItem>
           {entityChoices.map((entry) => <MenuItem key={entityKey(entry)} value={entityKey(entry)}>
-            {[entry.shortname, entry.name].filter(Boolean).join(" · ") || entry.uuid}
+            {[entry.shortname, entry.name].filter(Boolean).join(" · ") || "Unnamed entry"}
           </MenuItem>)}
         </Select>
       </FormControl>
     </Stack></CardContent></Card>
     {selectedEntityKey && !loading && !error && <Box>
-      <Typography variant="h6" mb={1}>Resulting UUIDs</Typography>
-      {resultEntries.length === 0 ? <Alert severity="info">No UUIDs match this selection.</Alert> : <List disablePadding sx={{ border: 1, borderColor: "divider", borderRadius: 1, maxHeight: 360, overflow: "auto" }}>
+      <Typography variant="h6" mb={1}>Available entries</Typography>
+      {resultEntries.length === 0 ? <Alert severity="info">No entries match this selection.</Alert> : <List disablePadding sx={{ border: 1, borderColor: "divider", borderRadius: 1, maxHeight: 360, overflow: "auto" }}>
         {resultEntries.map((entry) => <ListItem key={entry.uuid} divider secondaryAction={<Button variant="contained" size="small" onClick={() => applyFocus(entry)}>Apply</Button>}>
-          <ListItemText primary={entry.uuid} secondary={[entry.gender, entry.shortname, entry.name].filter(Boolean).join(" · ")} primaryTypographyProps={{ sx: { overflowWrap: "anywhere", pr: 10 } }} />
+          <ListItemText primary={entry.gender || "Unspecified"} secondary={[entry.shortname, entry.name].filter(Boolean).join(" · ")} />
         </ListItem>)}
       </List>}
     </Box>}
@@ -134,7 +134,7 @@ function SelectorPage({ type, onFocus }) {
   </Box>;
 }
 
-function TeamsPage({ focus, onBack }) {
+function TeamsPage({ focus }) {
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -162,12 +162,7 @@ function TeamsPage({ focus, onBack }) {
   if (!focus) return <Alert severity="info">Choose a competition or league before opening its teams.</Alert>;
 
   return <Box component="main">
-    <Button onClick={onBack} sx={{ mb: 2 }}>Back to selection</Button>
-    <Stack spacing={1} mb={4}>
-      <Typography color="primary" fontWeight={700} variant="overline">{focus.type}</Typography>
-      <Typography variant="h4" component="h1">Teams</Typography>
-      <Typography color="text.secondary" sx={{ overflowWrap: "anywhere" }}>UUID: {focus.uuid}</Typography>
-    </Stack>
+    <Typography variant="h4" component="h1" mb={4}>Teams</Typography>
     {loading && <Typography color="text.secondary">Loading teams…</Typography>}
     {error && <Alert severity="error">{error}</Alert>}
     {!loading && !error && teams.length === 0 && <Alert severity="info">No teams are available for this {focus.type}.</Alert>}
@@ -176,7 +171,7 @@ function TeamsPage({ focus, onBack }) {
         {team.logoImageForScreenOutputLink || team.logoImageLink ? <Box component="img" src={team.logoImageForScreenOutputLink || team.logoImageLink} alt={team.name || team.shortName || team.shortname || "Team"} sx={{ width: 40, height: 40, mr: 2, objectFit: "contain" }} /> : <Avatar sx={{ mr: 2 }}>
           {(team.name || team.shortName || team.shortname || "?").slice(0, 1)}
         </Avatar>}
-        <ListItemText primary={team.name || team.shortName || team.shortname || team.uuid} secondary={team.shortName || team.shortname || team.uuid} />
+        <ListItemText primary={team.name || team.shortName || team.shortname || "Unnamed team"} secondary={team.shortName || team.shortname || undefined} />
       </ListItem>)}
     </List>}
   </Box>;
@@ -187,7 +182,7 @@ function PlanPage({ focus }) {
     <Stack spacing={1} mb={4}>
       <Typography color="primary" fontWeight={700} variant="overline">{focus.type}</Typography>
       <Typography variant="h4" component="h1">Plan</Typography>
-      <Typography color="text.secondary">The schedule for {focus.name || focus.uuid} will appear here.</Typography>
+      <Typography color="text.secondary">The schedule for {focus.name || "this selection"} will appear here.</Typography>
     </Stack>
     <Alert severity="info">Plan data has not been connected to API 2.0 yet.</Alert>
   </Box>;
@@ -200,7 +195,7 @@ export default function App() {
   const [page, setPage] = useState("selector");
   const chooseType = (nextType) => { setType(nextType); setPage("selector"); setMenuAnchor(null); };
   const applyFocus = (nextFocus) => { setFocus(nextFocus); setPage("teams"); };
-  const title = page === "selector" ? "Selection in progress" : focus?.name || focus?.uuid || "SAMS Score Board";
+  const title = page === "selector" ? "Selection in progress" : focus?.name || "SAMS Score Board";
 
   useEffect(() => {
     if (!focus || focus.name) return undefined;
@@ -228,7 +223,7 @@ export default function App() {
         <Button color="inherit" onClick={() => setPage("plan")} sx={{ textTransform: "none", bgcolor: page === "plan" ? "rgba(255,255,255,0.18)" : "transparent", "&:hover": { bgcolor: "rgba(255,255,255,0.24)" } }}>Plan</Button>
       </Stack>}
     </Toolbar></AppBar>
-    <Container maxWidth="lg" sx={{ py: { xs: 3, md: 5 }, flexGrow: 1 }}>{page === "teams" ? <TeamsPage focus={focus} onBack={() => setPage("selector")} /> : page === "plan" ? <PlanPage focus={focus} /> : <SelectorPage key={type} type={type} onFocus={applyFocus} />}</Container>
+    <Container maxWidth="lg" sx={{ py: { xs: 3, md: 5 }, flexGrow: 1 }}>{page === "teams" ? <TeamsPage focus={focus} /> : page === "plan" ? <PlanPage focus={focus} /> : <SelectorPage key={type} type={type} onFocus={applyFocus} />}</Container>
     <Box component="footer" sx={{ borderTop: 1, borderColor: "divider", bgcolor: "background.paper", py: 2 }}>
       <Container maxWidth="lg">
         <Typography variant="body2" color="text.secondary">
