@@ -120,5 +120,15 @@ def league_teams(league_id: UUID) -> dict:
     return {"data": DATABASE.list_entity_teams("league", str(league_id))}
 
 
+@app.get("/api/league/{league_id}/rankings")
+def league_rankings(league_id: UUID) -> dict:
+    return {"data": DATABASE.list_league_rankings(str(league_id))}
+
+
+@app.get("/api/league/{league_id}/match-days")
+def league_match_days(league_id: UUID) -> dict:
+    return {"data": DATABASE.list_league_match_days(str(league_id))}
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host=HOST, port=PORT)

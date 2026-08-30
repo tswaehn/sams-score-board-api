@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import MenuIcon from "@mui/icons-material/Menu";
 import SportsVolleyballIcon from "@mui/icons-material/SportsVolleyball";
 import { Alert, AppBar, Avatar, Box, Button, Card, CardContent, Container, FormControl, InputLabel, List, ListItem, ListItemText, Menu, MenuItem, Select, Stack, Toolbar, Typography } from "@mui/material";
+import LeagueTable from "./components/LeagueTable.jsx";
+import LeagueMatchDays from "./components/LeagueMatchDays.jsx";
 import "./App.css";
 
 const labels = { competition: { singular: "competition", plural: "Competitions" }, league: { singular: "league", plural: "Leagues" } };
@@ -178,13 +180,46 @@ function TeamsPage({ focus }) {
 }
 
 function PlanPage({ focus }) {
+  const [rankings, setRankings] = useState([]);
+  const [matchDays, setMatchDays] = useState([]);
+  const [loading, setLoading] = useState(focus?.type === "league");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (focus?.type !== "league") return undefined;
+    let active = true;
+    setLoading(true);
+    setError("");
+    const getData = async (path, label) => {
+      const response = await fetch(apiPath(path));
+      if (!response.ok) throw new Error(`The ${label} could not be loaded.`);
+      const payload = await response.json();
+      return Array.isArray(payload) ? payload : payload.data ?? [];
+    };
+    Promise.all([
+      getData(`/api/league/${focus.uuid}/rankings`, "league table"),
+      getData(`/api/league/${focus.uuid}/match-days`, "match days"),
+    ])
+      .then(([rankingData, matchDayData]) => {
+        if (!active) return;
+        setRankings(rankingData);
+        setMatchDays(matchDayData);
+      })
+      .catch((reason) => active && setError(reason.message))
+      .finally(() => active && setLoading(false));
+    return () => { active = false; };
+  }, [focus]);
+
   return <Box component="main">
-    <Stack spacing={1} mb={4}>
-      <Typography color="primary" fontWeight={700} variant="overline">{focus.type}</Typography>
-      <Typography variant="h4" component="h1">Plan</Typography>
-      <Typography color="text.secondary">The schedule for {focus.name || "this selection"} will appear here.</Typography>
-    </Stack>
-    <Alert severity="info">Plan data has not been connected to API 2.0 yet.</Alert>
+    <Typography variant="h4" component="h1" mb={4}>Plan</Typography>
+    {focus?.type !== "league" && <Alert severity="info">Plan data has not been connected to API 2.0 for competitions yet.</Alert>}
+    {focus?.type === "league" && loading && <Typography color="text.secondary">Loading league table…</Typography>}
+    {focus?.type === "league" && error && <Alert severity="error">{error}</Alert>}
+    {focus?.type === "league" && !loading && !error && rankings.length === 0 && matchDays.length === 0 && <Alert severity="info">No plan data is available yet.</Alert>}
+    {focus?.type === "league" && !loading && !error && <Stack spacing={4}>
+      {rankings.length > 0 && <Box><Typography variant="h6" mb={2}>League table</Typography><LeagueTable rankings={rankings} /></Box>}
+      {matchDays.length > 0 && <Box><Typography variant="h6" mb={2}>Match days</Typography><LeagueMatchDays matchDays={matchDays} /></Box>}
+    </Stack>}
   </Box>;
 }
 

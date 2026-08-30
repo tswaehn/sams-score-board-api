@@ -368,6 +368,20 @@ class Database:
         )
         return [json.loads(row["payload_json"]) for row in rows]
 
+    def list_league_rankings(self, league_uuid: str) -> list[dict[str, Any]]:
+        rows = self.connection().execute(
+            "SELECT payload_json FROM league_rankings WHERE league_uuid = ? ORDER BY rank ASC, team_name COLLATE NOCASE",
+            (league_uuid,),
+        )
+        return [json.loads(row["payload_json"]) for row in rows]
+
+    def list_league_match_days(self, league_uuid: str) -> list[dict[str, Any]]:
+        rows = self.connection().execute(
+            "SELECT payload_json FROM league_match_days WHERE league_uuid = ? ORDER BY match_date ASC, name COLLATE NOCASE",
+            (league_uuid,),
+        )
+        return [json.loads(row["payload_json"]) for row in rows]
+
     def get_entity(self, entity: str, uuid: str) -> dict[str, Any] | None:
         table = "competitions" if entity == "competition" else "leagues"
         row = self.connection().execute(f"SELECT payload_json FROM {table} WHERE uuid = ?", (uuid,)).fetchone()
