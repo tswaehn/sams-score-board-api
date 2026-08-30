@@ -353,6 +353,21 @@ class Database:
             visit(entry, 0)
         return ordered
 
+    def list_entity_teams(self, entity: str, entity_uuid: str) -> list[dict[str, Any]]:
+        """Return teams linked to one stored competition or league."""
+        if entity not in {"competition", "league"}:
+            raise ValueError(f"Unsupported entity: {entity}")
+        link_table = f"{entity}_teams"
+        entity_column = f"{entity}_uuid"
+        rows = self.connection().execute(
+            f"""SELECT teams.payload_json FROM teams
+                JOIN {link_table} ON {link_table}.team_uuid = teams.uuid
+                WHERE {link_table}.{entity_column} = ?
+                ORDER BY teams.name COLLATE NOCASE""",
+            (entity_uuid,),
+        )
+        return [json.loads(row["payload_json"]) for row in rows]
+
     def get_entity(self, entity: str, uuid: str) -> dict[str, Any] | None:
         table = "competitions" if entity == "competition" else "leagues"
         row = self.connection().execute(f"SELECT payload_json FROM {table} WHERE uuid = ?", (uuid,)).fetchone()

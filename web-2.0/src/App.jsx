@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import MenuIcon from "@mui/icons-material/Menu";
 import SportsVolleyballIcon from "@mui/icons-material/SportsVolleyball";
-import { Alert, AppBar, Box, Button, Card, CardContent, Chip, Container, FormControl, InputLabel, List, ListItem, ListItemText, Menu, MenuItem, Select, Stack, Toolbar, Typography } from "@mui/material";
+import { Alert, AppBar, Avatar, Box, Button, Card, CardContent, Container, FormControl, InputLabel, List, ListItem, ListItemText, Menu, MenuItem, Select, Stack, Toolbar, Typography } from "@mui/material";
 import "./App.css";
 
 const labels = { competition: { singular: "competition", plural: "Competitions" }, league: { singular: "league", plural: "Leagues" } };
@@ -85,8 +85,8 @@ function SelectorPage({ type, onFocus }) {
 
   const entityChoices = entries.filter((entry, index) => entries.findIndex((candidate) => entityKey(candidate) === entityKey(entry)) === index);
   const resultEntries = entries.filter((entry) => entityKey(entry) === selectedEntityKey);
-  const applyFocus = (uuid) => {
-    const nextFocus = { type, uuid };
+  const applyFocus = (entry) => {
+    const nextFocus = { type, uuid: entry.uuid, name: entry.name || entry.shortname || entry.shortName || entry.uuid };
     window.localStorage.setItem("sams-score-board:focus", JSON.stringify(nextFocus));
     onFocus(nextFocus);
   };
@@ -125,7 +125,7 @@ function SelectorPage({ type, onFocus }) {
     {selectedEntityKey && !loading && !error && <Box>
       <Typography variant="h6" mb={1}>Resulting UUIDs</Typography>
       {resultEntries.length === 0 ? <Alert severity="info">No UUIDs match this selection.</Alert> : <List disablePadding sx={{ border: 1, borderColor: "divider", borderRadius: 1, maxHeight: 360, overflow: "auto" }}>
-        {resultEntries.map((entry) => <ListItem key={entry.uuid} divider secondaryAction={<Button variant="contained" size="small" onClick={() => applyFocus(entry.uuid)}>Apply</Button>}>
+        {resultEntries.map((entry) => <ListItem key={entry.uuid} divider secondaryAction={<Button variant="contained" size="small" onClick={() => applyFocus(entry)}>Apply</Button>}>
           <ListItemText primary={entry.uuid} secondary={[entry.gender, entry.shortname, entry.name].filter(Boolean).join(" · ")} primaryTypographyProps={{ sx: { overflowWrap: "anywhere", pr: 10 } }} />
         </ListItem>)}
       </List>}
@@ -134,19 +134,107 @@ function SelectorPage({ type, onFocus }) {
   </Box>;
 }
 
+function TeamsPage({ focus, onBack }) {
+  const [teams, setTeams] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!focus) {
+      setLoading(false);
+      return undefined;
+    }
+    let active = true;
+    setLoading(true);
+    setError("");
+    fetch(apiPath(`/api/${focus.type}/${focus.uuid}/teams`))
+      .then(async (response) => {
+        if (!response.ok) throw new Error("The teams could not be loaded.");
+        const payload = await response.json();
+        return Array.isArray(payload) ? payload : payload.data ?? [];
+      })
+      .then((data) => active && setTeams(data))
+      .catch((reason) => active && setError(reason.message))
+      .finally(() => active && setLoading(false));
+    return () => { active = false; };
+  }, [focus]);
+
+  if (!focus) return <Alert severity="info">Choose a competition or league before opening its teams.</Alert>;
+
+  return <Box component="main">
+    <Button onClick={onBack} sx={{ mb: 2 }}>Back to selection</Button>
+    <Stack spacing={1} mb={4}>
+      <Typography color="primary" fontWeight={700} variant="overline">{focus.type}</Typography>
+      <Typography variant="h4" component="h1">Teams</Typography>
+      <Typography color="text.secondary" sx={{ overflowWrap: "anywhere" }}>UUID: {focus.uuid}</Typography>
+    </Stack>
+    {loading && <Typography color="text.secondary">Loading teams…</Typography>}
+    {error && <Alert severity="error">{error}</Alert>}
+    {!loading && !error && teams.length === 0 && <Alert severity="info">No teams are available for this {focus.type}.</Alert>}
+    {!loading && !error && teams.length > 0 && <List disablePadding sx={{ border: 1, borderColor: "divider", borderRadius: 1 }}>
+      {teams.map((team) => <ListItem key={team.uuid} divider>
+        {team.logoImageForScreenOutputLink || team.logoImageLink ? <Box component="img" src={team.logoImageForScreenOutputLink || team.logoImageLink} alt={team.name || team.shortName || team.shortname || "Team"} sx={{ width: 40, height: 40, mr: 2, objectFit: "contain" }} /> : <Avatar sx={{ mr: 2 }}>
+          {(team.name || team.shortName || team.shortname || "?").slice(0, 1)}
+        </Avatar>}
+        <ListItemText primary={team.name || team.shortName || team.shortname || team.uuid} secondary={team.shortName || team.shortname || team.uuid} />
+      </ListItem>)}
+    </List>}
+  </Box>;
+}
+
+function PlanPage({ focus }) {
+  return <Box component="main">
+    <Stack spacing={1} mb={4}>
+      <Typography color="primary" fontWeight={700} variant="overline">{focus.type}</Typography>
+      <Typography variant="h4" component="h1">Plan</Typography>
+      <Typography color="text.secondary">The schedule for {focus.name || focus.uuid} will appear here.</Typography>
+    </Stack>
+    <Alert severity="info">Plan data has not been connected to API 2.0 yet.</Alert>
+  </Box>;
+}
+
 export default function App() {
   const [type, setType] = useState("competition");
   const [menuAnchor, setMenuAnchor] = useState(null);
   const [focus, setFocus] = useState(readFocus);
-  const chooseType = (nextType) => { setType(nextType); setMenuAnchor(null); };
-  return <Box minHeight="100vh">
+  const [page, setPage] = useState("selector");
+  const chooseType = (nextType) => { setType(nextType); setPage("selector"); setMenuAnchor(null); };
+  const applyFocus = (nextFocus) => { setFocus(nextFocus); setPage("teams"); };
+  const title = page === "selector" ? "Selection in progress" : focus?.name || focus?.uuid || "SAMS Score Board";
+
+  useEffect(() => {
+    if (!focus || focus.name) return undefined;
+    let active = true;
+    fetch(apiPath(`/api/${focus.type}/${focus.uuid}`))
+      .then((response) => response.ok ? response.json() : null)
+      .then((entity) => {
+        const name = entity?.name || entity?.shortname || entity?.shortName;
+        if (!active || !name) return;
+        const nextFocus = { ...focus, name };
+        window.localStorage.setItem("sams-score-board:focus", JSON.stringify(nextFocus));
+        setFocus(nextFocus);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [focus]);
+  return <Box minHeight="100vh" display="flex" flexDirection="column">
     <AppBar position="sticky" elevation={0}><Toolbar>
       <Button color="inherit" onClick={(event) => setMenuAnchor(event.currentTarget)} sx={{ minWidth: 0, mr: 1 }} aria-label="Open selection menu" aria-haspopup="menu"><MenuIcon /></Button>
       <SportsVolleyballIcon sx={{ mr: 1.25 }} />
-      <Typography variant="h6">SAMS Score Board</Typography>
-      <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={() => setMenuAnchor(null)}><MenuItem selected={type === "competition"} onClick={() => chooseType("competition")}>Select a competition</MenuItem><MenuItem selected={type === "league"} onClick={() => chooseType("league")}>Select a league</MenuItem></Menu>
-      {focus && <Chip label={`Focus: ${focus.type} · ${focus.uuid.slice(0, 8)}…`} color="secondary" size="small" sx={{ ml: "auto", maxWidth: { xs: 170, sm: "none" } }} />}
+      <Typography variant="h6" noWrap>{title}</Typography>
+      <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={() => setMenuAnchor(null)}><MenuItem selected={page === "selector" && type === "competition"} onClick={() => chooseType("competition")}>Select a competition</MenuItem><MenuItem selected={page === "selector" && type === "league"} onClick={() => chooseType("league")}>Select a league</MenuItem></Menu>
+      {focus && <Stack direction="row" spacing={0.5} sx={{ ml: "auto" }}>
+        <Button color="inherit" onClick={() => setPage("teams")} sx={{ textTransform: "none", bgcolor: page === "teams" ? "rgba(255,255,255,0.18)" : "transparent", "&:hover": { bgcolor: "rgba(255,255,255,0.24)" } }}>Team</Button>
+        <Button color="inherit" onClick={() => setPage("plan")} sx={{ textTransform: "none", bgcolor: page === "plan" ? "rgba(255,255,255,0.18)" : "transparent", "&:hover": { bgcolor: "rgba(255,255,255,0.24)" } }}>Plan</Button>
+      </Stack>}
     </Toolbar></AppBar>
-    <Container maxWidth="lg" sx={{ py: { xs: 3, md: 5 } }}><SelectorPage key={type} type={type} onFocus={setFocus} /></Container>
+    <Container maxWidth="lg" sx={{ py: { xs: 3, md: 5 }, flexGrow: 1 }}>{page === "teams" ? <TeamsPage focus={focus} onBack={() => setPage("selector")} /> : page === "plan" ? <PlanPage focus={focus} /> : <SelectorPage key={type} type={type} onFocus={applyFocus} />}</Container>
+    <Box component="footer" sx={{ borderTop: 1, borderColor: "divider", bgcolor: "background.paper", py: 2 }}>
+      <Container maxWidth="lg">
+        <Typography variant="body2" color="text.secondary">
+          Focus: {focus ? `${focus.type} · ${focus.uuid}` : "No competition or league selected"}
+        </Typography>
+      </Container>
+    </Box>
   </Box>;
 }

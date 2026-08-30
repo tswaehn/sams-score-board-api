@@ -102,12 +102,22 @@ def competition(competition_id: UUID) -> dict:
     return payload
 
 
+@app.get("/api/competition/{competition_id}/teams")
+def competition_teams(competition_id: UUID) -> dict:
+    return {"data": DATABASE.list_entity_teams("competition", str(competition_id))}
+
+
 @app.get("/api/league/{league_id}")
 def league(league_id: UUID) -> dict:
     payload = DATABASE.get_entity("league", str(league_id))
     if payload is None:
         raise HTTPException(404, "League is not in the historical mirror")
     return payload
+
+
+@app.get("/api/league/{league_id}/teams")
+def league_teams(league_id: UUID) -> dict:
+    return {"data": DATABASE.list_entity_teams("league", str(league_id))}
 
 
 if __name__ == "__main__":
