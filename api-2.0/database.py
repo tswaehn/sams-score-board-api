@@ -382,6 +382,15 @@ class Database:
         )
         return [json.loads(row["payload_json"]) for row in rows]
 
+    def list_league_matches(self, league_uuid: str, match_day_uuid: str) -> list[dict[str, Any]]:
+        rows = self.connection().execute(
+            """SELECT payload_json FROM league_matches
+               WHERE league_uuid = ? AND match_day_uuid = ?
+               ORDER BY match_date ASC, payload_json""",
+            (league_uuid, match_day_uuid),
+        )
+        return [json.loads(row["payload_json"]) for row in rows]
+
     def get_entity(self, entity: str, uuid: str) -> dict[str, Any] | None:
         table = "competitions" if entity == "competition" else "leagues"
         row = self.connection().execute(f"SELECT payload_json FROM {table} WHERE uuid = ?", (uuid,)).fetchone()

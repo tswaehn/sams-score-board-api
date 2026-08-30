@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { Box, Button, FormControl, InputLabel, MenuItem, Select, Stack, Typography } from "@mui/material";
 
 function formatDate(value) {
@@ -11,25 +10,18 @@ function label(matchDay) {
   return matchDay.name || "Match day";
 }
 
-export default function LeagueMatchDays({ matchDays }) {
-  const [selectedUuid, setSelectedUuid] = useState(matchDays[0]?.uuid ?? "");
+export default function LeagueMatchDays({ matchDays, selectedUuid, onSelect }) {
   const selectedMatchDay = matchDays.find((matchDay) => matchDay.uuid === selectedUuid);
-
-  useEffect(() => {
-    if (!matchDays.some((matchDay) => matchDay.uuid === selectedUuid)) {
-      setSelectedUuid(matchDays[0]?.uuid ?? "");
-    }
-  }, [matchDays, selectedUuid]);
 
   return <Stack spacing={1.5}>
     <FormControl fullWidth sx={{ display: { xs: "block", sm: "none" } }}>
       <InputLabel id="match-day-label">Match day</InputLabel>
-      <Select labelId="match-day-label" label="Match day" value={selectedUuid} onChange={(event) => setSelectedUuid(event.target.value)}>
+      <Select labelId="match-day-label" label="Match day" value={selectedUuid} onChange={(event) => onSelect(event.target.value)}>
         {matchDays.map((matchDay) => <MenuItem key={matchDay.uuid} value={matchDay.uuid}>{label(matchDay)} · {formatDate(matchDay.matchdate || matchDay.matchDate)}</MenuItem>)}
       </Select>
     </FormControl>
     <Box sx={{ display: { xs: "none", sm: "flex" }, flexWrap: "wrap", gap: 1 }}>
-      {matchDays.map((matchDay) => <Button key={matchDay.uuid} variant={matchDay.uuid === selectedUuid ? "contained" : "outlined"} onClick={() => setSelectedUuid(matchDay.uuid)}>
+      {matchDays.map((matchDay) => <Button key={matchDay.uuid} variant={matchDay.uuid === selectedUuid ? "contained" : "outlined"} onClick={() => onSelect(matchDay.uuid)}>
         {label(matchDay)}
       </Button>)}
     </Box>

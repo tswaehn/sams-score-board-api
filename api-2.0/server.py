@@ -130,5 +130,10 @@ def league_match_days(league_id: UUID) -> dict:
     return {"data": DATABASE.list_league_match_days(str(league_id))}
 
 
+@app.get("/api/league/{league_id}/matches")
+def league_matches(league_id: UUID, match_day_id: UUID) -> dict:
+    return {"data": DATABASE.list_league_matches(str(league_id), str(match_day_id))}
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host=HOST, port=PORT)

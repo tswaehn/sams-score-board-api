@@ -4,6 +4,7 @@ import SportsVolleyballIcon from "@mui/icons-material/SportsVolleyball";
 import { Alert, AppBar, Avatar, Box, Button, Card, CardContent, Container, FormControl, InputLabel, List, ListItem, ListItemText, Menu, MenuItem, Select, Stack, Toolbar, Typography } from "@mui/material";
 import LeagueTable from "./components/LeagueTable.jsx";
 import LeagueMatchDays from "./components/LeagueMatchDays.jsx";
+import LeagueMatches from "./components/LeagueMatches.jsx";
 import "./App.css";
 
 const labels = { competition: { singular: "competition", plural: "Competitions" }, league: { singular: "league", plural: "Leagues" } };
@@ -182,7 +183,11 @@ function TeamsPage({ focus }) {
 function PlanPage({ focus }) {
   const [rankings, setRankings] = useState([]);
   const [matchDays, setMatchDays] = useState([]);
+  const [selectedMatchDay, setSelectedMatchDay] = useState("");
+  const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(focus?.type === "league");
+  const [matchesLoading, setMatchesLoading] = useState(false);
+  const [matchesError, setMatchesError] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -204,11 +209,32 @@ function PlanPage({ focus }) {
         if (!active) return;
         setRankings(rankingData);
         setMatchDays(matchDayData);
+        setSelectedMatchDay((current) => matchDayData.some((matchDay) => matchDay.uuid === current) ? current : matchDayData[0]?.uuid ?? "");
       })
       .catch((reason) => active && setError(reason.message))
       .finally(() => active && setLoading(false));
     return () => { active = false; };
   }, [focus]);
+
+  useEffect(() => {
+    if (focus?.type !== "league" || !selectedMatchDay) {
+      setMatches([]);
+      return undefined;
+    }
+    let active = true;
+    setMatchesLoading(true);
+    setMatchesError("");
+    fetch(apiPath(`/api/league/${focus.uuid}/matches?match_day_id=${encodeURIComponent(selectedMatchDay)}`))
+      .then(async (response) => {
+        if (!response.ok) throw new Error("The matches could not be loaded.");
+        const payload = await response.json();
+        return Array.isArray(payload) ? payload : payload.data ?? [];
+      })
+      .then((data) => active && setMatches(data))
+      .catch((reason) => active && setMatchesError(reason.message))
+      .finally(() => active && setMatchesLoading(false));
+    return () => { active = false; };
+  }, [focus, selectedMatchDay]);
 
   return <Box component="main">
     <Typography variant="h4" component="h1" mb={4}>Plan</Typography>
@@ -218,7 +244,13 @@ function PlanPage({ focus }) {
     {focus?.type === "league" && !loading && !error && rankings.length === 0 && matchDays.length === 0 && <Alert severity="info">No plan data is available yet.</Alert>}
     {focus?.type === "league" && !loading && !error && <Stack spacing={4}>
       {rankings.length > 0 && <Box><Typography variant="h6" mb={2}>League table</Typography><LeagueTable rankings={rankings} /></Box>}
-      {matchDays.length > 0 && <Box><Typography variant="h6" mb={2}>Match days</Typography><LeagueMatchDays matchDays={matchDays} /></Box>}
+      {matchDays.length > 0 && <Box><Typography variant="h6" mb={2}>Match days</Typography><LeagueMatchDays matchDays={matchDays} selectedUuid={selectedMatchDay} onSelect={setSelectedMatchDay} /></Box>}
+      {selectedMatchDay && <Box><Typography variant="h6" mb={2}>Matches</Typography>
+        {matchesLoading && <Typography color="text.secondary">Loading matches…</Typography>}
+        {matchesError && <Alert severity="error">{matchesError}</Alert>}
+        {!matchesLoading && !matchesError && matches.length === 0 && <Alert severity="info">No matches are available for this match day.</Alert>}
+        {!matchesLoading && !matchesError && matches.length > 0 && <LeagueMatches matches={matches} />}
+      </Box>}
     </Stack>}
   </Box>;
 }
