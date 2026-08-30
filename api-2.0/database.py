@@ -292,15 +292,66 @@ class Database:
           (item.uuid, item.league_uuid, item.rank, item.team_name, self._payload(item.payload)))
         self._commit_if_needed()
 
-    def list_entities(self, entity: str, season_uuid: str | None = None) -> list[dict[str, Any]]:
+    def list_entities(
+        self,
+        entity: str,
+        season_uuid: str | None = None,
+        association_uuid: str | None = None,
+    ) -> list[dict[str, Any]]:
         table = "competitions" if entity == "competition" else "leagues"
         query = f"SELECT payload_json FROM {table}"
-        params: tuple[str, ...] = ()
+        conditions: list[str] = []
+        params: list[str] = []
         if season_uuid:
-            query += " WHERE season_uuid = ?"
-            params = (season_uuid,)
+            conditions.append("season_uuid = ?")
+            params.append(season_uuid)
+        if association_uuid:
+            conditions.append("association_uuid = ?")
+            params.append(association_uuid)
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
         query += " ORDER BY name COLLATE NOCASE"
         return [json.loads(row["payload_json"]) for row in self.connection().execute(query, params)]
+
+    def list_associations(self) -> list[dict[str, Any]]:
+        """Return association payloads in a parent-before-child display order."""
+        rows = self.connection().execute(
+            "SELECT uuid, parent_uuid, name, shortname, payload_json FROM associations"
+        ).fetchall()
+        entries: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            payload = json.loads(row["payload_json"])
+            payload["uuid"] = payload.get("uuid") or row["uuid"]
+            payload["parentUuid"] = payload.get("parentUuid") or row["parent_uuid"]
+            payload["name"] = payload.get("name") or row["name"]
+            payload["shortname"] = payload.get("shortname") or row["shortname"]
+            entries[row["uuid"]] = payload
+
+        children: dict[str | None, list[dict[str, Any]]] = {}
+        for entry in entries.values():
+            parent = entry.get("parentUuid")
+            key = parent if parent in entries else None
+            children.setdefault(key, []).append(entry)
+        for group in children.values():
+            group.sort(key=lambda item: (item.get("name") or item.get("shortname") or "").casefold())
+
+        ordered: list[dict[str, Any]] = []
+        visited: set[str] = set()
+
+        def visit(entry: dict[str, Any], depth: int) -> None:
+            uuid = entry["uuid"]
+            if uuid in visited:
+                return
+            visited.add(uuid)
+            ordered.append({**entry, "depth": depth})
+            for child in children.get(uuid, []):
+                visit(child, depth + 1)
+
+        for root in children.get(None, []):
+            visit(root, 0)
+        for entry in entries.values():  # Include malformed/cyclic orphan branches deterministically.
+            visit(entry, 0)
+        return ordered
 
     def get_entity(self, entity: str, uuid: str) -> dict[str, Any] | None:
         table = "competitions" if entity == "competition" else "leagues"

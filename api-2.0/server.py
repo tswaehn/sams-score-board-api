@@ -6,6 +6,7 @@ from uuid import UUID
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from config import (
     DATABASE_PATH,
@@ -59,6 +60,12 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="SAMS historical mirror API", version="2.0.0", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/api/healthz")
@@ -72,14 +79,19 @@ def seasons() -> dict:
     return {"data": DATABASE.list_seasons()}
 
 
+@app.get("/api/associations")
+def associations() -> dict:
+    return {"data": DATABASE.list_associations()}
+
+
 @app.get("/api/competition-list")
-def competition_list(season_id: UUID | None = None) -> dict:
-    return {"data": DATABASE.list_entities("competition", str(season_id) if season_id else None)}
+def competition_list(season_id: UUID | None = None, association_id: UUID | None = None) -> dict:
+    return {"data": DATABASE.list_entities("competition", str(season_id) if season_id else None, str(association_id) if association_id else None)}
 
 
 @app.get("/api/league-list")
-def league_list(season_id: UUID | None = None) -> dict:
-    return {"data": DATABASE.list_entities("league", str(season_id) if season_id else None)}
+def league_list(season_id: UUID | None = None, association_id: UUID | None = None) -> dict:
+    return {"data": DATABASE.list_entities("league", str(season_id) if season_id else None, str(association_id) if association_id else None)}
 
 
 @app.get("/api/competition/{competition_id}")
