@@ -5,6 +5,9 @@ import { Alert, AppBar, Avatar, Box, Button, Card, CardContent, Container, FormC
 import LeagueTable from "./components/LeagueTable.jsx";
 import LeagueMatchDays from "./components/LeagueMatchDays.jsx";
 import LeagueMatches from "./components/LeagueMatches.jsx";
+import CompetitionTable from "./components/CompetitionTable.jsx";
+import CompetitionMatchGroups from "./components/CompetitionMatchGroups.jsx";
+import CompetitionMatches from "./components/CompetitionMatches.jsx";
 import "./App.css";
 
 const labels = { competition: { singular: "competition", plural: "Competitions" }, league: { singular: "league", plural: "Leagues" } };
@@ -180,6 +183,63 @@ function TeamsPage({ focus }) {
   </Box>;
 }
 
+function CompetitionPlan({ focus }) {
+  const [groups, setGroups] = useState([]);
+  const [rankingGroups, setRankingGroups] = useState([]);
+  const [selectedGroup, setSelectedGroup] = useState("");
+  const [matches, setMatches] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [matchesLoading, setMatchesLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    const getData = async (path, label) => {
+      const response = await fetch(apiPath(path));
+      if (!response.ok) throw new Error(`The ${label} could not be loaded.`);
+      const payload = await response.json();
+      return Array.isArray(payload) ? payload : payload.data ?? [];
+    };
+    setLoading(true); setError("");
+    Promise.all([
+      getData(`/api/competition/${focus.uuid}/match-groups`, "match groups"),
+      getData(`/api/competition/${focus.uuid}/rankings`, "competition table"),
+    ]).then(([groupData, rankingData]) => {
+      if (!active) return;
+      setGroups(groupData); setRankingGroups(rankingData); setSelectedGroup(groupData[0]?.uuid ?? "");
+    }).catch((reason) => active && setError(reason.message)).finally(() => active && setLoading(false));
+    return () => { active = false; };
+  }, [focus]);
+
+  useEffect(() => {
+    if (!selectedGroup) return undefined;
+    let active = true;
+    setMatchesLoading(true);
+    fetch(apiPath(`/api/competition/${focus.uuid}/matches?match_group_id=${encodeURIComponent(selectedGroup)}`))
+      .then(async (response) => {
+        if (!response.ok) throw new Error("The matches could not be loaded.");
+        const payload = await response.json();
+        return Array.isArray(payload) ? payload : payload.data ?? [];
+      }).then((data) => active && setMatches(data)).catch((reason) => active && setError(reason.message)).finally(() => active && setMatchesLoading(false));
+    return () => { active = false; };
+  }, [focus, selectedGroup]);
+
+  const activeGroup = groups.find((group) => group.uuid === selectedGroup);
+  const activeRanking = rankingGroups.find((ranking) => ranking.matchGroupName === activeGroup?.name);
+  if (loading) return <Typography color="text.secondary">Loading competition plan…</Typography>;
+  if (error) return <Alert severity="error">{error}</Alert>;
+  if (groups.length === 0 && rankingGroups.length === 0) return <Alert severity="info">No plan data is available yet.</Alert>;
+  return <Stack spacing={4}>
+    {selectedGroup && <Box><Typography variant="h6" mb={2}>Competition table</Typography><CompetitionTable rankingGroup={activeRanking} /></Box>}
+    {groups.length > 0 && <Box><Typography variant="h6" mb={2}>Match groups</Typography><CompetitionMatchGroups groups={groups} selectedUuid={selectedGroup} onSelect={setSelectedGroup} /></Box>}
+    {selectedGroup && <Box><Typography variant="h6" mb={2}>Matches</Typography>
+      {matchesLoading && <Typography color="text.secondary">Loading matches…</Typography>}
+      {!matchesLoading && matches.length === 0 && <Alert severity="info">No matches are available for this match group.</Alert>}
+      {!matchesLoading && matches.length > 0 && <CompetitionMatches matches={matches} />}
+    </Box>}
+  </Stack>;
+}
+
 function PlanPage({ focus }) {
   const [rankings, setRankings] = useState([]);
   const [matchDays, setMatchDays] = useState([]);
@@ -238,7 +298,7 @@ function PlanPage({ focus }) {
 
   return <Box component="main">
     <Typography variant="h4" component="h1" mb={4}>Plan</Typography>
-    {focus?.type !== "league" && <Alert severity="info">Plan data has not been connected to API 2.0 for competitions yet.</Alert>}
+    {focus?.type === "competition" && <CompetitionPlan focus={focus} />}
     {focus?.type === "league" && loading && <Typography color="text.secondary">Loading league table…</Typography>}
     {focus?.type === "league" && error && <Alert severity="error">{error}</Alert>}
     {focus?.type === "league" && !loading && !error && rankings.length === 0 && matchDays.length === 0 && <Alert severity="info">No plan data is available yet.</Alert>}

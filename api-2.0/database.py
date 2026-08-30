@@ -391,6 +391,29 @@ class Database:
         )
         return [json.loads(row["payload_json"]) for row in rows]
 
+    def list_competition_match_groups(self, competition_uuid: str) -> list[dict[str, Any]]:
+        rows = self.connection().execute(
+            "SELECT payload_json FROM match_groups WHERE competition_uuid = ? ORDER BY tourney_level ASC, name COLLATE NOCASE",
+            (competition_uuid,),
+        )
+        return [json.loads(row["payload_json"]) for row in rows]
+
+    def list_competition_rankings(self, competition_uuid: str) -> list[dict[str, Any]]:
+        rows = self.connection().execute(
+            "SELECT payload_json FROM competition_match_group_rankings WHERE competition_uuid = ? ORDER BY match_group_name COLLATE NOCASE",
+            (competition_uuid,),
+        )
+        return [json.loads(row["payload_json"]) for row in rows]
+
+    def list_competition_matches(self, competition_uuid: str, match_group_uuid: str) -> list[dict[str, Any]]:
+        rows = self.connection().execute(
+            """SELECT payload_json FROM competition_matches
+               WHERE competition_uuid = ? AND match_group_uuid = ?
+               ORDER BY match_date ASC, payload_json""",
+            (competition_uuid, match_group_uuid),
+        )
+        return [json.loads(row["payload_json"]) for row in rows]
+
     def get_entity(self, entity: str, uuid: str) -> dict[str, Any] | None:
         table = "competitions" if entity == "competition" else "leagues"
         row = self.connection().execute(f"SELECT payload_json FROM {table} WHERE uuid = ?", (uuid,)).fetchone()

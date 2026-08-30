@@ -107,6 +107,21 @@ def competition_teams(competition_id: UUID) -> dict:
     return {"data": DATABASE.list_entity_teams("competition", str(competition_id))}
 
 
+@app.get("/api/competition/{competition_id}/match-groups")
+def competition_match_groups(competition_id: UUID) -> dict:
+    return {"data": DATABASE.list_competition_match_groups(str(competition_id))}
+
+
+@app.get("/api/competition/{competition_id}/rankings")
+def competition_rankings(competition_id: UUID) -> dict:
+    return {"data": DATABASE.list_competition_rankings(str(competition_id))}
+
+
+@app.get("/api/competition/{competition_id}/matches")
+def competition_matches(competition_id: UUID, match_group_id: UUID) -> dict:
+    return {"data": DATABASE.list_competition_matches(str(competition_id), str(match_group_id))}
+
+
 @app.get("/api/league/{league_id}")
 def league(league_id: UUID) -> dict:
     payload = DATABASE.get_entity("league", str(league_id))
